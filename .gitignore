@@ -12,6 +12,7 @@ out/
 
 # Logs and local tooling
 *.log
+*.tsbuildinfo
 .vercel/
 tmp/
 .agents/

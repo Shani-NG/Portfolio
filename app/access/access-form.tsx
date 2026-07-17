@@ -49,6 +49,9 @@ export function AccessForm({ nextPath }: AccessFormProps) {
         name="password"
         type="password"
         autoComplete="current-password"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         required
