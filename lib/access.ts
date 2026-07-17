@@ -9,12 +9,21 @@ function getSessionSecret(): string | null {
   return secret && secret.length >= 32 ? secret : null;
 }
 
+function normalizePassword(value: string | undefined): string | null {
+  const normalized = value?.normalize("NFC").trim();
+  return normalized ? normalized : null;
+}
+
+function getExpectedPassword(): string | null {
+  return normalizePassword(process.env.SITE_PASSWORD);
+}
+
 function digest(value: string, secret: string): Buffer {
   return createHmac("sha256", secret).update(value, "utf8").digest();
 }
 
 export function isAccessConfigured(): boolean {
-  return Boolean(process.env.SITE_PASSWORD && getSessionSecret());
+  return Boolean(getExpectedPassword() && getSessionSecret());
 }
 
 export function createAccessToken(): string | null {
@@ -41,11 +50,12 @@ export function isAccessTokenValid(token: string | undefined): boolean {
 }
 
 export function isPasswordValid(candidate: string): boolean {
-  const expectedPassword = process.env.SITE_PASSWORD;
+  const expectedPassword = getExpectedPassword();
+  const normalizedCandidate = normalizePassword(candidate);
   const secret = getSessionSecret();
-  if (!expectedPassword || !secret) return false;
+  if (!expectedPassword || !normalizedCandidate || !secret) return false;
 
   const expected = digest(expectedPassword, secret);
-  const received = digest(candidate, secret);
+  const received = digest(normalizedCandidate, secret);
   return timingSafeEqual(received, expected);
 }
