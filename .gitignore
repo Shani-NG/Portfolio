@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js output
+.next/
+out/
+
+# Local secrets
+.env*
+!.env.example
+
+# Logs and local tooling
+*.log
+.vercel/
+tmp/
+.agents/
+.git.onedrive-placeholder-backup/
+
+# Private project source material
+AGENTS.md
+Project Documentation/
+References/
+
+# Operating system files
+.DS_Store
+Thumbs.db
