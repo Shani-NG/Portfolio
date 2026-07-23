@@ -1,0 +1,1010 @@
+﻿{
+    "lexicon_id":  "role-fit-professional-lexicon",
+    "version":  "0.1.1",
+    "status":  "draft",
+    "source_of_truth":  "This file is the editable source of truth for Role Fit title and capability normalization.",
+    "languages":  [
+                      "en",
+                      "he"
+                  ],
+    "entry_contract":  {
+                           "concept_id":  "Stable semantic concept shared across languages.",
+                           "preferred_label":  "Canonical label used internally.",
+                           "aliases":  "Equivalent or commonly used labels.",
+                           "keywords":  "Terms that strengthen retrieval but do not prove a match alone.",
+                           "related_titles":  "Nearby concepts that require context before mapping.",
+                           "not_equivalent":  "Terms that must not be treated as automatic equivalents.",
+                           "context_signals":  "Responsibilities or domains that help disambiguate the concept.",
+                           "status":  "draft | approved | needs_review | blocked"
+                       },
+    "entries":  [
+                    {
+                        "id":  "ux_strategy.en",
+                        "language":  "en",
+                        "concept_id":  "ux_strategy",
+                        "kind":  "title_family",
+                        "preferred_label":  "UX Strategist",
+                        "aliases":  [
+                                        "UX Strategy Lead",
+                                        "Strategic UX Leader",
+                                        "UX Lead"
+                                    ],
+                        "keywords":  [
+                                         "UX strategy",
+                                         "experience strategy",
+                                         "complex systems",
+                                         "product direction"
+                                     ],
+                        "related_titles":  [
+                                               "Product Designer",
+                                               "Design Lead",
+                                               "Product Strategist"
+                                           ],
+                        "not_equivalent":  [
+                                               "Visual Designer"
+                                           ],
+                        "context_signals":  [
+                                                "problem framing",
+                                                "cross-functional alignment",
+                                                "system-level decisions"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "ux_strategy.he",
+                        "language":  "he",
+                        "concept_id":  "ux_strategy",
+                        "kind":  "title_family",
+                        "preferred_label":  "אסטרטגית UX",
+                        "aliases":  [
+                                        "מובילת אסטרטגיית חוויית משתמש",
+                                        "אסטרטגית חוויית משתמש",
+                                        "מובילת UX"
+                                    ],
+                        "keywords":  [
+                                         "אסטרטגיית UX",
+                                         "אסטרטגיית חוויה",
+                                         "מערכות מורכבות",
+                                         "כיוון מוצר"
+                                     ],
+                        "related_titles":  [
+                                               "מעצבת מוצר",
+                                               "מובילת עיצוב",
+                                               "אסטרטגית מוצר"
+                                           ],
+                        "not_equivalent":  [
+                                               "מעצבת חזותית"
+                                           ],
+                        "context_signals":  [
+                                                "הגדרת בעיה",
+                                                "יישור בין תחומים",
+                                                "קבלת החלטות מערכתית"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "ux_research.en",
+                        "language":  "en",
+                        "concept_id":  "ux_research",
+                        "kind":  "title_family",
+                        "preferred_label":  "UX Researcher",
+                        "aliases":  [
+                                        "User Researcher",
+                                        "UXR",
+                                        "User Experience Researcher"
+                                    ],
+                        "keywords":  [
+                                         "user research",
+                                         "discovery",
+                                         "interviews",
+                                         "usability testing"
+                                     ],
+                        "related_titles":  [
+                                               "UX Strategist",
+                                               "Service Designer",
+                                               "Product Researcher"
+                                           ],
+                        "not_equivalent":  [
+                                               "Market Researcher"
+                                           ],
+                        "context_signals":  [
+                                                "research methods",
+                                                "user evidence",
+                                                "behavioral findings"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "ux_research.he",
+                        "language":  "he",
+                        "concept_id":  "ux_research",
+                        "kind":  "title_family",
+                        "preferred_label":  "חוקרת UX",
+                        "aliases":  [
+                                        "חוקרת משתמשים",
+                                        "חוקרת חוויית משתמש",
+                                        "מחקר UX"
+                                    ],
+                        "keywords":  [
+                                         "מחקר משתמשים",
+                                         "גילוי",
+                                         "ראיונות",
+                                         "בדיקות שמישות"
+                                     ],
+                        "related_titles":  [
+                                               "אסטרטגית UX",
+                                               "מעצבת שירות",
+                                               "חוקרת מוצר"
+                                           ],
+                        "not_equivalent":  [
+                                               "חוקרת שוק"
+                                           ],
+                        "context_signals":  [
+                                                "שיטות מחקר",
+                                                "ראיות משתמשים",
+                                                "ממצאים התנהגותיים"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "product_design.en",
+                        "language":  "en",
+                        "concept_id":  "product_design",
+                        "kind":  "title_family",
+                        "preferred_label":  "Product Designer",
+                        "aliases":  [
+                                        "UX/UI Designer",
+                                        "Product UX Designer",
+                                        "Digital Product Designer"
+                                    ],
+                        "keywords":  [
+                                         "product design",
+                                         "interaction design",
+                                         "end-to-end design",
+                                         "user flows"
+                                     ],
+                        "related_titles":  [
+                                               "UX Designer",
+                                               "Interaction Designer",
+                                               "Design Lead"
+                                           ],
+                        "not_equivalent":  [
+                                               "Graphic Designer"
+                                           ],
+                        "context_signals":  [
+                                                "product lifecycle",
+                                                "interface behavior",
+                                                "delivery collaboration"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "product_design.he",
+                        "language":  "he",
+                        "concept_id":  "product_design",
+                        "kind":  "title_family",
+                        "preferred_label":  "מעצבת מוצר",
+                        "aliases":  [
+                                        "מעצבת UX/UI",
+                                        "מעצבת חוויית מוצר",
+                                        "מעצבת מוצר דיגיטלי"
+                                    ],
+                        "keywords":  [
+                                         "עיצוב מוצר",
+                                         "עיצוב אינטראקציה",
+                                         "עיצוב מקצה לקצה",
+                                         "זרימות משתמש"
+                                     ],
+                        "related_titles":  [
+                                               "מעצבת UX",
+                                               "מעצבת אינטראקציה",
+                                               "מובילת עיצוב"
+                                           ],
+                        "not_equivalent":  [
+                                               "מעצבת גרפית"
+                                           ],
+                        "context_signals":  [
+                                                "מחזור חיי מוצר",
+                                                "התנהגות ממשק",
+                                                "שיתוף פעולה במסירה"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "product_strategy.en",
+                        "language":  "en",
+                        "concept_id":  "product_strategy",
+                        "kind":  "title_family",
+                        "preferred_label":  "Product Strategist",
+                        "aliases":  [
+                                        "Product Strategy Lead",
+                                        "Product Planning Lead",
+                                        "Product Thinker"
+                                    ],
+                        "keywords":  [
+                                         "product strategy",
+                                         "roadmap",
+                                         "prioritization",
+                                         "product direction"
+                                     ],
+                        "related_titles":  [
+                                               "Product Manager",
+                                               "UX Strategist",
+                                               "Innovation Lead"
+                                           ],
+                        "not_equivalent":  [
+                                               "Project Coordinator"
+                                           ],
+                        "context_signals":  [
+                                                "business goals",
+                                                "user value",
+                                                "trade-offs",
+                                                "priorities"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "product_strategy.he",
+                        "language":  "he",
+                        "concept_id":  "product_strategy",
+                        "kind":  "title_family",
+                        "preferred_label":  "אסטרטגית מוצר",
+                        "aliases":  [
+                                        "מובילת אסטרטגיית מוצר",
+                                        "מובילת תכנון מוצר",
+                                        "חשיבה מוצרית"
+                                    ],
+                        "keywords":  [
+                                         "אסטרטגיית מוצר",
+                                         "מפת דרכים",
+                                         "תעדוף",
+                                         "כיוון מוצר"
+                                     ],
+                        "related_titles":  [
+                                               "מנהלת מוצר",
+                                               "אסטרטגית UX",
+                                               "מובילת חדשנות"
+                                           ],
+                        "not_equivalent":  [
+                                               "רכזת פרויקט"
+                                           ],
+                        "context_signals":  [
+                                                "יעדים עסקיים",
+                                                "ערך למשתמש",
+                                                "פשרות",
+                                                "סדרי עדיפויות"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "systems_thinking.en",
+                        "language":  "en",
+                        "concept_id":  "systems_thinking",
+                        "kind":  "capability",
+                        "preferred_label":  "Systems Thinking",
+                        "aliases":  [
+                                        "Systemic Thinking",
+                                        "Systems Analysis",
+                                        "Whole-System Thinking"
+                                    ],
+                        "keywords":  [
+                                         "complex systems",
+                                         "dependencies",
+                                         "root causes",
+                                         "system relationships"
+                                     ],
+                        "related_titles":  [
+                                               "Systems Designer",
+                                               "Systems Analyst",
+                                               "UX Strategist"
+                                           ],
+                        "not_equivalent":  [
+                                               "Systems Administration"
+                                           ],
+                        "context_signals":  [
+                                                "people-process-technology relationships",
+                                                "failure patterns",
+                                                "organizational constraints"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "systems_thinking.he",
+                        "language":  "he",
+                        "concept_id":  "systems_thinking",
+                        "kind":  "capability",
+                        "preferred_label":  "חשיבה מערכתית",
+                        "aliases":  [
+                                        "חשיבה סיסטמית",
+                                        "ניתוח מערכות",
+                                        "ראייה מערכתית"
+                                    ],
+                        "keywords":  [
+                                         "מערכות מורכבות",
+                                         "תלויות",
+                                         "גורמי שורש",
+                                         "יחסי מערכת"
+                                     ],
+                        "related_titles":  [
+                                               "מעצבת מערכות",
+                                               "אנליסטית מערכות",
+                                               "אסטרטגית UX"
+                                           ],
+                        "not_equivalent":  [
+                                               "ניהול מערכות IT"
+                                           ],
+                        "context_signals":  [
+                                                "יחסי אנשים־תהליך־טכנולוגיה",
+                                                "דפוסי כשל",
+                                                "מגבלות ארגוניות"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "complex_workflow_design.en",
+                        "language":  "en",
+                        "concept_id":  "complex_workflow_design",
+                        "kind":  "capability",
+                        "preferred_label":  "Complex Workflow Design",
+                        "aliases":  [
+                                        "Workflow Architecture",
+                                        "Operational Flow Design",
+                                        "Process UX"
+                                    ],
+                        "keywords":  [
+                                         "workflow",
+                                         "process design",
+                                         "multi-role systems",
+                                         "operational flow"
+                                     ],
+                        "related_titles":  [
+                                               "Service Designer",
+                                               "Business Process Designer",
+                                               "UX Architect"
+                                           ],
+                        "not_equivalent":  [
+                                               "Process Automation Engineer"
+                                           ],
+                        "context_signals":  [
+                                                "multiple roles",
+                                                "handoffs",
+                                                "permissions",
+                                                "decision points"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "complex_workflow_design.he",
+                        "language":  "he",
+                        "concept_id":  "complex_workflow_design",
+                        "kind":  "capability",
+                        "preferred_label":  "תכנון תהליכי עבודה מורכבים",
+                        "aliases":  [
+                                        "ארכיטקטורת תהליכים",
+                                        "תכנון זרימה תפעולית",
+                                        "UX של תהליכים"
+                                    ],
+                        "keywords":  [
+                                         "תהליך עבודה",
+                                         "תכנון תהליך",
+                                         "מערכות מרובות תפקידים",
+                                         "זרימה תפעולית"
+                                     ],
+                        "related_titles":  [
+                                               "מעצבת שירות",
+                                               "מעצבת תהליכים עסקיים",
+                                               "ארכיטקטית UX"
+                                           ],
+                        "not_equivalent":  [
+                                               "מהנדסת אוטומציית תהליכים"
+                                           ],
+                        "context_signals":  [
+                                                "ריבוי תפקידים",
+                                                "העברת אחריות",
+                                                "הרשאות",
+                                                "נקודות החלטה"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "design_leadership.en",
+                        "language":  "en",
+                        "concept_id":  "design_leadership",
+                        "kind":  "title_family",
+                        "preferred_label":  "Design Lead",
+                        "aliases":  [
+                                        "UX Team Lead",
+                                        "Design Manager",
+                                        "Head of UX"
+                                    ],
+                        "keywords":  [
+                                         "design leadership",
+                                         "team direction",
+                                         "design methodology",
+                                         "quality bar"
+                                     ],
+                        "related_titles":  [
+                                               "Principal Designer",
+                                               "UX Strategist",
+                                               "Innovation Lead"
+                                           ],
+                        "not_equivalent":  [
+                                               "Creative Director"
+                                           ],
+                        "context_signals":  [
+                                                "team leadership",
+                                                "mentoring",
+                                                "process ownership",
+                                                "cross-functional influence"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "design_leadership.he",
+                        "language":  "he",
+                        "concept_id":  "design_leadership",
+                        "kind":  "title_family",
+                        "preferred_label":  "מובילת עיצוב",
+                        "aliases":  [
+                                        "ראש צוות UX",
+                                        "מנהלת עיצוב",
+                                        "ראש תחום UX"
+                                    ],
+                        "keywords":  [
+                                         "הובלת עיצוב",
+                                         "הובלת צוות",
+                                         "מתודולוגיית עיצוב",
+                                         "רף איכות"
+                                     ],
+                        "related_titles":  [
+                                               "מעצבת ראשית",
+                                               "אסטרטגית UX",
+                                               "מובילת חדשנות"
+                                           ],
+                        "not_equivalent":  [
+                                               "מנהלת קריאייטיב"
+                                           ],
+                        "context_signals":  [
+                                                "ניהול צוות",
+                                                "מנטורינג",
+                                                "בעלות על תהליך",
+                                                "השפעה חוצת־ארגון"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "innovation_leadership.en",
+                        "language":  "en",
+                        "concept_id":  "innovation_leadership",
+                        "kind":  "title_family",
+                        "preferred_label":  "Innovation Lead",
+                        "aliases":  [
+                                        "Innovation Manager",
+                                        "Innovation Strategist",
+                                        "Chief Innovation Officer"
+                                    ],
+                        "keywords":  [
+                                         "innovation strategy",
+                                         "organizational change",
+                                         "experimentation",
+                                         "adoption"
+                                     ],
+                        "related_titles":  [
+                                               "Product Strategist",
+                                               "Transformation Lead",
+                                               "Design Thinking Facilitator"
+                                           ],
+                        "not_equivalent":  [
+                                               "Innovation Consultant"
+                                           ],
+                        "context_signals":  [
+                                                "organizational capability",
+                                                "culture",
+                                                "facilitation",
+                                                "implementation"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "innovation_leadership.he",
+                        "language":  "he",
+                        "concept_id":  "innovation_leadership",
+                        "kind":  "title_family",
+                        "preferred_label":  "מובילת חדשנות",
+                        "aliases":  [
+                                        "מנהלת חדשנות",
+                                        "אסטרטגית חדשנות",
+                                        "מנהלת חדשנות ראשית"
+                                    ],
+                        "keywords":  [
+                                         "אסטרטגיית חדשנות",
+                                         "שינוי ארגוני",
+                                         "ניסויים",
+                                         "הטמעה"
+                                     ],
+                        "related_titles":  [
+                                               "אסטרטגית מוצר",
+                                               "מובילת טרנספורמציה",
+                                               "מנחת חשיבה עיצובית"
+                                           ],
+                        "not_equivalent":  [
+                                               "יועצת חדשנות"
+                                           ],
+                        "context_signals":  [
+                                                "יכולת ארגונית",
+                                                "תרבות",
+                                                "הנחיה",
+                                                "יישום"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "design_thinking_facilitation.en",
+                        "language":  "en",
+                        "concept_id":  "design_thinking_facilitation",
+                        "kind":  "capability",
+                        "preferred_label":  "Design Thinking Facilitation",
+                        "aliases":  [
+                                        "Innovation Workshop Facilitation",
+                                        "Design Sprint Facilitation",
+                                        "Workshop Leadership"
+                                    ],
+                        "keywords":  [
+                                         "design thinking",
+                                         "workshops",
+                                         "sprints",
+                                         "ideation",
+                                         "alignment"
+                                     ],
+                        "related_titles":  [
+                                               "Innovation Lead",
+                                               "Service Designer",
+                                               "Facilitator"
+                                           ],
+                        "not_equivalent":  [
+                                               "Event Coordinator"
+                                           ],
+                        "context_signals":  [
+                                                "structured workshops",
+                                                "diverse stakeholders",
+                                                "decision making",
+                                                "prototyping"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "design_thinking_facilitation.he",
+                        "language":  "he",
+                        "concept_id":  "design_thinking_facilitation",
+                        "kind":  "capability",
+                        "preferred_label":  "הנחיית חשיבה עיצובית",
+                        "aliases":  [
+                                        "הנחיית סדנאות חדשנות",
+                                        "הנחיית Design Sprint",
+                                        "הובלת סדנאות"
+                                    ],
+                        "keywords":  [
+                                         "חשיבה עיצובית",
+                                         "סדנאות",
+                                         "ספרינטים",
+                                         "העלאת רעיונות",
+                                         "יישור"
+                                     ],
+                        "related_titles":  [
+                                               "מובילת חדשנות",
+                                               "מעצבת שירות",
+                                               "מנחה"
+                                           ],
+                        "not_equivalent":  [
+                                               "רכזת אירועים"
+                                           ],
+                        "context_signals":  [
+                                                "סדנאות מובנות",
+                                                "בעלי עניין מגוונים",
+                                                "קבלת החלטות",
+                                                "יצירת אב־טיפוס"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "ai_product_strategy.en",
+                        "language":  "en",
+                        "concept_id":  "ai_product_strategy",
+                        "kind":  "title_family",
+                        "preferred_label":  "AI Product Strategist",
+                        "aliases":  [
+                                        "AI UX Strategist",
+                                        "AI Product Lead",
+                                        "AI Transformation Lead"
+                                    ],
+                        "keywords":  [
+                                         "AI product",
+                                         "human oversight",
+                                         "trust",
+                                         "AI workflows",
+                                         "automation"
+                                     ],
+                        "related_titles":  [
+                                               "AI Product Manager",
+                                               "AI UX Designer",
+                                               "Innovation Lead"
+                                           ],
+                        "not_equivalent":  [
+                                               "Machine Learning Engineer"
+                                           ],
+                        "context_signals":  [
+                                                "human control",
+                                                "explainability",
+                                                "workflow integration",
+                                                "adoption"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "ai_product_strategy.he",
+                        "language":  "he",
+                        "concept_id":  "ai_product_strategy",
+                        "kind":  "title_family",
+                        "preferred_label":  "אסטרטגית מוצרי AI",
+                        "aliases":  [
+                                        "אסטרטגית UX ל־AI",
+                                        "מובילת מוצרי AI",
+                                        "מובילת טרנספורמציית AI"
+                                    ],
+                        "keywords":  [
+                                         "מוצרי AI",
+                                         "פיקוח אנושי",
+                                         "אמון",
+                                         "תהליכי AI",
+                                         "אוטומציה"
+                                     ],
+                        "related_titles":  [
+                                               "מנהלת מוצרי AI",
+                                               "מעצבת UX ל־AI",
+                                               "מובילת חדשנות"
+                                           ],
+                        "not_equivalent":  [
+                                               "מהנדסת למידת מכונה"
+                                           ],
+                        "context_signals":  [
+                                                "שליטה אנושית",
+                                                "יכולת הסבר",
+                                                "שילוב בתהליך",
+                                                "הטמעה"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "knowledge_management.en",
+                        "language":  "en",
+                        "concept_id":  "knowledge_management",
+                        "kind":  "title_family",
+                        "preferred_label":  "Knowledge Management Lead",
+                        "aliases":  [
+                                        "Knowledge Strategist",
+                                        "KMS Product Lead",
+                                        "Knowledge Systems Designer"
+                                    ],
+                        "keywords":  [
+                                         "knowledge management",
+                                         "expert knowledge",
+                                         "guidance",
+                                         "content systems"
+                                     ],
+                        "related_titles":  [
+                                               "Content Strategist",
+                                               "Information Architect",
+                                               "Product Manager"
+                                           ],
+                        "not_equivalent":  [
+                                               "Technical Writer"
+                                           ],
+                        "context_signals":  [
+                                                "expert workflows",
+                                                "content governance",
+                                                "publishing",
+                                                "field adoption"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "knowledge_management.he",
+                        "language":  "he",
+                        "concept_id":  "knowledge_management",
+                        "kind":  "title_family",
+                        "preferred_label":  "מובילת ניהול ידע",
+                        "aliases":  [
+                                        "אסטרטגית ידע",
+                                        "מובילת מערכות ניהול ידע",
+                                        "מעצבת מערכות ידע"
+                                    ],
+                        "keywords":  [
+                                         "ניהול ידע",
+                                         "ידע מומחה",
+                                         "הדרכה",
+                                         "מערכות תוכן"
+                                     ],
+                        "related_titles":  [
+                                               "אסטרטגית תוכן",
+                                               "ארכיטקטית מידע",
+                                               "מנהלת מוצר"
+                                           ],
+                        "not_equivalent":  [
+                                               "כותבת טכנית"
+                                           ],
+                        "context_signals":  [
+                                                "תהליכי מומחים",
+                                                "ממשל תוכן",
+                                                "פרסום",
+                                                "הטמעה בשטח"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "operational_clarity.en",
+                        "language":  "en",
+                        "concept_id":  "operational_clarity",
+                        "kind":  "capability",
+                        "preferred_label":  "Operational Clarity",
+                        "aliases":  [
+                                        "Operational UX",
+                                        "Decision Support Design",
+                                        "Mission-Critical UX"
+                                    ],
+                        "keywords":  [
+                                         "operational clarity",
+                                         "situational awareness",
+                                         "decision support",
+                                         "mission-critical"
+                                     ],
+                        "related_titles":  [
+                                               "C2 UX Lead",
+                                               "Systems Designer",
+                                               "UX Strategist"
+                                           ],
+                        "not_equivalent":  [
+                                               "Operations Manager"
+                                           ],
+                        "context_signals":  [
+                                                "high-stakes decisions",
+                                                "critical systems",
+                                                "situational awareness",
+                                                "reliability"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "operational_clarity.he",
+                        "language":  "he",
+                        "concept_id":  "operational_clarity",
+                        "kind":  "capability",
+                        "preferred_label":  "בהירות תפעולית",
+                        "aliases":  [
+                                        "UX תפעולי",
+                                        "תכנון מערכות תומכות החלטה",
+                                        "UX למערכות קריטיות"
+                                    ],
+                        "keywords":  [
+                                         "בהירות תפעולית",
+                                         "מודעות מצבית",
+                                         "תמיכה בהחלטות",
+                                         "מערכות קריטיות"
+                                     ],
+                        "related_titles":  [
+                                               "מובילת UX למערכות C2",
+                                               "מעצבת מערכות",
+                                               "אסטרטגית UX"
+                                           ],
+                        "not_equivalent":  [
+                                               "מנהלת תפעול"
+                                           ],
+                        "context_signals":  [
+                                                "החלטות בסיכון גבוה",
+                                                "מערכות קריטיות",
+                                                "מודעות מצבית",
+                                                "אמינות"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "information_architecture.en",
+                        "language":  "en",
+                        "concept_id":  "information_architecture",
+                        "kind":  "capability",
+                        "preferred_label":  "Information Architecture",
+                        "aliases":  [
+                                        "IA",
+                                        "Content Architecture",
+                                        "Information Design"
+                                    ],
+                        "keywords":  [
+                                         "information architecture",
+                                         "navigation",
+                                         "taxonomy",
+                                         "content structure"
+                                     ],
+                        "related_titles":  [
+                                               "UX Designer",
+                                               "Content Strategist",
+                                               "Knowledge Strategist"
+                                           ],
+                        "not_equivalent":  [
+                                               "Database Architect"
+                                           ],
+                        "context_signals":  [
+                                                "findability",
+                                                "hierarchy",
+                                                "classification",
+                                                "complex information"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "information_architecture.he",
+                        "language":  "he",
+                        "concept_id":  "information_architecture",
+                        "kind":  "capability",
+                        "preferred_label":  "ארכיטקטורת מידע",
+                        "aliases":  [
+                                        "IA",
+                                        "ארכיטקטורת תוכן",
+                                        "עיצוב מידע"
+                                    ],
+                        "keywords":  [
+                                         "ארכיטקטורת מידע",
+                                         "ניווט",
+                                         "טקסונומיה",
+                                         "מבנה תוכן"
+                                     ],
+                        "related_titles":  [
+                                               "מעצבת UX",
+                                               "אסטרטגית תוכן",
+                                               "אסטרטגית ידע"
+                                           ],
+                        "not_equivalent":  [
+                                               "ארכיטקטית בסיסי נתונים"
+                                           ],
+                        "context_signals":  [
+                                                "נגישות למידע",
+                                                "היררכיה",
+                                                "סיווג",
+                                                "מידע מורכב"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "cross_functional_leadership.en",
+                        "language":  "en",
+                        "concept_id":  "cross_functional_leadership",
+                        "kind":  "capability",
+                        "preferred_label":  "Cross-functional Leadership",
+                        "aliases":  [
+                                        "Multidisciplinary Leadership",
+                                        "Stakeholder Leadership",
+                                        "Organizational Alignment"
+                                    ],
+                        "keywords":  [
+                                         "cross-functional",
+                                         "stakeholder alignment",
+                                         "team collaboration",
+                                         "decision alignment"
+                                     ],
+                        "related_titles":  [
+                                               "Program Lead",
+                                               "Product Lead",
+                                               "Design Lead"
+                                           ],
+                        "not_equivalent":  [
+                                               "People Manager"
+                                           ],
+                        "context_signals":  [
+                                                "R\u0026D",
+                                                "engineering",
+                                                "product",
+                                                "leadership",
+                                                "shared decisions"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "cross_functional_leadership.he",
+                        "language":  "he",
+                        "concept_id":  "cross_functional_leadership",
+                        "kind":  "capability",
+                        "preferred_label":  "הובלה חוצת־תחומים",
+                        "aliases":  [
+                                        "הובלה רב־תחומית",
+                                        "הובלת בעלי עניין",
+                                        "יישור ארגוני"
+                                    ],
+                        "keywords":  [
+                                         "חוצה ארגון",
+                                         "יישור בעלי עניין",
+                                         "שיתוף פעולה צוותי",
+                                         "יישור החלטות"
+                                     ],
+                        "related_titles":  [
+                                               "מובילת תוכנית",
+                                               "מובילת מוצר",
+                                               "מובילת עיצוב"
+                                           ],
+                        "not_equivalent":  [
+                                               "מנהלת אנשים"
+                                           ],
+                        "context_signals":  [
+                                                "מו״פ",
+                                                "הנדסה",
+                                                "מוצר",
+                                                "הנהלה",
+                                                "החלטות משותפות"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "mentoring_and_teaching.en",
+                        "language":  "en",
+                        "concept_id":  "mentoring_and_teaching",
+                        "kind":  "capability",
+                        "preferred_label":  "Mentoring and Teaching",
+                        "aliases":  [
+                                        "UX Education",
+                                        "Design Mentorship",
+                                        "Capability Building"
+                                    ],
+                        "keywords":  [
+                                         "mentoring",
+                                         "teaching",
+                                         "curriculum",
+                                         "professional development"
+                                     ],
+                        "related_titles":  [
+                                               "UX Lecturer",
+                                               "Learning Lead",
+                                               "Design Manager"
+                                           ],
+                        "not_equivalent":  [
+                                               "Training Coordinator"
+                                           ],
+                        "context_signals":  [
+                                                "portfolio development",
+                                                "methodology",
+                                                "feedback",
+                                                "skill development"
+                                            ],
+                        "status":  "draft"
+                    },
+                    {
+                        "id":  "mentoring_and_teaching.he",
+                        "language":  "he",
+                        "concept_id":  "mentoring_and_teaching",
+                        "kind":  "capability",
+                        "preferred_label":  "מנטורינג והוראה",
+                        "aliases":  [
+                                        "הדרכת UX",
+                                        "מנטורינג בעיצוב",
+                                        "בניית יכולת מקצועית"
+                                    ],
+                        "keywords":  [
+                                         "מנטורינג",
+                                         "הוראה",
+                                         "תוכנית לימודים",
+                                         "התפתחות מקצועית"
+                                     ],
+                        "related_titles":  [
+                                               "מרצה ל־UX",
+                                               "מובילת למידה",
+                                               "מנהלת עיצוב"
+                                           ],
+                        "not_equivalent":  [
+                                               "רכזת הדרכה"
+                                           ],
+                        "context_signals":  [
+                                                "פיתוח פורטפוליו",
+                                                "מתודולוגיה",
+                                                "משוב",
+                                                "פיתוח מיומנויות"
+                                            ],
+                        "status":  "draft"
+                    }
+                ]
+}

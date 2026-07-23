@@ -1,0 +1,579 @@
+.page {
+  width: min(100%, var(--ds-layout-content-max));
+  margin-inline: auto;
+  padding-inline: var(--ds-grid-gutter);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(20rem, 0.96fr);
+  align-items: center;
+  box-sizing: border-box;
+  width: calc(100% + (2 * var(--ds-grid-gutter)));
+  min-height: 100svh;
+  margin-inline: calc(var(--ds-grid-gutter) * -1);
+  gap: clamp(2rem, 6vw, 5rem);
+  padding: clamp(3.5rem, 8vw, 6.5rem) max(var(--ds-grid-gutter), calc((100vw - var(--ds-layout-content-max)) / 2 + var(--ds-grid-gutter)));
+}
+
+.heroCopy {
+  display: grid;
+  gap: var(--ds-space-lg);
+  justify-items: center;
+  text-align: center;
+}
+
+.projectCard span {
+  margin: 0;
+  color: var(--ds-color-action-primary-hover);
+  font-size: var(--ds-type-label-13-size);
+  font-weight: var(--ds-type-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero h1,
+.sectionIntro h2,
+.agentEntry h2,
+.contactBand h2 {
+  margin: 0;
+  color: var(--ds-color-text-primary);
+  letter-spacing: 0;
+}
+
+.hero h1 {
+  max-width: none;
+  font-size: var(--ds-type-display-64-size);
+  line-height: var(--ds-type-display-64-line);
+  white-space: nowrap;
+}
+
+.subheadline {
+  margin: 0;
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-type-heading-28-size);
+  line-height: var(--ds-type-heading-28-line);
+}
+
+.heroActions,
+.contactBand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-sm);
+}
+
+.primaryAction,
+.secondaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-xs);
+  min-height: 2.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--ds-radius-sm);
+  padding: 0.75rem 1.25rem;
+  font-size: var(--ds-type-button-size);
+  line-height: var(--ds-type-button-line);
+  color: var(--ds-color-action-primary-text);
+  font-weight: var(--ds-type-weight-semibold);
+  text-decoration: none;
+  transition: transform var(--ds-duration-fast) var(--ds-ease-standard), border-color var(--ds-duration-fast) var(--ds-ease-standard), background-color var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.primaryAction {
+  background: var(--ds-color-action-primary);
+}
+
+.secondaryAction {
+  border-color: var(--ds-color-border-strong);
+  background: var(--ds-color-surface-muted);
+  color: var(--ds-color-text-primary);
+}
+
+.primaryAction:hover,
+.secondaryAction:hover,
+.projectCard:hover {
+  transform: translateY(-0.15rem);
+}
+
+.primaryAction:focus-visible,
+.secondaryAction:focus-visible,
+.projectCard:focus-visible {
+  outline: 0;
+  box-shadow: var(--ds-shadow-focus);
+}
+
+.heroVisual {
+  position: relative;
+  display: grid;
+  min-height: clamp(22rem, 44vw, 32rem);
+  overflow: hidden;
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-radius-lg);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ds-color-surface-raised) 88%, transparent), rgba(255, 255, 255, 0.02)),
+    radial-gradient(circle at 20% 18%, rgba(216, 166, 180, 0.2), transparent 12rem);
+  box-shadow: var(--ds-shadow-raised);
+}
+
+.heroVisual::before {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: 50%;
+}
+
+.visualNode,
+.visualLine,
+.visualPanel {
+  position: absolute;
+}
+
+.visualNode {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: var(--ds-color-action-primary);
+  box-shadow: 0 0 2rem rgba(216, 166, 180, 0.45);
+}
+
+.visualNode:nth-child(1) {
+  top: 22%;
+  left: 25%;
+}
+
+.visualNode:nth-child(2) {
+  top: 48%;
+  right: 22%;
+}
+
+.visualNode:nth-child(3) {
+  right: 38%;
+  bottom: 22%;
+}
+
+.visualLine {
+  inset: 34% 18% auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ds-color-border-strong), transparent);
+  transform: rotate(-18deg);
+}
+
+.visualPanel {
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-radius-sm);
+  background: rgba(11, 13, 18, 0.58);
+  color: var(--ds-color-text-primary);
+  padding: 0.7rem 0.8rem;
+}
+
+.visualPanel:nth-of-type(5) {
+  top: 16%;
+  right: 12%;
+}
+
+.visualPanel:nth-of-type(6) {
+  top: 45%;
+  left: 12%;
+}
+
+.visualPanel:nth-of-type(7) {
+  right: 18%;
+  bottom: 15%;
+}
+
+.sectionIntro h2,
+.contactBand h2 {
+  font-size: var(--ds-type-heading-36-size);
+  font-weight: var(--ds-type-weight-medium);
+  line-height: var(--ds-type-heading-36-line);
+}
+
+.sectionIntro p,
+.contactBand p,
+.infoCard p,
+.projectCard p,
+.infoCard li {
+  margin: 0;
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-line);
+}
+
+.sectionIntro p {
+  font-family: var(--ds-font-family-display);
+  font-size: var(--ds-type-section-subtitle-size);
+  font-weight: var(--ds-type-section-subtitle-weight);
+  line-height: var(--ds-type-section-subtitle-line);
+}
+
+.section {
+  --section-padding-block: clamp(var(--space-20), 9vw, var(--space-30));
+  position: relative;
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--section-padding-block) 0;
+  overflow: hidden;
+}
+
+.valuesSection {
+  min-height: 100svh;
+  align-content: center;
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  padding-inline: max(var(--ds-grid-gutter), calc((100vw - var(--ds-layout-content-max)) / 2 + var(--ds-grid-gutter)));
+  background: var(--bg);
+}
+
+.workSection {
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  padding-inline: max(var(--ds-grid-gutter), calc((100vw - var(--ds-layout-content-max)) / 2 + var(--ds-grid-gutter)));
+  background:
+    linear-gradient(180deg, #14161b 0%, var(--surface-dark-band) 100%);
+  color: var(--text-on-dark);
+}
+
+.workSection::before {
+  content: none;
+}
+
+.expertiseSection {
+  min-height: auto;
+  box-sizing: border-box;
+  align-content: center;
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  padding-inline: max(var(--ds-grid-gutter), calc((100vw - var(--ds-layout-content-max)) / 2 + var(--ds-grid-gutter)));
+  background: var(--surface-dark-band);
+  color: var(--text-on-dark);
+  text-align: center;
+}
+
+.sectionIntro {
+  display: grid;
+  max-width: 40rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.valuesSection .sectionIntro,
+.workSection .sectionIntro {
+  justify-self: center;
+  justify-items: center;
+  max-width: 48rem;
+  text-align: center;
+}
+
+.valuesSection .sectionIntro p {
+  color: color-mix(in srgb, var(--ds-color-text-secondary) 78%, var(--ds-color-text-primary));
+  font-family: var(--ds-font-family-display);
+  font-size: var(--ds-type-section-subtitle-size);
+  line-height: var(--ds-type-section-subtitle-line);
+}
+
+.workSection .sectionIntro p {
+  color: var(--ds-color-text-on-dark-body);
+  font-family: var(--ds-font-family-display);
+  font-size: var(--ds-type-section-subtitle-size);
+  line-height: var(--ds-type-section-subtitle-line);
+}
+
+.workSection .sectionIntro h2 {
+  color: var(--text-on-dark);
+}
+
+.expertiseSection .sectionIntro {
+  justify-self: center;
+  justify-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.expertiseSection .sectionIntro h2 {
+  color: var(--text-on-dark);
+}
+
+.expertiseSection .sectionIntro p:not(.expertiseEyebrow) {
+  color: var(--ds-color-text-on-dark-body);
+  font-family: var(--ds-font-family-display);
+  font-size: var(--ds-type-section-subtitle-size);
+  line-height: var(--ds-type-section-subtitle-line);
+}
+
+.cardGrid,
+.projectGrid,
+.expertiseGrid {
+  display: grid;
+  gap: var(--ds-grid-gap);
+}
+
+.cardGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.projectGrid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.expertiseGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.expertiseCardsReveal {
+  transition-delay: var(--ds-duration-base);
+}
+
+.expertiseCardHeader {
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  gap: 1.5rem;
+  text-align: center;
+}
+
+.expertiseCard {
+  --system-card-hover-border: var(--ds-color-action-primary);
+  --system-card-hover-lift: 0.4rem;
+  --system-card-hover-shadow: 0 0 1.8rem color-mix(in srgb, var(--ds-color-action-primary) 24%, transparent), var(--ds-shadow-raised);
+  gap: 1.5rem;
+  padding: 2rem;
+  transition:
+    border-color var(--ds-duration-fast) var(--ds-ease-standard),
+    box-shadow var(--ds-duration-fast) var(--ds-ease-standard),
+    transform var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.expertiseCard:hover {
+  border-color: var(--system-card-hover-border);
+  box-shadow: var(--system-card-hover-shadow);
+  transform: translateY(calc(var(--system-card-hover-lift) * -1));
+}
+
+.expertiseCardIcon {
+  width: 3.75rem;
+  height: 3.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-action-primary);
+  font-size: 1.8rem;
+}
+
+.expertiseList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-type-body-size);
+  line-height: var(--ds-type-body-line);
+  text-align: center;
+}
+
+.expertiseList li {
+  width: 78%;
+  margin-inline: auto;
+  padding-block: var(--ds-space-sm);
+  border-bottom: 2px solid color-mix(in srgb, var(--ds-color-action-primary) 38%, transparent);
+}
+
+.expertiseList li:last-child {
+  border-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expertiseCard,
+  .expertiseCard:hover {
+    transform: none;
+    transition: border-color var(--ds-duration-fast) linear, box-shadow var(--ds-duration-fast) linear;
+  }
+}
+
+.infoCard,
+.projectCard {
+  display: grid;
+  align-content: start;
+  gap: var(--ds-space-md);
+  min-width: 0;
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-color-surface-raised);
+  padding: clamp(1rem, 3vw, 1.35rem);
+}
+
+.valueCard {
+  --system-card-hover-border: var(--ds-color-action-secondary-hover);
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: none;
+  padding: var(--space-8);
+}
+
+.valueCardHeader {
+  align-items: flex-start;
+}
+
+.valueCardIcon {
+  border-radius: 50%;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  background: var(--surface-green);
+  color: var(--green-500);
+}
+
+.valueCard:nth-child(2n) .valueCardIcon {
+  background: var(--surface-green);
+  color: var(--green-500);
+}
+
+.valueCardTitle {
+  align-self: center;
+  text-align: left;
+}
+
+.infoCard h3,
+.projectCard h3 {
+  margin: 0;
+  color: var(--ds-color-text-primary);
+  font-size: var(--ds-type-heading-18-size);
+  font-weight: var(--ds-type-weight-medium);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+.infoCard ul {
+  display: grid;
+  gap: var(--ds-space-xs);
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}
+
+.projectCard {
+  color: inherit;
+  text-decoration: none;
+  transition: transform var(--ds-duration-fast) var(--ds-ease-standard), border-color var(--ds-duration-fast) var(--ds-ease-standard), background-color var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.projectCard:hover {
+  border-color: var(--ds-color-action-primary-hover);
+  background: color-mix(in srgb, var(--ds-color-surface-raised) 84%, var(--ds-color-action-primary) 16%);
+}
+
+.projectCard strong {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-xs);
+  color: var(--ds-color-text-primary);
+  font-size: var(--ds-type-label-14-size);
+}
+
+.contactBand {
+  min-height: auto;
+  box-sizing: border-box;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-4);
+  width: 100vw;
+  max-width: none;
+  margin-inline: calc(50% - 50vw);
+  padding: clamp(var(--space-20), 9vw, var(--space-30)) max(var(--ds-grid-gutter), calc((100vw - var(--ds-layout-content-max)) / 2 + var(--ds-grid-gutter)));
+  background: var(--surface-dark-band);
+  color: var(--text-on-dark);
+  text-align: center;
+}
+
+.closingSection::before {
+  content: none;
+}
+
+.contactBand h2 {
+  color: var(--text-on-dark);
+}
+
+.contactBand p {
+  color: var(--ds-color-text-on-dark-body);
+  font-size: var(--ds-type-heading-22-size);
+  line-height: var(--ds-type-heading-22-line);
+  max-width: 46rem;
+}
+
+.contactBand .primaryAction {
+  margin-top: var(--space-4);
+  position: relative;
+  z-index: 1;
+}
+
+.contactLink {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--space-4);
+  color: inherit;
+  text-decoration: none;
+}
+
+.contactCtaButton {
+  gap: var(--ds-space-xs);
+}
+
+@media (max-width: 68rem) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .projectGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 42rem) {
+  .cardGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 48rem) {
+  .page {
+    width: min(100%, 38rem);
+  }
+
+  .section {
+    --section-padding-block: clamp(var(--space-16), 14vw, var(--space-20));
+  }
+
+  .hero {
+    width: calc(100% + (2 * var(--ds-grid-gutter)));
+    min-height: 100svh;
+    margin-inline: calc(var(--ds-grid-gutter) * -1);
+    padding-inline: var(--ds-grid-gutter);
+  }
+
+  .heroActions {
+    align-items: stretch;
+  }
+
+  .primaryAction,
+  .secondaryAction {
+    width: 100%;
+  }
+
+  .projectGrid,
+  .expertiseGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryAction,
+  .secondaryAction,
+  .projectCard {
+    transition-duration: 0.01ms;
+  }
+
+  .primaryAction:hover,
+  .secondaryAction:hover,
+  .projectCard:hover {
+    transform: none;
+  }
+}

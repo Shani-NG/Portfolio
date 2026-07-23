@@ -1,0 +1,46 @@
+.reveal {
+  min-width: 0;
+}
+
+.overlap,
+.creative {
+  opacity: 0;
+  transform: translateY(var(--ds-distance-md));
+  will-change: opacity, transform;
+  transition:
+    opacity var(--ds-duration-slow) var(--ds-ease-enter),
+    transform var(--ds-duration-slow) var(--ds-ease-enter);
+}
+
+.overlap.visible,
+.creative.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.creative {
+  clip-path: inset(0 0 12% 0 round var(--ds-radius-lg));
+  transform: translateY(var(--ds-distance-lg)) scale(0.985);
+  will-change: clip-path, opacity, transform;
+}
+
+.creative.visible {
+  clip-path: inset(0 round var(--ds-radius-lg));
+  transform: translateY(0) scale(1);
+}
+
+.static {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlap,
+  .creative,
+  .overlap.visible,
+  .creative.visible {
+    clip-path: none;
+    opacity: 1;
+    transform: none;
+    transition: opacity var(--ds-duration-fast) linear;
+  }
+}

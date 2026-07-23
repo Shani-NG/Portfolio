@@ -57,7 +57,7 @@ export function AccessForm({ nextPath }: AccessFormProps) {
         required
         autoFocus
       />
-      <button type="submit" disabled={isSubmitting || password.length === 0}>
+      <button type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Checking…" : "Enter portfolio"}
       </button>
       <p className="form-message" role="status" aria-live="polite">

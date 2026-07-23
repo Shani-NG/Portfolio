@@ -1,0 +1,148 @@
+.chip {
+  --chip-bg: transparent;
+  --chip-border: var(--ds-color-border-subtle);
+  --chip-color: var(--ds-color-text-secondary);
+  --chip-hover-bg: var(--ds-color-surface-muted);
+  --chip-hover-border: var(--ds-color-border-strong);
+  --chip-hover-color: var(--ds-color-text-primary);
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  overflow: hidden;
+  border: var(--ds-border-width) solid var(--chip-border);
+  border-radius: var(--radius-pill);
+  background: var(--chip-bg);
+  color: var(--chip-color);
+  font-family: var(--ds-font-family-primary);
+  font-size: clamp(0.6875rem, 1.2vw, var(--ds-type-label-13-size));
+  font-weight: var(--ds-type-weight-semibold);
+  line-height: 1.2;
+  padding: 4px 6px;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--ds-duration-fast) var(--ds-ease-standard),
+    border-color var(--ds-duration-fast) var(--ds-ease-standard),
+    color var(--ds-duration-fast) var(--ds-ease-standard),
+    box-shadow var(--ds-duration-fast) var(--ds-ease-standard),
+    transform var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon {
+  flex: 0 0 auto;
+  font-size: 1rem;
+}
+
+.action,
+.link {
+  cursor: pointer;
+}
+
+.info {
+  cursor: default;
+}
+
+.action:hover:not(:disabled),
+.link:hover {
+  border-color: var(--chip-hover-border);
+  background: var(--chip-hover-bg);
+  color: var(--chip-hover-color);
+  transform: translateY(-1px);
+}
+
+.action:focus-visible,
+.link:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 0.25rem var(--ds-color-focus);
+}
+
+.selected {
+  border-color: var(--chip-hover-border);
+  background: var(--chip-hover-bg);
+  color: var(--chip-hover-color);
+}
+
+.disabled,
+.action:disabled,
+.link[aria-disabled="true"] {
+  border-color: var(--ds-color-border-subtle);
+  background: var(--ds-color-disabled-surface);
+  color: var(--ds-color-disabled-text);
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+}
+
+.neutral {
+  --chip-bg: color-mix(in srgb, var(--ds-color-surface-raised) 34%, transparent);
+  --chip-border: var(--ds-color-border-subtle);
+  --chip-color: var(--ds-color-text-secondary);
+  --chip-hover-bg: color-mix(in srgb, var(--ds-color-surface-raised) 68%, transparent);
+  --chip-hover-border: var(--ds-color-border-strong);
+  --chip-hover-color: var(--ds-color-text-primary);
+}
+
+.primary {
+  --chip-bg: color-mix(in srgb, var(--ds-color-action-primary) 8%, transparent);
+  --chip-border: color-mix(in srgb, var(--ds-color-action-primary) 34%, var(--ds-color-border-subtle));
+  --chip-color: var(--ds-color-action-primary-hover);
+  --chip-hover-bg: color-mix(in srgb, var(--ds-color-action-primary) 14%, transparent);
+  --chip-hover-border: color-mix(in srgb, var(--ds-color-action-primary) 72%, var(--ds-color-border-subtle));
+  --chip-hover-color: var(--ds-color-text-primary);
+}
+
+.secondary {
+  --chip-bg: color-mix(in srgb, var(--ds-color-action-secondary) 8%, transparent);
+  --chip-border: color-mix(in srgb, var(--ds-color-action-secondary) 34%, var(--ds-color-border-subtle));
+  --chip-color: var(--ds-color-action-secondary-hover);
+  --chip-hover-bg: color-mix(in srgb, var(--ds-color-action-secondary) 14%, transparent);
+  --chip-hover-border: color-mix(in srgb, var(--ds-color-action-secondary) 72%, var(--ds-color-border-subtle));
+  --chip-hover-color: var(--ds-color-text-primary);
+}
+
+.success {
+  --chip-bg: color-mix(in srgb, var(--green-500) 10%, transparent);
+  --chip-border: color-mix(in srgb, var(--green-500) 36%, var(--ds-color-border-subtle));
+  --chip-color: var(--green-600);
+  --chip-hover-bg: color-mix(in srgb, var(--green-500) 16%, transparent);
+  --chip-hover-border: color-mix(in srgb, var(--green-500) 72%, var(--ds-color-border-subtle));
+  --chip-hover-color: var(--ds-color-text-primary);
+}
+
+.warning {
+  --chip-bg: rgba(217, 164, 65, 0.1);
+  --chip-border: rgba(217, 164, 65, 0.34);
+  --chip-color: #d9a441;
+  --chip-hover-bg: rgba(217, 164, 65, 0.16);
+  --chip-hover-border: rgba(217, 164, 65, 0.58);
+  --chip-hover-color: var(--ds-color-text-primary);
+}
+
+@media (max-width: 40rem) {
+  .chip {
+    font-size: clamp(0.625rem, 3vw, 0.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition-duration: 0.01ms;
+  }
+
+  .action:hover:not(:disabled),
+  .link:hover {
+    transform: none;
+  }
+}

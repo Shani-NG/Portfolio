@@ -1,0 +1,309 @@
+.header {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--ds-color-border-subtle);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ds-color-canvas) 97%, transparent) 0%, color-mix(in srgb, var(--ds-color-canvas) 92%, transparent) 100%);
+  box-shadow: 0 0.75rem 2rem color-mix(in srgb, var(--ds-color-text-primary) 8%, transparent);
+  backdrop-filter: blur(1.25rem) saturate(135%);
+  -webkit-backdrop-filter: blur(1.25rem) saturate(135%);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(100% - 2rem, 76rem);
+  min-height: 4.5rem;
+  margin-inline: auto;
+  gap: 2rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ds-color-text-primary);
+  font-size: var(--ds-type-label-14-size);
+  font-weight: var(--ds-type-weight-semibold);
+  letter-spacing: 0;
+  text-decoration: none;
+  white-space: nowrap;
+  text-shadow: none;
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.navLink,
+.experienceButton,
+.themeToggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ds-type-nav-14-size);
+  font-weight: var(--ds-type-weight-medium);
+  line-height: var(--ds-type-nav-14-line);
+  padding: 0.55rem 0.8rem;
+  text-decoration: none;
+  text-shadow: none;
+  transition: background-color var(--ds-duration-fast) var(--ds-ease-standard), color var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.navLink:hover,
+.experienceButton:hover,
+.themeToggle:hover,
+.navLink:focus-visible,
+.experienceButton:focus-visible,
+.themeToggle:focus-visible,
+.active > .navLink,
+.active > .experienceButton,
+.navLink.active {
+  background: var(--ds-color-surface-muted);
+  color: var(--ds-color-action-primary-hover);
+}
+
+.navLink:focus-visible,
+.experienceButton:focus-visible,
+.brand:focus-visible,
+.menuToggle:focus-visible,
+.themeToggle:focus-visible,
+.projectLink:focus-visible {
+  outline: 0;
+  box-shadow: var(--ds-shadow-focus);
+}
+
+.experienceItem {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+
+.experienceButton {
+  min-width: 2.25rem;
+  gap: 0.35rem;
+  padding-inline: 0.45rem;
+}
+
+.experiencePrimary {
+  padding-right: 0.5rem;
+}
+
+.chevron {
+  font-size: 1.1rem;
+  transition: transform var(--ds-duration-base) var(--ds-ease-standard);
+}
+
+.experienceButton[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.projectMenu {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  display: grid;
+  min-width: 18rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-border-subtle) 72%, transparent);
+  border-radius: var(--ds-radius-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 62%),
+    color-mix(in srgb, var(--ds-color-surface-raised) 88%, transparent);
+  backdrop-filter: blur(1.25rem) saturate(140%);
+  -webkit-backdrop-filter: blur(1.25rem) saturate(140%);
+  box-shadow: var(--ds-shadow-raised);
+  opacity: 0;
+  padding: 0.45rem;
+  pointer-events: none;
+  transform: translateY(calc(var(--ds-distance-sm) * -1));
+  transform-origin: top right;
+  transition: opacity var(--ds-duration-fast) var(--ds-ease-standard), transform var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.projectMenuOpen {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.experienceItem:hover .projectMenu,
+.experienceItem:focus-within .projectMenu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.experienceItem:hover .chevron,
+.experienceItem:focus-within .chevron {
+  transform: rotate(180deg);
+}
+
+.projectLink {
+  border-radius: var(--ds-radius-sm);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-type-body-14-size);
+  line-height: 1.35;
+  padding: 0.7rem 0.75rem;
+  text-decoration: none;
+  transition: background-color var(--ds-duration-fast) var(--ds-ease-standard), color var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.projectLink:hover {
+  background: var(--ds-color-surface-muted);
+  color: var(--ds-color-text-primary);
+}
+
+.menuToggle {
+  display: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-color-surface-muted);
+  color: var(--ds-color-text-primary);
+  cursor: pointer;
+}
+
+.menuToggle span,
+.themeToggle span {
+  font-size: 1.45rem;
+}
+
+.themeToggle {
+  width: 2.75rem;
+  justify-content: center;
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: 999px;
+  background: var(--ds-color-surface-raised);
+  padding: 0;
+}
+
+@media (max-width: 48rem) {
+  .inner {
+    width: min(100% - 1.25rem, 38rem);
+    min-height: 4rem;
+  }
+
+  .brand {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .menuToggle {
+    display: inline-grid;
+    place-items: center;
+  }
+
+  .navigation {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    display: grid;
+    max-height: 0;
+    overflow: hidden;
+    border-bottom: 1px solid transparent;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--ds-color-canvas) 98%, transparent), color-mix(in srgb, var(--ds-color-canvas) 94%, transparent));
+    backdrop-filter: blur(1.5rem) saturate(145%);
+    -webkit-backdrop-filter: blur(1.5rem) saturate(145%);
+    opacity: 0;
+    padding-inline: max(0.625rem, calc((100vw - 38rem) / 2));
+    pointer-events: none;
+    transform: translateY(calc(var(--ds-distance-sm) * -1));
+    transition: max-height var(--ds-duration-base) var(--ds-ease-standard), opacity var(--ds-duration-fast) var(--ds-ease-standard), transform var(--ds-duration-base) var(--ds-ease-standard), border-color var(--ds-duration-base) var(--ds-ease-standard);
+  }
+
+  .navigationOpen,
+  .header:focus-within .navigation {
+    max-height: 31rem;
+    border-color: var(--ds-color-border-subtle);
+    opacity: 1;
+    padding-bottom: 0.85rem;
+    padding-top: 0.45rem;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .navLink,
+  .experienceButton,
+  .themeToggle {
+    justify-content: space-between;
+    width: 100%;
+    min-height: 3rem;
+    padding-inline: 0.75rem;
+  }
+
+  .themeToggle {
+    border-radius: var(--ds-radius-sm);
+  }
+
+  .experienceItem {
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+
+  .experiencePrimary {
+    padding-right: 0.75rem;
+  }
+
+  .experienceButton {
+    justify-content: center;
+    min-width: 3rem;
+    width: auto;
+  }
+
+  .projectMenu {
+    grid-column: 1 / -1;
+    position: static;
+    min-width: 0;
+    max-height: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    opacity: 0;
+    padding: 0 0 0 0.8rem;
+    pointer-events: none;
+    transform: none;
+    transition: max-height var(--ds-duration-base) var(--ds-ease-standard), opacity var(--ds-duration-fast) var(--ds-ease-standard), padding var(--ds-duration-base) var(--ds-ease-standard);
+  }
+
+  .projectMenuOpen {
+    max-height: 23rem;
+    opacity: 1;
+    padding-bottom: 0.35rem;
+    padding-top: 0.1rem;
+    pointer-events: auto;
+  }
+
+  .projectLink {
+    display: block;
+    padding: 0.6rem 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navLink,
+  .experienceButton,
+  .themeToggle,
+  .chevron,
+  .projectMenu,
+  .projectLink,
+  .navigation {
+    transition-duration: 0.01ms;
+  }
+}
