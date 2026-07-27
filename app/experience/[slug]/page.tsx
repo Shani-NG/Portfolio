@@ -8,6 +8,7 @@ import { MaterialIcon } from "@/components/ui/material-icon";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { bigRedButtonCaseStudy, c4iCaseStudy, epdCaseStudy, kmsCaseStudy, projectCards } from "@/lib/portfolio-content";
 import { projects } from "@/lib/navigation";
+import { BigRedControlToggle } from "./big-red-control-toggle";
 import styles from "./page.module.css";
 
 export function generateStaticParams() {
@@ -76,6 +77,291 @@ function CaseImage({
     <div className={[styles.caseImage, className].filter(Boolean).join(" ")}>
       <Image src={src} alt={alt} fill sizes="(max-width: 48rem) 100vw, 50vw" />
     </div>
+  );
+}
+
+const monitoringMeta = [
+  ["Role", "Project Manager & Strategic UX Lead"],
+  ["Reach", "100+ users across multiple platforms"],
+] as const;
+
+const monitoringPills = ["System Monitoring", "Product Strategy", "Behavioral Telemetry", "UX Benchmarking"] as const;
+
+const monitoringSections = [
+  {
+    id: "from-field-noise-to-product-judgment",
+    wash: "green",
+    label: "Overview",
+    icon: "insights",
+    title: "From field noise to product judgment",
+    body: "The shift was not from qualitative to quantitative. It was from fragmented evidence to a product learning loop.",
+    layout: "overview",
+    visualIcon: "trending_up",
+    visualLabel: "From fragmented evidence to a learning loop",
+    visualHeight: "short",
+  },
+  {
+    id: "a-learning-system",
+    wash: "neutral",
+    label: "Personal Context & Confidentiality",
+    icon: "description",
+    title: "I did not want another feedback loop. I wanted a learning system.",
+    body: "The monitoring initiative started from a product concern: the organization was making decisions from field impressions, commander summaries, and evaluation spreadsheets, while the system itself had a much richer truth about behavior. The goal was to create a way to reach users without always meeting them, compare claims with real usage, and give product and engineering teams a shared evidence base.",
+    cards: [
+      ["Confidential by design", "All screens, data, operational details, service names, and user identifiers are abstracted. This case study focuses on learning, methods, and product impact.", "lock"],
+      ["Product strategy lens", "This was not only UX analytics. It was a mechanism for prioritization, release evaluation, adoption learning, and organizational change.", "strategy"],
+    ],
+  },
+  {
+    id: "scenario-mapping",
+    wash: "rose",
+    label: "Deep Dive 01",
+    icon: "map",
+    title: "Scenario mapping turned \"usage\" into measurable intent",
+    body: "I submitted the initial mapping scenarios and helped the team build a full scenario kit across major capabilities. Each scenario defined what success looked like for a specific user, workflow, and release moment. This gave product and engineering a shared way to evaluate whether a capability was actually working in the field.",
+    layout: "text-left",
+    visualIcon: "device_hub",
+    visualLabel: "Scenario-mapping visual with workflow nodes per capability",
+    visualHeight: "medium",
+  },
+  {
+    id: "matomo-product-evaluation-layer",
+    wash: "neutral",
+    label: "Deep Dive 02",
+    icon: "settings_input_component",
+    title: "Matomo became a product evaluation layer",
+    body: "The implementation was framed around complete workflows, not vanity metrics. I connected Matomo telemetry with UX benchmarking logic: task success, time on task, errors, abandonment, adoption, and lightweight perception metrics. This made monitoring useful for release evaluation, prioritization, training, and redesign.",
+    layout: "text-right",
+    visualIcon: "dashboard",
+    visualLabel: "Matomo telemetry dashboard and workflow metrics",
+    visualHeight: "medium",
+  },
+  {
+    id: "evidence-backed-ux-decisions",
+    wash: "green",
+    label: "Measurement Architecture",
+    icon: "architecture",
+    title: "From analytics to evidence-backed UX decisions",
+    body: "I used the monitoring initiative as a way to combine behavioral telemetry with UX benchmarking logic: task success, time on task, error patterns, adoption, retention, and lightweight perception measures. The goal was to reduce bias, evaluate releases with confidence, and choose three to four meaningful KPIs per workflow instead of drowning in generic dashboards.",
+    columns: [
+      ["Measurement Methods", ["Top-task success", "Time on task", "Single Ease Question or UMUX-Lite", "System Usability Scale", "Confidence intervals only where the sample and method support them"]],
+      ["Evidence Stack", ["Behavioral Data", "Task Benchmark", "Perception Pulse", "Field Context"]],
+    ],
+  },
+  {
+    id: "first-week-product-value",
+    wash: "rose",
+    label: "Deep Dive 03",
+    icon: "lightbulb",
+    title: "The first week surfaced hidden product value",
+    body: "The data immediately exposed patterns that field reports alone could not explain: forms that were used often but incorrectly, new forms that almost nobody opened, and repeated user behaviors that pointed to better defaults. This was the moment the initiative became impossible to ignore.",
+    cards: [
+      ["Used, but wrong", "High usage exposed a need, but the pattern showed users were operating the form in an unintended way.", "warning"],
+      ["Useful, but invisible", "New forms with high potential were barely discovered, exposing an awareness and discoverability gap.", "visibility_off"],
+      ["Patterns to presets", "Repeated usage behavior became role-based presets that reduced setup time and supported faster operation.", "auto_fix_high"],
+    ],
+  },
+  {
+    id: "insight-loop-prioritization",
+    wash: "neutral",
+    label: "Deep Dive 04",
+    icon: "loop",
+    title: "The insight loop changed prioritization",
+    body: "Instead of debating single comments, the team could compare claims with behavioral patterns. That shifted decisions from feature requests to evidence categories: Is the issue systemic, local, training-related, discoverability-related, or truly a missing capability? The initiative received priority because it made product learning visible.",
+    findings: [
+      ["Systemic", "Patterns affecting the majority of workflows or user roles", "schema"],
+      ["Local", "Problems specific to a role, device type, or workflow variant", "pin_drop"],
+      ["Training-related", "Discoverability and onboarding, not system limitations", "school"],
+      ["Discoverability-related", "Features present but not surfaced in the right context", "search"],
+      ["Truly missing capability", "Confirmed gaps that justified new development", "add_circle"],
+    ],
+    visualIcon: "mediation",
+    visualLabel: "Insight loop and prioritization framework visual",
+    visualHeight: "tall",
+  },
+] as const;
+
+function MonitoringIcon({ name }: { name: string }) {
+  return <MaterialIcon className={styles.monitoringIcon} name={name} />;
+}
+
+function MonitoringVisual({
+  icon,
+  label,
+  height = "medium",
+}: {
+  icon: string;
+  label: string;
+  height?: "short" | "medium" | "tall";
+}) {
+  return (
+    <div className={[styles.monitoringVisual, styles[`monitoringVisual${height[0].toUpperCase()}${height.slice(1)}`]].join(" ")} aria-label={label} role="img">
+      <span className={styles.monitoringVisualGrid} aria-hidden="true" />
+      <span className={styles.monitoringVisualPulse} aria-hidden="true" />
+      <MonitoringIcon name={icon} />
+      <strong>{label}</strong>
+    </div>
+  );
+}
+
+function MonitoringSectionHeader({
+  icon,
+  label,
+  title,
+  body,
+}: {
+  icon: string;
+  label: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className={styles.monitoringSectionHead}>
+      <Eyebrow as="div" className={styles.monitoringEyebrow} icon={<MonitoringIcon name={icon} />}>{label}</Eyebrow>
+      <h2>{title}</h2>
+      <p>{body}</p>
+    </div>
+  );
+}
+
+function MonitoringCaseStudy() {
+  const currentProjectIndex = projectCards.findIndex((project) => project.href === "/experience/monitoring-product-intelligence");
+  const nextProject = projectCards[(currentProjectIndex + 1) % projectCards.length];
+
+  return (
+    <main className={[styles.page, styles.monitoringPage].join(" ")}>
+      <section className={styles.monitoringHero} data-ds-theme="dark" id="monitoring-and-product-intelligence">
+        <div className={styles.monitoringHeroBg} aria-hidden="true">
+          <Image
+            src="/assets/project-monitoring-product-intelligence.png"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+          />
+        </div>
+        <div className={styles.monitoringWrap}>
+          <div className={styles.monitoringHeroCopy}>
+            <Eyebrow as="div" className={styles.monitoringEyebrow} icon={<MonitoringIcon name="monitoring" />}>System Monitoring / Product Strategy</Eyebrow>
+            <h1>Monitoring as Product Intelligence</h1>
+            <p>Turning field feedback, commander evaluations, and Excel-based reports into a measurable product learning system.</p>
+            <dl className={styles.monitoringHeroMeta}>
+              {monitoringMeta.map(([term, value]) => (
+                <div key={term}>
+                  <dt>{term}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className={styles.monitoringPills} aria-label="Case study focus areas">
+              {monitoringPills.map((pill) => <span key={pill}>{pill}</span>)}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {monitoringSections.map((section, index) => {
+        const washClass = section.wash === "green"
+          ? styles.monitoringWashGreen
+          : section.wash === "rose"
+            ? styles.monitoringWashRose
+            : styles.monitoringWashNeutral;
+
+        if ("columns" in section) {
+          return (
+            <ScrollReveal mode="overlap" key={section.id}>
+              <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
+                <div className={styles.monitoringWrap}>
+                  <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+                  <div className={styles.monitoringColumnGrid}>
+                    {section.columns.map(([title, items]) => (
+                      <article className={styles.monitoringInfoCard} key={title}>
+                        <h3>{title}</h3>
+                        <ul className={styles.monitoringList}>
+                          {items.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </ScrollReveal>
+          );
+        }
+
+        if ("findings" in section) {
+          return (
+            <ScrollReveal mode="creative" key={section.id}>
+              <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
+                <div className={[styles.monitoringWrap, styles.monitoringLoopGrid].join(" ")}>
+                  <div>
+                    <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+                    <div className={styles.monitoringFindingList}>
+                      {section.findings.map(([title, body, icon]) => (
+                        <article className={styles.monitoringFinding} key={title}>
+                          <MonitoringIcon name={icon} />
+                          <div>
+                            <h3>{title}</h3>
+                            <p>{body}</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                  <MonitoringVisual icon={section.visualIcon} label={section.visualLabel} height={section.visualHeight} />
+                </div>
+              </section>
+            </ScrollReveal>
+          );
+        }
+
+        if ("cards" in section) {
+          return (
+            <ScrollReveal mode={index % 2 === 0 ? "creative" : "overlap"} key={section.id}>
+              <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
+                <div className={styles.monitoringWrap}>
+                  <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+                  <div className={section.cards.length === 2 ? styles.monitoringCardGridTwo : styles.monitoringCardGridThree}>
+                    {section.cards.map(([title, body, icon]) => (
+                      <article className={styles.monitoringInfoCard} key={title}>
+                        <span className={styles.monitoringCardIcon}><MonitoringIcon name={icon} /></span>
+                        <h3>{title}</h3>
+                        <p>{body}</p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </ScrollReveal>
+          );
+        }
+
+        return (
+          <ScrollReveal mode={index % 2 === 0 ? "creative" : "overlap"} key={section.id}>
+            <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
+              <div className={[styles.monitoringWrap, styles.monitoringSplit, section.layout === "text-right" ? styles.monitoringSplitReverse : ""].join(" ")}>
+                <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+                <MonitoringVisual icon={section.visualIcon} label={section.visualLabel} height={section.visualHeight} />
+              </div>
+            </section>
+          </ScrollReveal>
+        );
+      })}
+
+      <section className={styles.monitoringClosing} data-ds-theme="dark" id="product-judgment">
+        <div className={styles.monitoringWrap}>
+          <MonitoringSectionHeader
+            icon="verified"
+            label="Closing Reflection"
+            title="Not dashboards. Product judgment."
+            body="Monitoring and Product Intelligence turned fragmented feedback into a product-learning mechanism that connected real behavior, field context, and UX benchmarks. As Project Manager and Strategic UX Lead, I led the initiative from scenario mapping through measurement architecture, helping product and engineering teams prioritize with evidence instead of isolated opinion."
+          />
+          <p>All screens, metrics, operational details, and user identifiers are anonymized, abstracted, or recreated for public sharing.</p>
+        </div>
+      </section>
+
+      <ContextFab href={nextProject.href} label="Next Case Study" icon="arrow_forward" />
+    </main>
   );
 }
 
@@ -230,14 +516,8 @@ function BigRedHtmlCaseStudy() {
               <p className={styles.snapshotParagraph}>I led the UX strategy and design of a Monitor Module that replaced blind resets with diagnosis, prevention, and role-based recovery tools.</p>
             </div>
             <div>
-              <div className={styles.requestCard}>
-                <div className={styles.quoteMark}>"</div>
-                <Eyebrow as="div" className={styles.requestTag} icon={<BigRedIcon name="warning" className={styles.tagIcon} />}>Initial Product Request</Eyebrow>
-                <blockquote>"Build one button that resets everything."</blockquote>
-                <div className={styles.attribution}>
-                  <div className={styles.avatar}><BigRedIcon name="person" /></div>
-                  <small>A well-intentioned ask for simplicity, but exposed a deeper operational risk problem.</small>
-                </div>
+              <div className={styles.snapshotVisual}>
+                <BigRedInlineImage src="/assets/case-studies/big-red-button/project-snapshot.png" alt="Initial product request: build one button that resets everything." />
               </div>
             </div>
           </div>
@@ -271,12 +551,12 @@ function BigRedHtmlCaseStudy() {
                 <BigRedInlineImage src="/assets/case-studies/big-red-button/03-the-reset-reflex.png" alt="Emergency shutdown interface showing the reset reflex risk" />
               </div>
               <div className={styles.uptimeCard}>
-                <Eyebrow as="div" className={styles.uptimeLabel} icon={<BigRedIcon name="trending_up" />}>Application uptime, before → after</Eyebrow>
+                <Eyebrow as="div" className={styles.uptimeLabel} icon={<BigRedIcon name="trending_up" />}>Application uptime, before to after</Eyebrow>
                 <svg viewBox="0 0 260 90" width="100%" height="90" aria-hidden="true">
                   <path className={styles.uptimeLine} d="M5,75 C40,72 60,68 85,60 C115,50 130,55 155,40 C185,23 200,28 225,14 L250,8" />
                   <circle className={styles.uptimeDot} cx="250" cy="8" r="4.5" />
                 </svg>
-                <div className={styles.uptimeCaption}>A steady, meaningful climb in time-online — not a single dramatic fix.</div>
+                <div className={styles.uptimeCaption}>A steady, meaningful climb in time-online, not a single dramatic fix.</div>
               </div>
             </div>
           </div>
@@ -335,7 +615,7 @@ function BigRedHtmlCaseStudy() {
             </div>
           </div>
 
-          <div className={[styles.solutionRow, styles.reverse].join(" ")} id="one-system-three-levels-of-control">
+          <div className={[styles.solutionRow, styles.reverse].join(" ")}>
             <div>
               <Eyebrow as="span" className={styles.solutionTag}>Solution 02</Eyebrow>
               <h3>Role-based visibility for safer operation</h3>
@@ -376,36 +656,38 @@ function BigRedHtmlCaseStudy() {
         </div>
       </section>
 
-      <section className={[styles.bigRedHtmlSection, styles.washRose].join(" ")} id="expert-tools-without-expert-complexity-for-everyone">
+      <section className={[styles.bigRedHtmlSection, styles.washRose].join(" ")} id="one-system-three-levels-of-control">
         <div className={styles.bigRedHtmlWrap}>
           <div className={[styles.sectionHead, styles.center].join(" ")}>
-            <Eyebrow as="div" className={styles.centerEyebrow} icon={<BigRedIcon name="layers" className={styles.inlineIcon} />}>One System, Three Levels of Control</Eyebrow>
+            <Eyebrow as="div" className={styles.centerEyebrow} icon={<BigRedIcon name="layers" className={styles.inlineIcon} />}>Expert Tools</Eyebrow>
             <h2>Expert Tools: Made for Everyone</h2>
             <p>Providing deep technical transparency while maintaining a high-level operational overview.</p>
           </div>
-          <div className={styles.toolsGrid}>
-            <div className={styles.toolCard}>
-              <div className={styles.toolThumb}><BigRedInlineImage src="/assets/case-studies/big-red-button/07-expert-tools-made-for-everyone.png" alt="Logs management expert tool" /></div>
-              <div className={styles.toolBody}>
-                <h4><BigRedIcon name="filter_alt" /> Logs Management</h4>
-                <p>Filtering logs by severity or mission component, allowing shore technicians to remote-diagnose without full data dumps.</p>
-              </div>
-            </div>
-            <div className={styles.toolCard}>
-              <div className={styles.toolThumb}><BigRedInlineImage src="/assets/case-studies/big-red-button/07-2-expert-tools-made-for-everyone.png" alt="Detailed technical logs expert tool" /></div>
-              <div className={styles.toolBody}>
-                <h4><BigRedIcon name="description" /> Detailed Technical Logs</h4>
-                <p>Exportable, time-stamped diagnostic bundles that follow maritime data standards for forensic system analysis.</p>
-              </div>
-            </div>
-            <div className={styles.toolCard}>
-              <div className={styles.toolThumb}><BigRedInlineImage src="/assets/case-studies/big-red-button/07-3-expert-tools-made-for-everyone.png" alt="Interfaces connectivity expert tool" /></div>
-              <div className={styles.toolBody}>
-                <h4><BigRedIcon name="cable" /> Interfaces Connectivity</h4>
-                <p>A live map of connected services and interfaces, so technicians can confirm what is actually linked before acting.</p>
-              </div>
-            </div>
-          </div>
+          <BigRedControlToggle
+            options={[
+              {
+                label: "Solution 1",
+                title: "Logs Management",
+                body: "Filtering logs by severity or mission component, allowing shore technicians to remote-diagnose without full data dumps.",
+                image: "/assets/case-studies/big-red-button/07-expert-tools-made-for-everyone.png",
+                imageAlt: "Logs management expert tool",
+              },
+              {
+                label: "Solution 2",
+                title: "Detailed Technical Logs",
+                body: "Exportable, time-stamped diagnostic bundles that follow maritime data standards for forensic system analysis.",
+                image: "/assets/case-studies/big-red-button/07-2-expert-tools-made-for-everyone.png",
+                imageAlt: "Detailed technical logs expert tool",
+              },
+              {
+                label: "Solution 3",
+                title: "Interfaces Connectivity",
+                body: "A live map of connected services and interfaces, so technicians can confirm what is actually linked before acting.",
+                image: "/assets/case-studies/big-red-button/07-3-expert-tools-made-for-everyone.png",
+                imageAlt: "Interfaces connectivity expert tool",
+              },
+            ]}
+          />
         </div>
       </section>
 
@@ -577,19 +859,13 @@ function C4iHtmlCaseStudy() {
       </ScrollReveal>
 
       <ScrollReveal mode="creative">
-        <section className={[styles.c4iHtmlSection, styles.c4iWashDark].join(" ")} id="four-pillars-one-shared-logic">
-          <div className={[styles.c4iBlob, styles.c4iBlobRose].join(" ")} />
+        <section className={[styles.c4iHtmlSection, styles.c4iWashDark, styles.c4iSystemStructure].join(" ")} id="four-pillars-one-shared-logic">
           <div className={styles.c4iHtmlWrap}>
             <div className={styles.c4iSectionHead}>
               <Eyebrow as="div" className={styles.c4iHtmlEyebrow} icon={<C4iIcon name="grain" />}>System Structure</Eyebrow>
               <h2>Four pillars. One logic.</h2>
               <p>The process connects strategy and UX across four C4I layers: clarifying the mission, mapping users and constraints, structuring decision flows, and validating trust in action.</p>
             </div>
-            <C4iImage
-              className={[styles.c4iWideImage, styles.c4iOpenVisual].join(" ")}
-              src="/assets/case-studies/c4i-beyond-clarity/03-four-pillars-one-logic.png"
-              alt="Dark feature composition representing four C4I layers connected into one shared product logic."
-            />
           </div>
         </section>
       </ScrollReveal>
@@ -613,19 +889,13 @@ function C4iHtmlCaseStudy() {
                   ))}
                 </div>
               </div>
-              <div className={styles.c4iMergeViz} aria-label="Multiple operational entities merging into one validated object" role="img">
-                <span className={[styles.c4iMergeNode, styles.c4iMergeNodeA].join(" ")}><span>Sensor source</span></span>
-                <span className={[styles.c4iMergeNode, styles.c4iMergeNodeB].join(" ")}><span>Platform update</span></span>
-                <span className={[styles.c4iMergeNode, styles.c4iMergeNodeC].join(" ")}><span>Shared entity</span></span>
-                <span className={[styles.c4iMergeNode, styles.c4iMergeNodeD].join(" ")}><span>Manual refinement</span></span>
-                <span className={[styles.c4iMergeNode, styles.c4iMergeNodeE].join(" ")}><span>Mission context</span></span>
-                <span className={styles.c4iRadarSweep} aria-hidden="true" />
-                <span className={styles.c4iMergeBackgroundA} aria-hidden="true" />
-                <span className={styles.c4iMergeBackgroundB} aria-hidden="true" />
-                <span className={styles.c4iMergeBackgroundC} aria-hidden="true" />
-                <span className={styles.c4iMergeBackgroundD} aria-hidden="true" />
-                <span className={styles.c4iMergeBackgroundE} aria-hidden="true" />
-                <span className={styles.c4iMergeCore}><C4iIcon name="hub" /></span>
+              <div className={styles.c4iMergeViz} aria-label="Multiple operational entities merging into one validated object">
+                <iframe
+                  className={styles.c4iMergeFrame}
+                  src="/assets/case-studies/c4i-beyond-clarity/entity-merge-animation.html"
+                  title="Entity merge animation"
+                  loading="lazy"
+                />
               </div>
             </div>
 
@@ -1380,6 +1650,10 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
 
   if (slug === bigRedButtonCaseStudy.slug) {
     return <BigRedHtmlCaseStudy />;
+  }
+
+  if (slug === "monitoring-product-intelligence") {
+    return <MonitoringCaseStudy />;
   }
 
   if (slug === kmsCaseStudy.slug) {

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="UTF-8">
+<title>Entity merge animation</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #0b0b0d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+</head>
+<body>
+<canvas id="c" width="700" height="700"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const cx = W / 2, cy = H / 2;
+
+// ---- config ----
+const colors = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#D85A30', '#5DCAA5'];
+const N = colors.length;
+const orbitR = 170;
+const nodeR = 15;
+const centerRMax = 34;
+
+// timeline (seconds)
+const T_ORBIT_1   = 1.2;
+const T_CONVERGE  = 1.2;
+const T_HOLD      = 1.0;
+const T_DIVERGE   = 1.2;
+const T_ORBIT_2   = 1.2;
+const TOTAL = T_ORBIT_1 + T_CONVERGE + T_HOLD + T_DIVERGE + T_ORBIT_2;
+
+const ANGULAR_SPEED = 0.55; // rad/sec, continuous throughout the whole loop
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function hexToRgb(hex) {
+  const v = parseInt(hex.slice(1), 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+const rgbColors = colors.map(hexToRgb);
+
+let startTime = null;
+
+function draw(now) {
+  if (startTime === null) startTime = now;
+  const elapsed = ((now - startTime) / 1000) % TOTAL;
+  const baseAngle = ((now - startTime) / 1000) * ANGULAR_SPEED;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // determine phase progress -> radiusFactor (1 = fully separated, 0 = fully merged)
+  // and mergeGlow (0..1) driving center circle visibility
+  let radiusFactor, mergeGlow;
+  let t = elapsed;
+
+  if (t < T_ORBIT_1) {
+    radiusFactor = 1;
+    mergeGlow = 0;
+  } else if (t < T_ORBIT_1 + T_CONVERGE) {
+    const p = easeInOutCubic((t - T_ORBIT_1) / T_CONVERGE);
+    radiusFactor = 1 - p;
+    mergeGlow = p;
+  } else if (t < T_ORBIT_1 + T_CONVERGE + T_HOLD) {
+    radiusFactor = 0;
+    mergeGlow = 1;
+  } else if (t < T_ORBIT_1 + T_CONVERGE + T_HOLD + T_DIVERGE) {
+    const p = easeInOutCubic((t - (T_ORBIT_1 + T_CONVERGE + T_HOLD)) / T_DIVERGE);
+    radiusFactor = p;
+    mergeGlow = 1 - p;
+  } else {
+    radiusFactor = 1;
+    mergeGlow = 0;
+  }
+
+  const r = orbitR * radiusFactor;
+
+  // ---- center merged circle (halo + outline + fill) ----
+  if (mergeGlow > 0.01) {
+    const rad = centerRMax * (0.5 + 0.5 * mergeGlow);
+
+    // halo
+    const grad = ctx.createRadialGradient(cx, cy, rad * 0.4, cx, cy, rad * 3.2);
+    grad.addColorStop(0, `rgba(255,255,255,${0.35 * mergeGlow})`);
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad * 3.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // fill
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${0.92 * mergeGlow})`;
+    ctx.fill();
+
+    // outline
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = `rgba(233,168,194,${mergeGlow})`;
+    ctx.stroke();
+  }
+
+  // ---- orbiting / converging colored nodes ----
+  for (let i = 0; i < N; i++) {
+    const angle = baseAngle + (i / N) * Math.PI * 2;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    const scale = 0.55 + 0.45 * radiusFactor;
+    const alpha = 0.35 + 0.65 * radiusFactor;
+
+    const [rr, gg, bb] = rgbColors[i];
+
+    ctx.beginPath();
+    ctx.arc(x, y, nodeR * scale, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha})`;
+    ctx.shadowColor = `rgba(${rr},${gg},${bb},${0.5 * radiusFactor})`;
+    ctx.shadowBlur = 12 * radiusFactor;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

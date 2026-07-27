@@ -1,7 +1,7 @@
 "use client";
 
 import { Chip } from "@/components/ui/chip";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import styles from "./page.module.css";
 
 type RoleFitScreenState = "home" | "conversation" | "missing-details" | "generating" | "error" | "report";
@@ -283,6 +283,8 @@ export default function RoleFitPage() {
   const [fitMode, setFitMode] = useState<FitMode>("strong");
   const [activeProject, setActiveProject] = useState<number | null>(null);
   const [reportRequestCount, setReportRequestCount] = useState(0);
+  const [roleInput, setRoleInput] = useState("");
+  const [apiStatusMessage, setApiStatusMessage] = useState("");
   const fit = fitModes[fitMode];
   const selectedProject = activeProject === null ? null : evidenceProjects[activeProject];
   const reportLimitReached = reportRequestCount >= 2;
@@ -295,22 +297,46 @@ export default function RoleFitPage() {
       ? "Create a new report"
       : "Generate report";
 
-  useEffect(() => {
-    if (screenState !== "generating") return undefined;
-
-    const timeoutId = window.setTimeout(() => {
-      setScreenState("report");
-    }, 1200);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [screenState]);
-
-  function requestReport() {
+  async function requestReport() {
     if (reportLimitReached) return;
+    if (!roleInput.trim()) {
+      setApiStatusMessage("Please paste role details before generating a report.");
+      setScreenState("missing-details");
+      return;
+    }
 
     setActiveProject(null);
-    setReportRequestCount((count) => count + 1);
+    setApiStatusMessage("");
     setScreenState("generating");
+
+    try {
+      const response = await fetch("/api/role-fit/report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roleText: roleInput,
+          approved: true,
+          completedReportCount: reportRequestCount,
+          language: "en",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.state !== "ready") {
+        setApiStatusMessage(result.safeMessageKey ?? result.eligibility?.safeMessageKey ?? "Report generation is not ready yet.");
+        setScreenState(result.state === "validation-failed" ? "missing-details" : "error");
+        return;
+      }
+
+      setReportRequestCount((count) => count + 1);
+      setScreenState("report");
+    } catch {
+      setApiStatusMessage("The report service is currently unavailable.");
+      setScreenState("error");
+    }
   }
 
   const chatMessages = useMemo(() => {
@@ -322,15 +348,15 @@ export default function RoleFitPage() {
     ];
 
     if (screenState === "missing-details") {
-      messages.push({ role: "agent", content: "Please upload a file or paste job details so we can generate a high-quality report." });
+      messages.push({ role: "agent", content: apiStatusMessage || "Please upload a file or paste job details so we can generate a high-quality report." });
     }
 
     if (screenState === "error") {
-      messages.push({ role: "agent", content: "I could not generate a reliable report from the provided input. Please add role requirements, responsibilities, or expected outcomes." });
+      messages.push({ role: "agent", content: apiStatusMessage || "I could not generate a reliable report from the provided input. Please add role requirements, responsibilities, or expected outcomes." });
     }
 
     return messages;
-  }, [screenState]);
+  }, [apiStatusMessage, screenState]);
 
   return (
     <main className={styles.roleFitPage}>
@@ -367,7 +393,12 @@ export default function RoleFitPage() {
           <p>Ask about my background, test a job description, or explore my case studies.</p>
 
           <div className={styles.chatBoxContainer}>
-            <textarea placeholder="Ask me anything about my experience or choose a starting point to begin the conversation..." aria-label="Role Fit message" />
+            <textarea
+              placeholder="Paste role details using labels: Company:, Title:, Description:, Responsibilities:, Requirements:"
+              aria-label="Role Fit message"
+              value={roleInput}
+              onChange={(event) => setRoleInput(event.target.value)}
+            />
             <div className={styles.chatBoxToolbar}>
               <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                 <span className={styles.msi} aria-hidden="true">add</span>
@@ -403,7 +434,12 @@ export default function RoleFitPage() {
             </div>
 
             <div className={styles.chatBoxContainer}>
-              <textarea placeholder="Ask a follow-up question..." aria-label="Role Fit follow-up" />
+              <textarea
+                placeholder="Paste or refine role details using labels: Company:, Title:, Description:, Responsibilities:, Requirements:"
+                aria-label="Role Fit follow-up"
+                value={roleInput}
+                onChange={(event) => setRoleInput(event.target.value)}
+              />
               <div className={styles.chatBoxToolbar}>
                 <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                   <span className={styles.msi} aria-hidden="true">add</span>

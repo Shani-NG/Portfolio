@@ -1,0 +1,45 @@
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  font-size: var(--ds-type-label-13-size);
+  font-weight: var(--ds-type-weight-semibold);
+  letter-spacing: 0.08em;
+  line-height: var(--ds-type-label-13-line);
+  text-transform: uppercase;
+}
+
+.withIcon {
+  gap: var(--ds-space-xs);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.primary {
+  color: var(--ds-color-action-primary);
+}
+
+.primaryHover {
+  color: var(--ds-color-action-primary-hover);
+}
+
+.secondary {
+  color: var(--ds-color-action-secondary);
+}
+
+.secondaryHover {
+  color: var(--ds-color-action-secondary-hover);
+}
+
+.textTertiary {
+  color: var(--ds-color-text-tertiary);
+}
+
+.inherit {
+  color: inherit;
+}

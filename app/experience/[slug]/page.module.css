@@ -254,7 +254,8 @@
 }
 
 .c4iProofVisual img {
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   transition: transform var(--ds-duration-slow) var(--ds-ease-standard);
 }
 
@@ -2888,7 +2889,7 @@
 }
 
 .bigRedHtmlSection {
-  padding: clamp(6rem, 10vw, 8rem) 0;
+  padding: var(--ds-case-section-padding) 0;
 }
 
 .washRose {
@@ -3076,6 +3077,22 @@
   padding: 36px 32px 32px;
 }
 
+.snapshotVisual {
+  display: grid;
+  height: clamp(15rem, 26vw, 21rem);
+  align-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--surface-rose);
+}
+
+.snapshotVisual .bigRedInlineImage {
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: drop-shadow(0 1.5rem 3rem color-mix(in srgb, var(--rose-400) 12%, transparent));
+}
+
 .quoteMark {
   position: absolute;
   top: 6px;
@@ -3170,8 +3187,8 @@
   border-top: 1px solid var(--border);
   padding-top: 22px;
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--ds-type-body-14-size);
+  line-height: var(--ds-type-body-14-line);
 }
 
 .disclaimerStrip strong {
@@ -3222,15 +3239,16 @@
 .resetVisual {
   min-height: clamp(16rem, 31vw, 28rem);
   margin-bottom: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-dark-band);
-  box-shadow: var(--shadow);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .resetVisual .bigRedInlineImage {
-  object-fit: cover;
+  object-fit: contain;
+  filter: drop-shadow(0 1.5rem 2.75rem color-mix(in srgb, var(--rose-400) 18%, transparent));
 }
 
 .compareStack,
@@ -3249,18 +3267,21 @@
 
 .compareCard {
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--rose-500) 12%, var(--surface));
+  background: color-mix(in srgb, var(--rose-500) 9%, var(--surface-dark-band));
   color: var(--text-primary);
-  padding: 24px;
+  padding: clamp(1.5rem, 3vw, 1.875rem);
 }
 
 .compareCard p {
-  color: var(--text-secondary);
+  color: var(--ds-color-text-primary);
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
 }
 
 .compareCard h4 {
-  margin-bottom: 10px;
-  font-size: 15.5px;
+  margin-bottom: 12px;
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
 }
 
 .compareCard p,
@@ -3275,6 +3296,12 @@
 .compareCard p,
 .toolBody p {
   color: var(--text-secondary);
+}
+
+.compareCard p {
+  color: var(--ds-color-text-primary);
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
 }
 
 .shutdownCard,
@@ -3385,8 +3412,35 @@
 }
 
 .toolsGrid {
-  width: min(100%, 58rem);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: stretch;
+  width: min(100%, 62rem);
   margin-inline: auto;
+}
+
+.toolsGrid .toolCard:first-child {
+  grid-column: span 6;
+  grid-row: span 2;
+}
+
+.toolsGrid .toolCard:not(:first-child) {
+  grid-column: span 6;
+  grid-template-columns: minmax(10rem, 0.76fr) minmax(0, 1fr);
+  grid-template-rows: auto;
+  gap: clamp(1rem, 2vw, 1.25rem);
+  align-items: center;
+}
+
+.toolsGrid .toolCard:first-child .toolThumb {
+  height: clamp(14rem, 23vw, 20rem);
+}
+
+.toolsGrid .toolCard:not(:first-child) .toolThumb {
+  height: clamp(7.5rem, 10vw, 9rem);
+}
+
+.toolsGrid .toolCard:not(:first-child) .toolBody {
+  padding-top: 0;
 }
 
 .objectiveCard {
@@ -3406,15 +3460,15 @@
 
 .objectiveCard::before {
   position: absolute;
-  right: 0.08em;
-  bottom: 0.02em;
+  top: -0.12em;
+  right: 0.04em;
   color: var(--secondary-process);
   content: attr(data-num);
   font-family: var(--font-display);
   font-size: var(--ds-type-display-64-size);
   font-weight: var(--ds-type-weight-semibold);
   line-height: 1;
-  opacity: 0.1;
+  opacity: 0.08;
   pointer-events: none;
 }
 
@@ -3473,6 +3527,97 @@
   margin-bottom: 0;
 }
 
+.controlTogglePanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(18rem, 0.92fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: center;
+}
+
+.controlToggleVisual {
+  display: grid;
+  height: clamp(18rem, 34vw, 28rem);
+  align-items: center;
+  overflow: visible;
+}
+
+.controlToggleVisual .bigRedInlineImage {
+  object-fit: contain;
+  filter: drop-shadow(0 1.75rem 3rem color-mix(in srgb, var(--green-500) 14%, transparent));
+}
+
+.controlToggleCopy {
+  display: grid;
+  align-content: center;
+  gap: var(--ds-space-lg);
+}
+
+.controlToggleTabs {
+  display: inline-flex;
+  width: fit-content;
+  gap: var(--ds-space-2xs);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 72%, var(--surface-dark-band));
+  padding: 0.25rem;
+}
+
+.controlToggleTab {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ds-type-label-13-size);
+  font-weight: var(--ds-type-weight-semibold);
+  line-height: 1;
+  padding: 0.65rem 0.85rem;
+  transition:
+    background-color var(--ds-duration-fast) var(--ds-ease-standard),
+    color var(--ds-duration-fast) var(--ds-ease-standard),
+    box-shadow var(--ds-duration-fast) var(--ds-ease-standard);
+  white-space: nowrap;
+}
+
+.controlToggleTab[aria-selected="true"] {
+  background: color-mix(in srgb, var(--green-500) 16%, var(--surface));
+  color: var(--ds-color-text-primary);
+  box-shadow: 0 0 1.2rem color-mix(in srgb, var(--green-500) 16%, transparent);
+}
+
+.controlToggleTab:focus-visible {
+  outline: 0;
+  box-shadow: var(--ds-shadow-focus);
+}
+
+.controlToggleText {
+  display: grid;
+  max-width: 27rem;
+}
+
+.controlToggleText > span {
+  margin-bottom: var(--ds-space-sm);
+  color: var(--green-500);
+  font-size: 11px;
+  font-weight: var(--ds-type-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.controlToggleText h4 {
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+  font-size: var(--ds-type-heading-28-size);
+  line-height: var(--ds-type-heading-28-line);
+}
+
+.controlToggleText p {
+  color: var(--text-secondary);
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
+}
+
 .solutionRow.reverse .solutionVisual {
   order: -1;
 }
@@ -3523,16 +3668,14 @@
 .solutionVisual,
 .recoveryVisual {
   position: relative;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
+  overflow: visible;
+  border-radius: 0;
 }
 
 .solutionVisual {
   height: clamp(16rem, 33vw, 28rem);
   background: transparent;
-  transition:
-    box-shadow var(--ds-duration-base) var(--ds-ease-standard),
-    transform var(--ds-duration-base) var(--ds-ease-standard);
+  transition: transform var(--ds-duration-base) var(--ds-ease-standard);
 }
 
 .solutionVisual::after {
@@ -3544,15 +3687,18 @@
   z-index: 1;
   object-fit: contain;
   padding: 0;
-  transition: transform var(--ds-duration-base) var(--ds-ease-standard);
+  filter: drop-shadow(0 1.75rem 3rem color-mix(in srgb, var(--green-500) 14%, transparent));
+  transition:
+    filter var(--ds-duration-base) var(--ds-ease-standard),
+    transform var(--ds-duration-base) var(--ds-ease-standard);
 }
 
 .solutionVisual:hover {
-  box-shadow: 0 0 2.25rem color-mix(in srgb, var(--green-500) 16%, transparent);
   transform: translateY(-0.15rem);
 }
 
 .solutionVisual:hover .bigRedInlineImage {
+  filter: drop-shadow(0 2rem 3.5rem color-mix(in srgb, var(--green-500) 24%, transparent));
   transform: scale(1.035);
 }
 
@@ -3574,23 +3720,24 @@
   height: clamp(17rem, 34vw, 28rem);
   border: 0;
   background: transparent;
-  transition:
-    box-shadow var(--ds-duration-base) var(--ds-ease-standard),
-    transform var(--ds-duration-base) var(--ds-ease-standard);
+  transition: transform var(--ds-duration-base) var(--ds-ease-standard);
 }
 
 .recoveryVisual .bigRedInlineImage {
   object-fit: contain;
   padding: 0;
-  transition: transform var(--ds-duration-base) var(--ds-ease-standard);
+  filter: drop-shadow(0 1.75rem 3rem color-mix(in srgb, var(--green-500) 14%, transparent));
+  transition:
+    filter var(--ds-duration-base) var(--ds-ease-standard),
+    transform var(--ds-duration-base) var(--ds-ease-standard);
 }
 
 .recoveryVisual:hover {
-  box-shadow: 0 0 2.25rem color-mix(in srgb, var(--green-500) 16%, transparent);
   transform: translateY(-0.15rem);
 }
 
 .recoveryVisual:hover .bigRedInlineImage {
+  filter: drop-shadow(0 2rem 3.5rem color-mix(in srgb, var(--green-500) 24%, transparent));
   transform: scale(1.035);
 }
 
@@ -3631,34 +3778,34 @@
 .toolCard {
   display: grid;
   grid-template-rows: auto auto;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  transition:
-    border-color var(--ds-duration-fast) var(--ds-ease-standard),
-    box-shadow var(--ds-duration-fast) var(--ds-ease-standard),
-    transform var(--ds-duration-fast) var(--ds-ease-standard);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: transform var(--ds-duration-fast) var(--ds-ease-standard);
 }
 
 .toolThumb {
   height: clamp(9.5rem, 15vw, 13rem);
   padding: 0;
-  background:
-    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--green-500) 16%, transparent), transparent 50%),
-    var(--surface-rose);
+  background: transparent;
 }
 
 .toolThumb .bigRedInlineImage {
   height: 100%;
   object-fit: contain;
   object-position: center;
-  transition: transform var(--ds-duration-base) var(--ds-ease-standard);
+  filter: drop-shadow(0 1.25rem 2.5rem color-mix(in srgb, var(--green-500) 14%, transparent));
+  transition:
+    filter var(--ds-duration-base) var(--ds-ease-standard),
+    transform var(--ds-duration-base) var(--ds-ease-standard);
 }
 
 .toolBody {
+  border-top: 1px solid var(--border);
   color: var(--text-primary);
-  padding: clamp(1rem, 2vw, 1.2rem);
+  padding: clamp(0.875rem, 1.8vw, 1.1rem) 0 0;
 }
 
 .toolBody h4 {
@@ -3680,12 +3827,11 @@
 }
 
 .toolCard:hover {
-  border-color: color-mix(in srgb, var(--green-500) 44%, var(--border));
-  box-shadow: 0 0 2rem color-mix(in srgb, var(--green-500) 18%, transparent), var(--shadow);
   transform: translateY(-0.18rem);
 }
 
 .toolCard:hover .bigRedInlineImage {
+  filter: drop-shadow(0 1.75rem 3rem color-mix(in srgb, var(--green-500) 24%, transparent));
   transform: scale(1.035);
 }
 
@@ -3693,11 +3839,15 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: clamp(1rem, 3vw, 2.75rem);
-  padding: 0 28px 14px;
+  padding: 0 28px calc(var(--ds-space-sm) / 2);
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.changedWrap {
+  gap: var(--ds-space-sm);
 }
 
 .changedLegend span:first-child {
@@ -3970,7 +4120,7 @@
   position: relative;
   z-index: 2;
   max-width: 22rem;
-  margin-top: 1rem;
+  margin-top: var(--ds-space-sm);
   color: var(--text-secondary);
   font-size: var(--ds-type-body-14-size);
   line-height: var(--ds-type-body-14-line);
@@ -4112,6 +4262,7 @@
 
   .solutionVisual,
   .recoveryVisual,
+  .controlToggleTab,
   .toolCard,
   .toolThumb .bigRedInlineImage,
   .changedMobileGroup,
@@ -4148,6 +4299,7 @@
 
   .problemGrid,
   .solutionRow,
+  .controlTogglePanel,
   .recoveryGrid {
     gap: clamp(1.25rem, 3vw, 2rem);
   }
@@ -4185,7 +4337,7 @@
   }
 
   .bigRedHtmlSection {
-    padding: 82px 0;
+    padding: var(--ds-case-section-padding) 0;
   }
 
   .bigRedHtmlHero {
@@ -4197,11 +4349,23 @@
   }
 
   .snapshotGridHtml {
-    grid-template-columns: minmax(0, 1fr) minmax(9rem, 0.72fr);
+    grid-template-columns: 1fr;
+    gap: var(--ds-space-lg);
+  }
+
+  .requestCard {
+    padding: 1.4rem 1.25rem;
+  }
+
+  .requestCard blockquote {
+    margin-bottom: 0;
+    font-size: var(--ds-type-heading-18-size);
+    line-height: var(--ds-type-heading-18-line);
   }
 
   .problemGrid,
   .solutionRow,
+  .controlTogglePanel,
   .recoveryGrid,
   .changedLegend,
   .changedRow,
@@ -4212,6 +4376,35 @@
 
   .solutionRow.reverse .solutionVisual {
     order: 1;
+  }
+
+  .controlTogglePanel {
+    gap: var(--ds-space-lg);
+  }
+
+  .controlToggleVisual {
+    order: 2;
+    height: clamp(13rem, 68vw, 22rem);
+  }
+
+  .controlToggleCopy {
+    order: 1;
+  }
+
+  .controlToggleTabs {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .controlToggleTab {
+    flex: 1 1 calc(50% - var(--ds-space-2xs));
+    padding-inline: 0.5rem;
+    text-align: center;
+  }
+
+  .controlToggleText {
+    max-width: none;
   }
 
   .recoveryGrid > :first-child {
@@ -4240,11 +4433,28 @@
   }
 
   .toolThumb {
-    height: clamp(7.5rem, 34vw, 11rem);
+    height: clamp(8rem, 42vw, 12rem);
   }
 
   .toolsGrid {
     width: min(100%, 24rem);
+  }
+
+  .toolsGrid .toolCard:first-child,
+  .toolsGrid .toolCard:not(:first-child) {
+    grid-column: auto;
+    grid-row: auto;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .toolsGrid .toolCard:first-child .toolThumb,
+  .toolsGrid .toolCard:not(:first-child) .toolThumb {
+    height: clamp(8rem, 42vw, 12rem);
+  }
+
+  .toolsGrid .toolCard:not(:first-child) .toolBody {
+    padding-top: clamp(0.875rem, 1.8vw, 1.1rem);
   }
 
   .changedLegend,
@@ -4781,6 +4991,627 @@
   .c4iHtmlPage .c4iMergeNode,
   .c4iHtmlPage .c4iMergeNode > span,
   .c4iHtmlPage .c4iRadarSweep { animation: none; }
+}
+
+/* C4I approved refinement: hero rhythm, full-bleed system structure, and external fusion motion. */
+.c4iHtmlPage .c4iHtmlHero {
+  min-height: calc(100svh - var(--site-header-height));
+  align-items: end;
+  padding: 0;
+}
+
+.c4iHtmlPage .c4iHtmlHero .c4iHtmlWrap {
+  align-self: end;
+  padding-block: clamp(6rem, 12vw, 9rem) clamp(3.5rem, 8vw, 6rem);
+}
+
+.c4iSystemStructure {
+  display: grid;
+  min-height: calc(100svh - var(--site-header-height));
+  align-items: center;
+  isolation: isolate;
+  background: var(--surface-dark-band);
+  color: var(--text-on-dark);
+  scroll-margin-top: var(--site-header-height);
+}
+
+.c4iSystemStructure::before,
+.c4iSystemStructure::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+}
+
+.c4iSystemStructure::before {
+  z-index: -2;
+  background:
+    url("/assets/case-studies/c4i-beyond-clarity/03-four-pillars-one-logic.png")
+    center / cover no-repeat;
+  filter: saturate(1.06) contrast(1.05) brightness(0.72);
+  transform: scale(1.01);
+}
+
+.c4iSystemStructure::after {
+  z-index: -1;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--surface-dark-band) 78%, transparent) 0%, color-mix(in srgb, var(--surface-dark-band) 46%, transparent) 48%, color-mix(in srgb, var(--surface-dark-band) 18%, transparent) 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-dark-band) 36%, transparent), color-mix(in srgb, var(--surface-dark-band) 62%, transparent));
+}
+
+.c4iSystemStructure .c4iHtmlWrap {
+  position: relative;
+  z-index: 1;
+}
+
+.c4iSystemStructure .c4iSectionHead {
+  max-width: min(43rem, 100%);
+}
+
+.c4iSystemStructure .c4iSectionHead h2 {
+  color: var(--text-on-dark);
+}
+
+.c4iSystemStructure .c4iSectionHead p {
+  color: var(--text-on-dark-body);
+}
+
+.c4iHtmlPage .c4iMergeViz {
+  display: grid;
+  min-height: clamp(22rem, 36vw, 30rem);
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #0b0b0d;
+}
+
+.c4iHtmlPage .c4iMergeViz::before,
+.c4iHtmlPage .c4iMergeViz::after {
+  display: none;
+}
+
+.c4iMergeFrame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  border: 0;
+  background: #0b0b0d;
+}
+
+@media (max-width: 48rem) {
+  .c4iHtmlPage .c4iHtmlHero .c4iHtmlWrap {
+    padding-block: clamp(5rem, 18vw, 6.5rem) clamp(3rem, 12vw, 4rem);
+  }
+
+  .c4iSystemStructure {
+    min-height: 100svh;
+    align-items: center;
+  }
+
+  .c4iSystemStructure::before {
+    background-position: center top;
+    filter: saturate(1.04) contrast(1.03) brightness(0.58);
+  }
+
+  .c4iSystemStructure::after {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--surface-dark-band) 18%, transparent), color-mix(in srgb, var(--surface-dark-band) 88%, transparent) 72%),
+      linear-gradient(90deg, color-mix(in srgb, var(--surface-dark-band) 70%, transparent), color-mix(in srgb, var(--surface-dark-band) 36%, transparent));
+  }
+
+  .c4iHtmlPage .c4iMergeViz {
+    min-height: clamp(18rem, 78vw, 24rem);
+  }
+}
+
+/* Monitoring and Product Intelligence: HTML content structure translated into the portfolio system. */
+.monitoringPage {
+  overflow-x: hidden;
+  background: var(--ds-color-canvas);
+  color: var(--ds-color-text-primary);
+}
+
+.monitoringWrap {
+  width: min(calc(100% - (var(--ds-grid-gutter) * 2)), var(--ds-layout-content-max));
+  margin-inline: auto;
+}
+
+.monitoringHero {
+  position: relative;
+  display: grid;
+  min-height: calc(100svh - var(--site-header-height));
+  align-items: end;
+  overflow: hidden;
+  background: var(--surface-dark-band);
+  color: var(--text-on-dark);
+  padding-block: clamp(6rem, 10vw, 9rem) clamp(3.5rem, 8vw, 6rem);
+  scroll-margin-top: var(--site-header-height);
+}
+
+.monitoringHeroBg {
+  position: absolute;
+  inset: 0;
+  opacity: 0.44;
+}
+
+.monitoringHeroBg :global(img) {
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(1.04) contrast(1.08);
+}
+
+.monitoringHero::after {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 32%, color-mix(in srgb, var(--rose-500) 18%, transparent), transparent 22rem),
+    radial-gradient(circle at 86% 72%, color-mix(in srgb, var(--green-500) 16%, transparent), transparent 28rem),
+    linear-gradient(90deg, color-mix(in srgb, var(--surface-dark-band) 86%, transparent) 0%, color-mix(in srgb, var(--surface-dark-band) 55%, transparent) 54%, color-mix(in srgb, var(--surface-dark-band) 24%, transparent) 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-dark-band) 18%, transparent), var(--surface-dark-band));
+  content: "";
+}
+
+.monitoringHeroCopy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  max-width: 46rem;
+}
+
+.monitoringEyebrow {
+  margin: 0 0 var(--ds-space-type-label-to-heading);
+  color: var(--ds-color-action-primary-hover);
+}
+
+.monitoringIcon {
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.monitoringHero h1 {
+  max-width: 13ch;
+  margin: 0 0 var(--ds-space-type-heading-to-subheading);
+  color: var(--text-on-dark);
+  font-size: var(--ds-type-display-64-size);
+  font-weight: var(--ds-type-weight-semibold);
+  line-height: var(--ds-type-display-line);
+  letter-spacing: 0;
+}
+
+.monitoringHeroCopy > p {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--text-on-dark-body);
+  font-size: var(--ds-type-heading-22-size);
+  line-height: var(--ds-type-heading-22-line);
+}
+
+.monitoringHeroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-xl);
+  margin: clamp(2rem, 5vw, 3rem) 0 var(--ds-space-lg);
+}
+
+.monitoringHeroMeta div {
+  display: grid;
+  gap: var(--ds-space-3xs);
+}
+
+.monitoringHeroMeta dt {
+  color: var(--ds-color-action-primary-hover);
+  font-size: var(--ds-type-label-13-size);
+  font-weight: var(--ds-type-weight-semibold);
+  letter-spacing: 0.08em;
+  line-height: var(--ds-type-label-13-line);
+  text-transform: uppercase;
+}
+
+.monitoringHeroMeta dd {
+  margin: 0;
+  color: var(--text-on-dark);
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
+}
+
+.monitoringPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-xs);
+}
+
+.monitoringPills span {
+  border: 1px solid color-mix(in srgb, var(--text-on-dark) 14%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-dark-band) 68%, transparent);
+  color: var(--text-on-dark);
+  font-size: var(--ds-type-label-13-size);
+  font-weight: var(--ds-type-weight-semibold);
+  line-height: var(--ds-type-label-13-line);
+  padding: 0.55rem 0.8rem;
+}
+
+.monitoringSection {
+  position: relative;
+  min-height: calc(100svh - var(--site-header-height));
+  overflow: hidden;
+  padding-block: var(--ds-case-section-padding);
+  scroll-margin-top: calc(var(--site-header-height) + 1rem);
+}
+
+.monitoringWashGreen {
+  background:
+    radial-gradient(circle at 8% 12%, color-mix(in srgb, var(--green-500) 13%, transparent), transparent 22rem),
+    var(--ds-color-surface-muted);
+}
+
+.monitoringWashRose {
+  background:
+    radial-gradient(circle at 92% 14%, color-mix(in srgb, var(--rose-500) 11%, transparent), transparent 24rem),
+    var(--ds-color-surface-muted);
+}
+
+.monitoringWashNeutral {
+  background: var(--ds-color-canvas);
+}
+
+.monitoringSplit,
+.monitoringLoopGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(18rem, 1.1fr);
+  gap: clamp(2.5rem, 6vw, 4.5rem);
+  align-items: center;
+}
+
+.monitoringSplitReverse {
+  grid-template-columns: minmax(18rem, 1.1fr) minmax(0, 0.9fr);
+}
+
+.monitoringSplitReverse .monitoringSectionHead {
+  order: 2;
+}
+
+.monitoringSplitReverse .monitoringVisual {
+  order: 1;
+}
+
+.monitoringSectionHead {
+  display: grid;
+  max-width: 46rem;
+}
+
+.monitoringSectionHead h2 {
+  margin: 0 0 var(--ds-space-type-heading-to-subheading);
+  color: var(--ds-color-text-primary);
+  font-size: var(--ds-case-section-title-size);
+  font-weight: var(--ds-type-weight-semibold);
+  line-height: var(--ds-case-section-title-line);
+  letter-spacing: 0;
+}
+
+.monitoringSectionHead p,
+.monitoringClosing > .monitoringWrap > p {
+  margin: 0;
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+.monitoringVisual {
+  position: relative;
+  display: grid;
+  min-height: clamp(21rem, 34vw, 28rem);
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--rose-500) 10%, transparent), color-mix(in srgb, var(--green-500) 12%, transparent)),
+    var(--surface-dark-band);
+  box-shadow: var(--ds-shadow-soft);
+  color: var(--text-on-dark);
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+  text-align: center;
+}
+
+.monitoringVisualShort {
+  min-height: clamp(19rem, 30vw, 24rem);
+}
+
+.monitoringVisualTall {
+  min-height: clamp(25rem, 38vw, 32rem);
+}
+
+.monitoringVisualGrid {
+  position: absolute;
+  inset: 12%;
+  border: 1px solid color-mix(in srgb, var(--text-on-dark) 10%, transparent);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--text-on-dark) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--text-on-dark) 8%, transparent) 1px, transparent 1px);
+  background-size: 2.2rem 2.2rem;
+  mask-image: radial-gradient(circle, #000 0%, transparent 72%);
+}
+
+.monitoringVisualPulse {
+  position: absolute;
+  width: clamp(10rem, 22vw, 18rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--ds-color-action-primary-hover) 26%, transparent), transparent 68%);
+  animation: monitoring-pulse 4.8s var(--ds-ease-standard) infinite;
+}
+
+.monitoringVisual .monitoringIcon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 4.25rem;
+  height: 4.25rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--text-on-dark) 14%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-dark-band) 72%, transparent);
+  color: var(--ds-color-action-primary-hover);
+  font-size: 2rem;
+}
+
+.monitoringVisual strong {
+  position: relative;
+  z-index: 1;
+  max-width: 20rem;
+  margin-top: var(--ds-space-md);
+  color: var(--text-on-dark);
+  font-size: var(--ds-type-heading-18-size);
+  font-weight: var(--ds-type-weight-semibold);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+.monitoringCardGridTwo,
+.monitoringCardGridThree,
+.monitoringColumnGrid {
+  display: grid;
+  gap: var(--ds-space-md);
+  margin-top: clamp(2rem, 5vw, 3.5rem);
+}
+
+.monitoringCardGridTwo,
+.monitoringColumnGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.monitoringCardGridThree {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.monitoringInfoCard {
+  display: grid;
+  align-content: start;
+  min-height: 14rem;
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--ds-color-surface-raised) 82%, transparent);
+  box-shadow: var(--ds-shadow-soft);
+  padding: clamp(1.35rem, 3vw, 1.8rem);
+}
+
+.monitoringCardIcon {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ds-color-action-primary) 12%, transparent);
+  color: var(--ds-color-action-primary-hover);
+  margin-bottom: var(--ds-space-lg);
+}
+
+.monitoringInfoCard h3,
+.monitoringFinding h3 {
+  margin: 0 0 var(--ds-space-xs);
+  color: var(--ds-color-text-primary);
+  font-size: var(--ds-type-heading-18-size);
+  font-weight: var(--ds-type-weight-semibold);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+.monitoringInfoCard p,
+.monitoringFinding p,
+.monitoringList li {
+  margin: 0;
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
+}
+
+.monitoringList {
+  display: grid;
+  gap: var(--ds-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.monitoringList li {
+  position: relative;
+  padding-left: 1.4rem;
+}
+
+.monitoringList li::before {
+  position: absolute;
+  top: 0.06em;
+  left: 0;
+  color: var(--ds-color-action-primary-hover);
+  content: "->";
+  font-weight: var(--ds-type-weight-semibold);
+}
+
+.monitoringFindingList {
+  display: grid;
+  gap: 0;
+  margin-top: var(--ds-space-xl);
+}
+
+.monitoringFinding {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--ds-space-sm);
+  border-top: 1px solid var(--ds-color-border-subtle);
+  padding-block: var(--ds-space-md);
+}
+
+.monitoringFinding .monitoringIcon {
+  color: var(--ds-color-action-primary-hover);
+  margin-top: 0.2rem;
+}
+
+.monitoringClosing {
+  position: relative;
+  display: grid;
+  min-height: calc(100svh - var(--site-header-height));
+  align-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 80% 12%, color-mix(in srgb, var(--rose-500) 14%, transparent), transparent 25rem),
+    radial-gradient(circle at 12% 82%, color-mix(in srgb, var(--green-500) 12%, transparent), transparent 25rem),
+    var(--surface-dark-band);
+  color: var(--text-on-dark);
+  padding-block: var(--ds-case-section-padding);
+  scroll-margin-top: var(--site-header-height);
+}
+
+.monitoringClosing .monitoringSectionHead h2,
+.monitoringClosing .monitoringSectionHead p,
+.monitoringClosing > .monitoringWrap > p {
+  color: var(--text-on-dark);
+}
+
+.monitoringClosing .monitoringSectionHead p,
+.monitoringClosing > .monitoringWrap > p {
+  max-width: 48rem;
+  color: var(--text-on-dark-body);
+}
+
+.monitoringClosing > .monitoringWrap > p {
+  margin-top: var(--ds-space-lg);
+}
+
+@keyframes monitoring-pulse {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.88);
+  }
+
+  50% {
+    opacity: 0.72;
+    transform: scale(1.08);
+  }
+}
+
+@media (min-width: 49rem) and (max-width: 68rem) {
+  .monitoringSplit,
+  .monitoringSplitReverse,
+  .monitoringLoopGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .monitoringSplitReverse .monitoringSectionHead,
+  .monitoringSplitReverse .monitoringVisual {
+    order: unset;
+  }
+
+  .monitoringCardGridThree {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 48rem) {
+  .monitoringHero {
+    min-height: calc(100svh - var(--site-header-height));
+    padding-block: clamp(5rem, 18vw, 6.5rem) clamp(3rem, 12vw, 4rem);
+  }
+
+  .monitoringHeroBg {
+    opacity: 0.34;
+  }
+
+  .monitoringHeroBg :global(img) {
+    object-position: center top;
+  }
+
+  .monitoringHero::after {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--surface-dark-band) 18%, transparent), var(--surface-dark-band) 82%),
+      linear-gradient(90deg, color-mix(in srgb, var(--surface-dark-band) 70%, transparent), color-mix(in srgb, var(--surface-dark-band) 26%, transparent));
+  }
+
+  .monitoringHero h1 {
+    font-size: var(--ds-type-display-48-size);
+    line-height: var(--ds-type-display-48-line);
+  }
+
+  .monitoringHeroCopy > p,
+  .monitoringSectionHead p,
+  .monitoringClosing > .monitoringWrap > p {
+    font-size: var(--ds-type-heading-18-size);
+    line-height: var(--ds-type-heading-18-line);
+  }
+
+  .monitoringHeroMeta {
+    gap: var(--ds-space-md);
+  }
+
+  .monitoringPills {
+    gap: var(--ds-space-2xs);
+  }
+
+  .monitoringPills span {
+    flex: 1 1 calc(50% - var(--ds-space-2xs));
+    text-align: center;
+  }
+
+  .monitoringSection,
+  .monitoringClosing {
+    min-height: 100svh;
+    padding-block: var(--ds-case-section-padding);
+  }
+
+  .monitoringSplit,
+  .monitoringSplitReverse,
+  .monitoringLoopGrid,
+  .monitoringCardGridTwo,
+  .monitoringCardGridThree,
+  .monitoringColumnGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .monitoringSplitReverse .monitoringSectionHead,
+  .monitoringSplitReverse .monitoringVisual {
+    order: unset;
+  }
+
+  .monitoringSectionHead h2 {
+    font-size: var(--ds-type-heading-28-size);
+    line-height: var(--ds-type-heading-28-line);
+  }
+
+  .monitoringVisual,
+  .monitoringVisualShort,
+  .monitoringVisualTall {
+    min-height: clamp(18rem, 72vw, 24rem);
+  }
+
+  .monitoringInfoCard {
+    min-height: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .monitoringVisualPulse {
+    animation: none;
+  }
 }
 
 /* Case Study System v1: EPD establishes the shared section rhythm. */
