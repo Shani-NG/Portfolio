@@ -5,6 +5,8 @@ export type RoleFitModelProviderName = "mock" | "gemini";
 export type RoleFitModelInput = {
   roleText: string;
   language: "he" | "en" | "mixed";
+  task: "chat" | "analysis";
+  maxOutputTokens: number;
 };
 
 export type RoleFitModelResult =

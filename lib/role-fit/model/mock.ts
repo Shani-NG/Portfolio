@@ -27,7 +27,7 @@ export function createMockRoleFitProvider(): RoleFitModelProvider {
         },
         evidenceConfidence: {
           level: "low",
-          rationale: "The live evidence retrieval and Gemini report generation steps are not yet enabled in this local mock mode.",
+          rationale: `The live evidence retrieval and Gemini report generation steps are not yet enabled in this local mock mode. Task: ${input.task}. Output limit: ${input.maxOutputTokens} tokens.`,
         },
         skillsMatch: {
           items: [],

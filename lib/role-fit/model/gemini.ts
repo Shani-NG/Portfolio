@@ -1,4 +1,5 @@
 import { reportUIPayloadSchema } from "../contracts/index.ts";
+import { getGoogleAiStudioModel } from "../runtime/policy.ts";
 import type { RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
 
 type GeminiCandidate = {
@@ -22,7 +23,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
     name: "gemini",
     async generateReport(input: RoleFitModelInput): Promise<RoleFitModelResult> {
       const apiKey = process.env.GOOGLE_AI_STUDIO_API_KEY;
-      const model = process.env.GOOGLE_AI_STUDIO_MODEL;
+      const model = getGoogleAiStudioModel(input.task);
 
       if (!apiKey || !model) {
         return {
@@ -54,6 +55,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
             },
           ],
           generationConfig: {
+            maxOutputTokens: input.maxOutputTokens,
             responseMimeType: "application/json",
             temperature: 0.2,
           },
