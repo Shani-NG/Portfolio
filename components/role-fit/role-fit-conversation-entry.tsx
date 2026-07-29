@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AgentComposer } from "@/components/ui/agent-composer";
+import { setPendingHomeRoleFitInput } from "@/lib/role-fit/client/session";
 import styles from "./role-fit-conversation-entry.module.css";
 
 const rotatingTerms = ["Product Strategy", "Vision & Innovation", "AI Workflows"];
@@ -119,7 +120,13 @@ export function RoleFitConversationEntry() {
           className={styles.composer}
           placeholder="Ask me anything about my experience or choose a starting point to begin the conversation."
           actions={quickActions}
-          onSubmit={() => router.push("/minime")}
+          onSubmit={(payload) => {
+            setPendingHomeRoleFitInput({
+              ...payload,
+              text: payload.text || (payload.fileName ? "I uploaded a job description file for validation." : ""),
+            });
+            router.push("/minime");
+          }}
           state="empty"
         />
       </div>

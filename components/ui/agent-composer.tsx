@@ -21,7 +21,7 @@ type AgentComposerProps = {
   actions?: ComposerAction[];
   statusText?: string;
   className?: string;
-  onSubmit?: () => void;
+  onSubmit?: (payload: { text: string; fileName?: string; fileText?: string }) => void;
 };
 
 function joinClasses(...classes: Array<string | false | undefined>) {
@@ -54,6 +54,7 @@ export function AgentComposer({
   const isLoading = state === "loading";
   const [inputValue, setInputValue] = useState(value);
   const [uploadedFileName, setUploadedFileName] = useState("");
+  const [uploadedFileText, setUploadedFileText] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const hasValue = inputValue.trim().length > 0 || uploadedFileName.length > 0 || isLoading;
   const isHintOnly = !hasValue;
@@ -90,6 +91,19 @@ export function AgentComposer({
     }
   };
 
+  const handleSubmit = () => {
+    if (isDisabled || isHintOnly || isLoading) return;
+
+    onSubmit?.({
+      text: inputValue,
+      fileName: uploadedFileName || undefined,
+      fileText: uploadedFileText || undefined,
+    });
+    setInputValue("");
+    setUploadedFileName("");
+    setUploadedFileText("");
+  };
+
   return (
     <div className={joinClasses(styles.shell, styles[visualState], className)} data-has-value={hasValue}>
       <div className={styles.inputSurface} aria-disabled={isDisabled}>
@@ -98,7 +112,14 @@ export function AgentComposer({
             <div className={styles.uploadedFileTag}>
               <MaterialIcon name="description" />
               <span>{uploadedFileName}</span>
-              <button aria-label="Remove attached file" type="button" onClick={() => setUploadedFileName("")}>
+              <button
+                aria-label="Remove attached file"
+                type="button"
+                onClick={() => {
+                  setUploadedFileName("");
+                  setUploadedFileText("");
+                }}
+              >
                 <MaterialIcon name="cancel" />
               </button>
             </div>
@@ -129,7 +150,14 @@ export function AgentComposer({
             disabled={isDisabled}
             onChange={(event) => {
               const file = event.target.files?.[0];
-              if (file) setUploadedFileName(file.name);
+              if (!file) return;
+
+              setUploadedFileName(file.name);
+              if (file.type.startsWith("text/") || /\.(md|txt|csv)$/i.test(file.name)) {
+                void file.text().then(setUploadedFileText).catch(() => setUploadedFileText(""));
+              } else {
+                setUploadedFileText("");
+              }
             }}
             ref={fileInputRef}
             type="file"
@@ -141,7 +169,7 @@ export function AgentComposer({
             <ComposerButton aria-label="Voice input" disabled={isDisabled}>
               <MaterialIcon name="mic" />
             </ComposerButton>
-            <ComposerButton className={styles.submitButton} aria-label="Generate role fit report" disabled={isDisabled || isHintOnly || isLoading} onClick={onSubmit}>
+            <ComposerButton className={styles.submitButton} aria-label="Send to Role Fit agent" disabled={isDisabled || isHintOnly || isLoading} onClick={handleSubmit}>
               <MaterialIcon name="arrow_forward" />
             </ComposerButton>
           </div>

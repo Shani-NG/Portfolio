@@ -1,6 +1,6 @@
 import { reportUIPayloadSchema } from "../contracts/index.ts";
 import { getGoogleAiStudioModel } from "../runtime/policy.ts";
-import type { RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
+import type { RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
 
 type GeminiCandidate = {
   content?: {
@@ -86,6 +86,82 @@ function createEvidenceLimitedReport(input: RoleFitModelInput, model: string, mo
 export function createGeminiRoleFitProvider(): RoleFitModelProvider {
   return {
     name: "gemini",
+    async generateChat(input: RoleFitChatInput): Promise<RoleFitChatResult> {
+      const apiKey = process.env.GOOGLE_AI_STUDIO_API_KEY ?? process.env.GEMINI_API_KEY;
+      const model = getGoogleAiStudioModel("chat");
+
+      if (!apiKey || !model) {
+        return {
+          ok: false,
+          provider: "gemini",
+          model,
+          error: "missing-configuration",
+          safeMessageKey: "model.google_ai_studio_missing_configuration",
+        };
+      }
+
+      const normalizedModel = normalizeGeminiModel(model);
+      const prompt = [
+        "You are Shani Nakash-Gomel's portfolio conversation agent.",
+        "Answer in the user's active language when clear.",
+        "Use only the approved context below for professional claims.",
+        "Do not invent achievements, metrics, clients, recommendations, rankings, or hiring decisions.",
+        "Do not generate a role-fit report in chat. If the user asks for a report or fit analysis, explain that the role details must be validated and explicitly confirmed first.",
+        "For unclear general questions, ask one focused clarifying question or answer with a brief relevant direction.",
+        `Approved context:\n${input.approvedContext}`,
+        `User message:\n${input.message}`,
+      ].join("\n\n");
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normalizedModel)}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: input.maxOutputTokens,
+            temperature: 0.25,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          provider: "gemini",
+          model: normalizedModel,
+          error: "provider-error",
+          safeMessageKey: "model.google_ai_studio_provider_error",
+          detail: `${response.status} ${response.statusText}`,
+        };
+      }
+
+      const data = (await response.json()) as GeminiResponse;
+      const answer = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
+
+      if (!answer) {
+        return {
+          ok: false,
+          provider: "gemini",
+          model: normalizedModel,
+          error: "invalid-output",
+          safeMessageKey: "model.google_ai_studio_empty_output",
+        };
+      }
+
+      return {
+        ok: true,
+        provider: "gemini",
+        model: normalizedModel,
+        answer,
+      };
+    },
     async generateReport(input: RoleFitModelInput): Promise<RoleFitModelResult> {
       const apiKey = process.env.GOOGLE_AI_STUDIO_API_KEY ?? process.env.GEMINI_API_KEY;
       const model = getGoogleAiStudioModel(input.task);

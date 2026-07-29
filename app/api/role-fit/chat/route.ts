@@ -1,0 +1,124 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getRoleFitModelProvider } from "@/lib/role-fit/model";
+import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
+import { looksLikeReportIntent, looksLikeRoleInput, validateRoleText } from "@/lib/role-fit/server/role-understanding";
+
+const requestSchema = z
+  .object({
+    conversationId: z.string(),
+    message: z.string().min(1),
+    language: z.enum(["he", "en", "mixed"]).default("en"),
+  })
+  .strict();
+
+async function loadApprovedConversationContext() {
+  const root = process.cwd();
+  const files = [
+    "PORTFOLIO_IMPLEMENTATION/role-fit-agent/docs/canonical/General_Profile_Knowledge.md",
+    "PORTFOLIO_IMPLEMENTATION/role-fit-agent/docs/canonical/Portfolio_Knowledge_Index.md",
+  ];
+  const contents = await Promise.all(
+    files.map(async (file) => {
+      const content = await readFile(join(root, file), "utf8");
+      return content.slice(0, 12000);
+    }),
+  );
+
+  return contents.join("\n\n---\n\n");
+}
+
+function missingFieldsCopy(missingFields: string[]) {
+  if (missingFields.length === 0) return "the remaining role details";
+
+  return missingFields.join(", ");
+}
+
+export async function POST(request: Request) {
+  const policy = getRoleFitPolicy();
+  const parsedRequest = requestSchema.safeParse(await request.json().catch(() => null));
+
+  if (!parsedRequest.success) {
+    return NextResponse.json(
+      {
+        state: "recoverable-error",
+        answer: "I need a message before I can continue.",
+        safeMessageKey: "conversation.invalid_request",
+      },
+      { status: 400 },
+    );
+  }
+
+  if (parsedRequest.data.message.length > policy.maxInputChars) {
+    return NextResponse.json(
+      {
+        state: "recoverable-error",
+        answer: "This is too much text for one message. Please send the core role description or the most relevant section first.",
+        safeMessageKey: "conversation.input_too_long",
+      },
+      { status: 413 },
+    );
+  }
+
+  const traceId = crypto.randomUUID();
+  const hasReportIntent = looksLikeReportIntent(parsedRequest.data.message);
+  const hasRoleInput = looksLikeRoleInput(parsedRequest.data.message);
+
+  if (hasReportIntent || hasRoleInput) {
+    const validation = validateRoleText({
+      conversationId: parsedRequest.data.conversationId,
+      traceId,
+      roleText: parsedRequest.data.message,
+      detectedLanguage: parsedRequest.data.language,
+    });
+
+    if (validation.parseStatus === "valid-complete") {
+      return NextResponse.json({
+        state: "awaiting-report-confirmation",
+        answer: "I found enough role detail to prepare a report request. Before I generate anything, please confirm that you want me to create an evidence-based Role Fit report for this role.",
+        validation,
+        safeMessageKey: "role.ready_for_confirmation",
+      });
+    }
+
+    return NextResponse.json({
+      state: "awaiting-role-completion",
+      answer: `I can help with a Role Fit report, but I need a little more role information first: ${missingFieldsCopy(validation.missingFields)}. Please add only the missing details and I will continue from there.`,
+      validation,
+      safeMessageKey: "role.missing_required_fields",
+    });
+  }
+
+  const provider = getRoleFitModelProvider();
+  const approvedContext = await loadApprovedConversationContext();
+  const modelResult = await provider.generateChat({
+    message: parsedRequest.data.message,
+    language: parsedRequest.data.language,
+    maxOutputTokens: Math.min(policy.maxOutputTokens, 900),
+    approvedContext,
+  });
+
+  if (!modelResult.ok) {
+    return NextResponse.json(
+      {
+        state: "recoverable-error",
+        provider: modelResult.provider,
+        model: modelResult.model,
+        error: modelResult.error,
+        answer: "The live conversation service is not available right now. You can still paste role details, and I will keep the conversation state ready for retry.",
+        safeMessageKey: modelResult.safeMessageKey,
+        detail: modelResult.detail,
+      },
+      { status: modelResult.error === "missing-configuration" ? 503 : 502 },
+    );
+  }
+
+  return NextResponse.json({
+    state: "general-qa",
+    provider: modelResult.provider,
+    model: modelResult.model,
+    answer: modelResult.answer,
+  });
+}

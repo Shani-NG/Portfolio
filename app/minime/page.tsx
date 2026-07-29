@@ -1,20 +1,31 @@
 "use client";
 
 import { Chip } from "@/components/ui/chip";
-import { useMemo, useState } from "react";
+import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 
 type RoleFitScreenState = "home" | "conversation" | "missing-details" | "generating" | "error" | "report";
+type RoleFitDisplayMode = "live" | RoleFitScreenState;
 type FitMode = "strong" | "good" | "partial";
 type MatchType = "direct" | "semantic" | "transferable" | "partial" | "insufficient";
 
-const screenOptions: { value: RoleFitScreenState; label: string }[] = [
-  { value: "home", label: "Initial entry" },
-  { value: "conversation", label: "Conversation started" },
-  { value: "missing-details", label: "Missing job details" },
-  { value: "generating", label: "Generating report" },
-  { value: "error", label: "Report generation failed" },
-  { value: "report", label: "Fit report" },
+type LiveReportState = {
+  provider?: string;
+  model?: string;
+  label?: string;
+  rationale?: string;
+};
+
+const screenOptions: { value: RoleFitDisplayMode; label: string }[] = [
+  { value: "live", label: "Live agent" },
+  { value: "home", label: "Simulation - initial entry" },
+  { value: "conversation", label: "Simulation - conversation started" },
+  { value: "missing-details", label: "Simulation - missing job details" },
+  { value: "generating", label: "Simulation - generating report" },
+  { value: "error", label: "Simulation - report generation failed" },
+  { value: "report", label: "Simulation - fit report" },
 ];
 
 const evidenceProjects = [
@@ -279,35 +290,110 @@ const matchTones: Record<MatchType, "success" | "secondary" | "warning"> = {
 };
 
 export default function RoleFitPage() {
+  const [displayMode, setDisplayMode] = useState<RoleFitDisplayMode>("live");
   const [screenState, setScreenState] = useState<RoleFitScreenState>("home");
   const [fitMode, setFitMode] = useState<FitMode>("strong");
   const [activeProject, setActiveProject] = useState<number | null>(null);
-  const [reportRequestCount, setReportRequestCount] = useState(0);
+  const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => getRoleFitLiveSession());
   const [roleInput, setRoleInput] = useState("");
   const [apiStatusMessage, setApiStatusMessage] = useState("");
+  const [liveReportState, setLiveReportState] = useState<LiveReportState | null>(null);
   const fit = fitModes[fitMode];
   const selectedProject = activeProject === null ? null : evidenceProjects[activeProject];
-  const reportLimitReached = reportRequestCount >= 2;
+  const reportLimitReached = liveSession.completedReportCount >= 2;
+  const isLiveMode = displayMode === "live";
+  const liveSplitCanvas = liveSession.state === "generating-report" || liveSession.state === "recoverable-error" || liveSession.state === "report-ready";
 
-  const splitCanvas = screenState === "generating" || screenState === "error" || screenState === "report";
-  const hasConversation = screenState !== "home";
+  const simulationSplitCanvas = screenState === "generating" || screenState === "error" || screenState === "report";
+  const splitCanvas = isLiveMode ? liveSplitCanvas : simulationSplitCanvas;
+  const hasConversation = isLiveMode ? liveSession.messages.length > 0 || liveSession.state !== "initial" : screenState !== "home";
   const reportActionLabel = reportLimitReached
     ? "Sorry, that is it for now. You are welcome to contact me."
-    : screenState === "report"
+    : isLiveMode && liveSession.pendingReportConfirmation
+      ? "Generate confirmed report"
+      : !isLiveMode && screenState === "report"
       ? "Create a new report"
       : "Generate report";
 
+  function syncLiveSession(update: Partial<RoleFitLiveSession>) {
+    const nextSession = updateRoleFitLiveSession(update);
+    setLiveSession(nextSession);
+    return nextSession;
+  }
+
+  function appendLiveMessage(message: { role: "user" | "agent"; content: string }) {
+    const nextSession = appendRoleFitMessage(message);
+    setLiveSession(nextSession);
+    return nextSession;
+  }
+
+  async function submitLiveMessage(textOverride?: string) {
+    const submittedText = (textOverride ?? roleInput).trim();
+    if (!submittedText) return;
+    const messageForAgent = liveSession.state === "awaiting-role-completion" && liveSession.activeRoleText
+      ? `${liveSession.activeRoleText}\n${submittedText}`
+      : submittedText;
+
+    const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
+    setRoleInput("");
+    setApiStatusMessage("");
+    setLiveReportState(null);
+    syncLiveSession({
+      state: "general-qa",
+      draftInput: "",
+    });
+
+    try {
+      const response = await fetch("/api/role-fit/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId: sessionAfterUser.conversationId,
+          message: messageForAgent,
+          language: "en",
+        }),
+      });
+
+      const result = await response.json();
+      const nextState = (result.state ?? "general-qa") as RoleFitLiveState;
+      appendLiveMessage({ role: "agent", content: result.answer ?? "I need a little more context before I can answer safely." });
+      syncLiveSession({
+        state: nextState,
+        activeRoleText: nextState === "awaiting-role-completion" || nextState === "awaiting-report-confirmation" ? messageForAgent : liveSession.activeRoleText,
+        pendingReportConfirmation: nextState === "awaiting-report-confirmation",
+      });
+
+      if (!response.ok) {
+        setApiStatusMessage(result.safeMessageKey ?? "The live conversation service is currently unavailable.");
+      }
+    } catch {
+      appendLiveMessage({ role: "agent", content: "The live conversation service is currently unavailable. Please try again in a moment." });
+      syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: false });
+    }
+  }
+
   async function requestReport() {
+    if (!isLiveMode) {
+      setScreenState("report");
+      return;
+    }
+
     if (reportLimitReached) return;
-    if (!roleInput.trim()) {
-      setApiStatusMessage("Please paste role details before generating a report.");
-      setScreenState("missing-details");
+    if (!liveSession.pendingReportConfirmation || !liveSession.activeRoleText.trim()) {
+      appendLiveMessage({
+        role: "agent",
+        content: "I can create a report only after the role details are validated and you explicitly confirm report generation.",
+      });
+      syncLiveSession({ state: "awaiting-role-completion", pendingReportConfirmation: false });
       return;
     }
 
     setActiveProject(null);
     setApiStatusMessage("");
-    setScreenState("generating");
+    setLiveReportState(null);
+    syncLiveSession({ state: "generating-report" });
 
     try {
       const response = await fetch("/api/role-fit/report", {
@@ -316,9 +402,10 @@ export default function RoleFitPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          roleText: roleInput,
+          roleText: liveSession.activeRoleText,
           approved: true,
-          completedReportCount: reportRequestCount,
+          completedReportCount: liveSession.completedReportCount,
+          conversationId: liveSession.conversationId,
           language: "en",
         }),
       });
@@ -327,19 +414,42 @@ export default function RoleFitPage() {
 
       if (!response.ok || result.state !== "ready") {
         setApiStatusMessage(result.safeMessageKey ?? result.eligibility?.safeMessageKey ?? "Report generation is not ready yet.");
-        setScreenState(result.state === "validation-failed" ? "missing-details" : "error");
+        appendLiveMessage({ role: "agent", content: result.safeMessageKey ?? result.eligibility?.safeMessageKey ?? "Report generation is not ready yet." });
+        syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: result.state === "validation-failed" });
         return;
       }
 
-      setReportRequestCount((count) => count + 1);
-      setScreenState("report");
+      const report = result.eligibility?.report;
+      setLiveReportState({
+        provider: result.provider,
+        model: result.model,
+        label: report?.overallFitVisual?.label,
+        rationale: report?.overallFitVisual?.rationale,
+      });
+      appendLiveMessage({ role: "agent", content: "The report is ready. You can review it on the report canvas and continue asking follow-up questions in this same session." });
+      syncLiveSession({
+        state: "report-ready",
+        completedReportCount: (liveSession.completedReportCount + 1) as 1 | 2,
+        pendingReportConfirmation: false,
+      });
     } catch {
       setApiStatusMessage("The report service is currently unavailable.");
-      setScreenState("error");
+      appendLiveMessage({ role: "agent", content: "The report service is currently unavailable. The role context is still preserved for this session." });
+      syncLiveSession({ state: "recoverable-error" });
     }
   }
 
+  useEffect(() => {
+    const pendingInput = consumePendingHomeRoleFitInput();
+    if (!pendingInput) return;
+
+    const submittedText = [pendingInput.text, pendingInput.fileText].filter(Boolean).join("\n\n").trim();
+    const uploadPrefix = pendingInput.fileName ? `Uploaded file: ${pendingInput.fileName}` : "";
+    void submitLiveMessage([uploadPrefix, submittedText].filter(Boolean).join("\n\n"));
+  }, []);
+
   const chatMessages = useMemo(() => {
+    if (isLiveMode) return liveSession.messages;
     if (screenState === "home") return [];
 
     const messages = [
@@ -356,12 +466,21 @@ export default function RoleFitPage() {
     }
 
     return messages;
-  }, [apiStatusMessage, screenState]);
+  }, [apiStatusMessage, isLiveMode, liveSession.messages, screenState]);
 
   return (
     <main className={styles.roleFitPage}>
       <section className={styles.stateBar} aria-label="Role Fit preview state">
-        <select id="role-fit-state" aria-label="Role Fit preview state" value={screenState} onChange={(event) => setScreenState(event.target.value as RoleFitScreenState)}>
+        <select
+          id="role-fit-state"
+          aria-label="Role Fit preview state"
+          value={displayMode}
+          onChange={(event) => {
+            const nextMode = event.target.value as RoleFitDisplayMode;
+            setDisplayMode(nextMode);
+            if (nextMode !== "live") setScreenState(nextMode);
+          }}
+        >
           {screenOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -374,14 +493,14 @@ export default function RoleFitPage() {
         className={splitCanvas ? `${styles.stickyReportChip} ${styles.canvasActiveAction}` : styles.stickyReportChip}
         aria-label={reportActionLabel}
         type="button"
-        disabled={reportLimitReached}
+        disabled={isLiveMode ? reportLimitReached || !liveSession.pendingReportConfirmation : false}
         title={reportActionLabel}
         onClick={requestReport}
       >
-        <span className={styles.msi} aria-hidden="true">{screenState === "report" ? "add" : "arrow_forward"}</span>
+        <span className={styles.msi} aria-hidden="true">{!isLiveMode && screenState === "report" ? "add" : "arrow_forward"}</span>
       </button>
       {splitCanvas ? (
-        <button className={styles.mobileBackChip} type="button" onClick={() => setScreenState("conversation")}>
+        <button className={styles.mobileBackChip} type="button" onClick={() => isLiveMode ? syncLiveSession({ state: "general-qa" }) : setScreenState("conversation")}>
           <span className={styles.msi} aria-hidden="true">arrow_back</span>
           Back to chat
         </button>
@@ -403,7 +522,7 @@ export default function RoleFitPage() {
               <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                 <span className={styles.msi} aria-hidden="true">add</span>
               </button>
-              <button className={styles.submitBtn} type="button" onClick={() => setScreenState("conversation")}>
+              <button className={styles.submitBtn} type="button" onClick={() => isLiveMode ? void submitLiveMessage() : setScreenState("conversation")}>
                 <span>Send</span>
                 <span className={styles.msi} aria-hidden="true">arrow_forward</span>
               </button>
@@ -411,13 +530,13 @@ export default function RoleFitPage() {
           </div>
 
           <div className={styles.chipsRow}>
-            <Chip className={styles.chipItem} icon="upload_file" kind="action" onClick={() => setScreenState("conversation")} tone="primary">
+            <Chip className={styles.chipItem} icon="upload_file" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to upload a job description for validation.") : setScreenState("conversation")} tone="primary">
               Upload a job description
             </Chip>
-            <Chip className={styles.chipItem} icon="content_paste" kind="action" onClick={() => setScreenState("conversation")} tone="primary">
+            <Chip className={styles.chipItem} icon="content_paste" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to paste job details for validation.") : setScreenState("conversation")} tone="primary">
               Paste job details
             </Chip>
-            <Chip className={styles.chipItem} icon="travel_explore" kind="action" onClick={() => setScreenState("conversation")} tone="primary">
+            <Chip className={styles.chipItem} icon="travel_explore" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("Explore my experience") : setScreenState("conversation")} tone="primary">
               Explore my experience
             </Chip>
           </div>
@@ -444,7 +563,7 @@ export default function RoleFitPage() {
                 <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                   <span className={styles.msi} aria-hidden="true">add</span>
                 </button>
-                <button className={styles.submitBtn} type="button">
+                <button className={styles.submitBtn} type="button" onClick={() => isLiveMode ? void submitLiveMessage() : requestReport()}>
                   <span>Send</span>
                   <span className={styles.msi} aria-hidden="true">arrow_forward</span>
                 </button>
@@ -454,7 +573,7 @@ export default function RoleFitPage() {
 
           {splitCanvas ? (
             <aside className={styles.canvasPane} aria-label="Role Fit report canvas">
-              {screenState === "generating" ? (
+              {(isLiveMode ? liveSession.state === "generating-report" : screenState === "generating") ? (
                 <div className={styles.generatingState} id="role-fit-generating">
                   <div className={styles.generatingBars} aria-hidden="true">
                     <div className={styles.genBar} />
@@ -463,12 +582,14 @@ export default function RoleFitPage() {
                   </div>
                   <p>Analyzing job requirements & matching Evidence Cards...</p>
                 </div>
-              ) : screenState === "error" ? (
+              ) : (isLiveMode ? liveSession.state === "recoverable-error" : screenState === "error") ? (
                 <div className={styles.errorState} id="role-fit-error">
                   <span className={styles.msi} aria-hidden="true">error</span>
-                  <h2>Report could not be generated</h2>
-                  <p>The job description does not include enough role requirements or responsibility context for an evidence-based fit report.</p>
+                  <h2>{isLiveMode ? "The live agent needs attention" : "Report could not be generated"}</h2>
+                  <p>{apiStatusMessage || (isLiveMode ? "The session is preserved. Please continue in the chat or try again." : "The job description does not include enough role requirements or responsibility context for an evidence-based fit report.")}</p>
                 </div>
+              ) : isLiveMode ? (
+                <LiveReportCanvas liveReportState={liveReportState} />
               ) : (
                 <RoleFitReport fitMode={fitMode} setFitMode={setFitMode} fit={fit} selectedProject={selectedProject} activeProject={activeProject} setActiveProject={setActiveProject} />
               )}
@@ -477,6 +598,21 @@ export default function RoleFitPage() {
         </section>
       )}
     </main>
+  );
+}
+
+function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportState | null }) {
+  return (
+    <div className={`${styles.reportShell} ${styles.liveReportCanvas}`} id="role-fit-live-report">
+      <section className={styles.bentoCard} aria-label="Live Role Fit report status">
+        <span className={styles.reportEyebrow}>Live report status</span>
+        <h2>{liveReportState?.label || "Live model connection confirmed"}</h2>
+        <p>{liveReportState?.rationale || "The server returned a valid response. Full evidence retrieval and final report composition remain gated by the approved Role Fit contracts."}</p>
+        <small>
+          Provider: {liveReportState?.provider || "unknown"} - Model: {liveReportState?.model || "unknown"}
+        </small>
+      </section>
+    </div>
   );
 }
 

@@ -1,9 +1,17 @@
 import { reportUIPayloadSchema } from "../contracts/index.ts";
-import type { RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
+import type { RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
 
 export function createMockRoleFitProvider(): RoleFitModelProvider {
   return {
     name: "mock",
+    async generateChat(input: RoleFitChatInput): Promise<RoleFitChatResult> {
+      return {
+        ok: true,
+        provider: "mock",
+        model: "mock-local",
+        answer: `I can help with that. In this local mock mode, I can preserve the conversation flow and ask for the next useful detail, but Gemini is not being called. Your message was: "${input.message.slice(0, 220)}"`,
+      };
+    },
     async generateReport(input: RoleFitModelInput): Promise<RoleFitModelResult> {
       const report = reportUIPayloadSchema.parse({
         schemaVersion: "1.0",

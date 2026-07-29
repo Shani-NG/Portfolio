@@ -453,6 +453,33 @@
   box-shadow: var(--rf-shadow);
 }
 
+.liveReportCanvas .bentoCard {
+  border-color: var(--rf-fit-border);
+  padding: 18px 20px;
+}
+
+.liveReportCanvas h2 {
+  font-family: var(--ds-font-family-display);
+  font-size: 18px;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 6px 0 8px;
+}
+
+.liveReportCanvas p {
+  color: var(--rf-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.liveReportCanvas small {
+  color: var(--rf-text-secondary);
+  display: block;
+  font-size: 11px;
+  margin-top: 12px;
+}
+
 .roleSnapshot {
   display: flex;
   flex-direction: column;
