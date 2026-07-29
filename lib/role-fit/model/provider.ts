@@ -13,13 +13,16 @@ export type RoleFitModelResult =
   | {
       ok: true;
       provider: RoleFitModelProviderName;
+      model: string;
       report: ReportUIPayload;
     }
   | {
       ok: false;
       provider: RoleFitModelProviderName;
+      model?: string;
       error: "missing-configuration" | "provider-error" | "invalid-output";
       safeMessageKey: string;
+      detail?: string;
     };
 
 export type RoleFitModelProvider = {

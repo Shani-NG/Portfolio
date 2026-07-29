@@ -62,6 +62,7 @@ export function createMockRoleFitProvider(): RoleFitModelProvider {
       return {
         ok: true,
         provider: "mock",
+        model: "mock-local",
         report,
       };
     },

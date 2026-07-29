@@ -157,8 +157,10 @@ export async function POST(request: Request) {
       {
         state: "model-unavailable",
         provider: modelResult.provider,
+        model: modelResult.model,
         error: modelResult.error,
         safeMessageKey: modelResult.safeMessageKey,
+        detail: modelResult.detail,
       },
       { status: modelResult.error === "missing-configuration" ? 503 : 502 },
     );
@@ -179,6 +181,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     state: "ready",
     provider: modelResult.provider,
+    model: modelResult.model,
     eligibility,
   });
 }
