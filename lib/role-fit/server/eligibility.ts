@@ -2,7 +2,7 @@ import type { EligibilityResult, RoleValidationResult, SessionRecord } from "../
 import { eligibilityResultSchema, roleDraftSchema, roleFieldSchema, roleValidationResultSchema } from "../contracts/index.ts";
 import { z } from "zod";
 
-type RequiredRoleField = "company" | "title" | "description" | "responsibilities" | "requirements";
+type RequiredRoleField = "title" | "responsibilities" | "requirements";
 
 type RoleDraftInput = {
   company?: unknown;
@@ -27,7 +27,7 @@ type ReportEligibilityInput = {
   report?: unknown;
 };
 
-const requiredFields: RequiredRoleField[] = ["company", "title", "description", "responsibilities", "requirements"];
+const requiredFields: RequiredRoleField[] = ["title", "responsibilities", "requirements"];
 const textRoleFieldSchema = roleFieldSchema(z.string());
 
 function hasConfirmedTextField(value: unknown): boolean {
@@ -51,9 +51,7 @@ function hasConfirmedListItem(value: unknown): boolean {
 export function getMissingRequiredRoleFields(roleDraft: RoleDraftInput): RequiredRoleField[] {
   const missing: RequiredRoleField[] = [];
 
-  if (!hasConfirmedTextField(roleDraft.company)) missing.push("company");
   if (!hasConfirmedTextField(roleDraft.title)) missing.push("title");
-  if (!hasConfirmedTextField(roleDraft.description)) missing.push("description");
   if (!hasConfirmedListItem(roleDraft.responsibilities)) missing.push("responsibilities");
   if (!hasConfirmedListItem(roleDraft.requirements)) missing.push("requirements");
 

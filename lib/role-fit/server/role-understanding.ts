@@ -23,23 +23,69 @@ function extractSection(roleText: string, labels: string[]): string {
   return "";
 }
 
-function extractList(roleText: string, labels: string[]): string[] {
-  const value = extractSection(roleText, labels);
-  if (!value) return [];
+function extractBlock(roleText: string, startLabels: string[], endLabels: string[]): string {
+  const lines = roleText.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => startLabels.some((label) => line.trim().toLowerCase() === label.toLowerCase()));
 
-  return value
-    .split(/[;•\n]/)
+  if (startIndex < 0) return "";
+
+  const endIndex = lines.findIndex((line, index) => index > startIndex && endLabels.some((label) => line.trim().toLowerCase() === label.toLowerCase()));
+  return lines
+    .slice(startIndex + 1, endIndex > startIndex ? endIndex : undefined)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function splitBlockItems(block: string): string[] {
+  return block
+    .split(/\n|;|•/)
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
+function extractList(roleText: string, labels: string[]): string[] {
+  const value = extractSection(roleText, labels);
+  if (!value) return [];
+
+  return splitBlockItems(value);
+}
+
+function inferTitle(roleText: string): string {
+  const labeledTitle = extractSection(roleText, ["title", "role"]);
+  if (labeledTitle) return labeledTitle;
+
+  const firstMeaningfulLine = roleText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("http") && !line.includes("applicants") && !line.includes("District"));
+
+  return firstMeaningfulLine ?? "";
+}
+
+function inferCompany(roleText: string): string {
+  const labeledCompany = extractSection(roleText, ["company", "organization"]);
+  if (labeledCompany) return labeledCompany;
+
+  const match = roleText.match(/\b([A-Z][A-Z0-9&.-]{1,})\s+is looking\b/);
+  return match?.[1] ?? "";
+}
+
 export function createRoleDraftFromText(roleText: string) {
   const sourceId = "role_input_current_request";
-  const company = extractSection(roleText, ["company", "organization"]);
-  const title = extractSection(roleText, ["title", "role"]);
-  const description = extractSection(roleText, ["description", "summary"]);
-  const responsibilities = extractList(roleText, ["responsibilities", "responsibility"]);
-  const requirements = extractList(roleText, ["requirements", "must have", "required"]);
+  const company = inferCompany(roleText);
+  const title = inferTitle(roleText);
+  const description =
+    extractSection(roleText, ["description", "summary"]) ||
+    extractBlock(roleText, ["About the job"], ["What You'll Do", "What You’ll Do", "What We're Looking For", "What We’re Looking For", "Nice to Have", "What We Offer"]);
+  const labeledResponsibilities = extractList(roleText, ["responsibilities", "responsibility"]);
+  const labeledRequirements = extractList(roleText, ["requirements", "must have", "required"]);
+  const responsibilities = labeledResponsibilities.length > 0
+    ? labeledResponsibilities
+    : splitBlockItems(extractBlock(roleText, ["What You'll Do", "What You’ll Do"], ["What We're Looking For", "What We’re Looking For", "Nice to Have", "What We Offer"]));
+  const requirements = labeledRequirements.length > 0
+    ? labeledRequirements
+    : splitBlockItems(extractBlock(roleText, ["What We're Looking For", "What We’re Looking For"], ["Nice to Have", "What We Offer"]));
 
   return {
     company: roleField(company, sourceId),
@@ -72,6 +118,7 @@ export function looksLikeReportIntent(message: string) {
 export function looksLikeRoleInput(message: string) {
   const lower = message.toLowerCase();
   const labeledFieldCount = ["company:", "organization:", "title:", "role:", "description:", "responsibilities:", "requirements:"].filter((label) => lower.includes(label)).length;
+  const linkedInSectionCount = ["about the job", "what you'll do", "what you’ll do", "what we're looking for", "what we’re looking for"].filter((label) => lower.includes(label)).length;
 
-  return labeledFieldCount >= 2 || /responsibilities|requirements|qualifications|job description/i.test(message) || /דרישות|אחריות|תיאור משרה|תיאור תפקיד/.test(message);
+  return labeledFieldCount >= 2 || linkedInSectionCount >= 2 || /responsibilities|requirements|qualifications|job description/i.test(message) || /דרישות|אחריות|תיאור משרה|תיאור תפקיד/.test(message);
 }
