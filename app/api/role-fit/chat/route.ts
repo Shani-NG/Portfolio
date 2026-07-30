@@ -1,16 +1,19 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
+import { logRoleFitEvent, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
-import { looksLikeReportIntent, looksLikeRoleInput, validateRoleText } from "@/lib/role-fit/server/role-understanding";
+import { inferRoleFamily, looksLikeReportIntent, looksLikeRoleInput, validateRoleText } from "@/lib/role-fit/server/role-understanding";
 
 const requestSchema = z
   .object({
     conversationId: z.string(),
+    sessionId: z.string().optional(),
     message: z.string().min(1),
     language: z.enum(["he", "en", "mixed"]).default("en"),
+    repeatedInput: z.boolean().optional().default(false),
   })
   .strict();
 
@@ -30,10 +33,11 @@ async function loadApprovedConversationContext() {
   return contents.join("\n\n---\n\n");
 }
 
-function missingFieldsCopy(missingFields: string[]) {
-  if (missingFields.length === 0) return "the remaining role details";
-
-  return missingFields.join(", ");
+function missingFieldQuestion(missingField: string | undefined) {
+  if (missingField === "title") return "What is the role title?";
+  if (missingField === "responsibilities") return "Please add the main responsibilities section.";
+  if (missingField === "requirements") return "Please add the main requirements section.";
+  return "What key role detail is still missing?";
 }
 
 export async function POST(request: Request) {
@@ -65,27 +69,96 @@ export async function POST(request: Request) {
   const traceId = crypto.randomUUID();
   const hasReportIntent = looksLikeReportIntent(parsedRequest.data.message);
   const hasRoleInput = looksLikeRoleInput(parsedRequest.data.message);
+  const { conversationId, sessionId } = parsedRequest.data;
 
   if (hasReportIntent || hasRoleInput) {
     const validation = validateRoleText({
-      conversationId: parsedRequest.data.conversationId,
+      conversationId,
       traceId,
       roleText: parsedRequest.data.message,
       detectedLanguage: parsedRequest.data.language,
     });
 
     if (validation.parseStatus === "valid-complete") {
+      const title = validation.roleDraft.title?.originalValue ?? "";
+      const companyName = validation.roleDraft.company?.originalValue;
+      after(async () => {
+        await Promise.all([
+          logRoleFitEvent({
+            eventName: "role.classified",
+            conversationId,
+            sessionId,
+            traceId,
+            mode: "role-understanding",
+            outcome: "success",
+            metadata: {
+              parseStatus: validation.parseStatus,
+              repeatedInput: parsedRequest.data.repeatedInput,
+            },
+          }),
+          logRoleFitSessionSummary({
+            conversationId,
+            sessionId,
+            language: parsedRequest.data.language,
+            executiveSummary: "Role input is complete and awaiting explicit report confirmation.",
+            intentPath: "role-fit",
+            lastMode: "role-understanding",
+            lastOutcome: "success",
+            roleStatus: validation.parseStatus,
+            roleFamily: inferRoleFamily(title),
+            companyName,
+            reportStatus: "awaiting-confirmation",
+          }),
+        ]);
+      });
+
       return NextResponse.json({
         state: "awaiting-report-confirmation",
-        answer: "I found enough role detail to prepare a report request. Before I generate anything, please confirm that you want me to create an evidence-based Role Fit report for this role.",
+        answer: parsedRequest.data.repeatedInput
+          ? "The role details are already complete. Confirm report generation when you are ready."
+          : "I found enough role detail. Please confirm if you want me to generate an evidence-based Role Fit report.",
         validation,
         safeMessageKey: "role.ready_for_confirmation",
       });
     }
 
+    const missingField = validation.missingFields[0];
+    after(async () => {
+      await Promise.all([
+        logRoleFitEvent({
+          eventName: "role.clarification_requested",
+          conversationId,
+          sessionId,
+          traceId,
+          mode: "role-understanding",
+          outcome: "partial",
+          metadata: {
+            parseStatus: validation.parseStatus,
+            missingField,
+            repeatedInput: parsedRequest.data.repeatedInput,
+          },
+        }),
+        logRoleFitSessionSummary({
+          conversationId,
+          sessionId,
+          language: parsedRequest.data.language,
+          executiveSummary: "Role input is incomplete; one focused clarification was requested.",
+          intentPath: "role-fit",
+          lastMode: "role-understanding",
+          lastOutcome: "partial",
+          roleStatus: validation.parseStatus,
+          roleFamily: inferRoleFamily(validation.roleDraft.title?.originalValue ?? ""),
+          companyName: validation.roleDraft.company?.originalValue,
+          reportStatus: "not-ready",
+        }),
+      ]);
+    });
+
     return NextResponse.json({
       state: "awaiting-role-completion",
-      answer: `I can help with a Role Fit report, but I need a little more role information first: ${missingFieldsCopy(validation.missingFields)}. Please add only the missing details and I will continue from there.`,
+      answer: parsedRequest.data.repeatedInput
+        ? `This appears unchanged. ${missingFieldQuestion(missingField)}`
+        : `I can analyze this role, but one key detail is still missing. ${missingFieldQuestion(missingField)}`,
       validation,
       safeMessageKey: "role.missing_required_fields",
     });
@@ -96,11 +169,27 @@ export async function POST(request: Request) {
   const modelResult = await provider.generateChat({
     message: parsedRequest.data.message,
     language: parsedRequest.data.language,
-    maxOutputTokens: Math.min(policy.maxOutputTokens, 900),
+    maxOutputTokens: Math.min(policy.maxOutputTokens, 350),
     approvedContext,
   });
 
   if (!modelResult.ok) {
+    after(() =>
+      logRoleFitEvent({
+        eventName: "error.occurred",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "portfolio-qa",
+        outcome: "failure",
+        metadata: {
+          error: modelResult.error,
+          provider: modelResult.provider,
+          safeMessageKey: modelResult.safeMessageKey,
+        },
+      }),
+    );
+
     return NextResponse.json(
       {
         state: "recoverable-error",
@@ -114,6 +203,20 @@ export async function POST(request: Request) {
       { status: modelResult.error === "missing-configuration" ? 503 : 502 },
     );
   }
+
+  after(() =>
+    logRoleFitSessionSummary({
+      conversationId,
+      sessionId,
+      language: parsedRequest.data.language,
+      executiveSummary: "Portfolio question answered without storing conversation text.",
+      intentPath: "portfolio-qa",
+      lastMode: "portfolio-qa",
+      lastOutcome: "success",
+      roleStatus: "not-active",
+      reportStatus: "not-requested",
+    }),
+  );
 
   return NextResponse.json({
     state: "general-qa",

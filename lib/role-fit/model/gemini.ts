@@ -12,8 +12,95 @@ type GeminiResponse = {
   candidates?: GeminiCandidate[];
 };
 
+type GeminiCallResult =
+  | { ok: true; model: string; data: GeminiResponse }
+  | { ok: false; model: string; detail: string };
+
+const geminiFallbackModels = ["gemini-2.5-flash", "gemini-1.5-flash"];
+
 function normalizeGeminiModel(model: string): string {
   return model.replace(/^models\//, "");
+}
+
+function getCandidateModels(model: string): string[] {
+  return Array.from(new Set([normalizeGeminiModel(model), ...geminiFallbackModels]));
+}
+
+async function readProviderError(response: Response): Promise<string> {
+  const fallback = `${response.status} ${response.statusText}`;
+
+  try {
+    const data = (await response.json()) as { error?: { message?: string } };
+    return data.error?.message ? `${fallback}: ${data.error.message}` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function generateGeminiContent(input: {
+  apiKey: string;
+  models: string[];
+  prompt: string;
+  maxOutputTokens: number;
+  temperature: number;
+}): Promise<GeminiCallResult> {
+  let lastError: GeminiCallResult | undefined;
+
+  for (const model of input.models) {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${input.apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: input.prompt }] }],
+        generationConfig: {
+          maxOutputTokens: input.maxOutputTokens,
+          temperature: input.temperature,
+        },
+      }),
+    });
+
+    if (response.ok) {
+      return {
+        ok: true,
+        model,
+        data: (await response.json()) as GeminiResponse,
+      };
+    }
+
+    lastError = {
+      ok: false,
+      model,
+      detail: await readProviderError(response),
+    };
+
+    if (response.status !== 400 && response.status !== 404) break;
+  }
+
+  return lastError ?? {
+    ok: false,
+    model: input.models[0] ?? "unknown",
+    detail: "Gemini request failed before a provider response was available.",
+  };
+}
+
+function limitChatAnswer(answer: string): string {
+  const lines = answer.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const limited: string[] = [];
+  let sentenceCount = 0;
+
+  for (const line of lines) {
+    const prefix = /^[-*]\s+/.test(line) ? line.match(/^[-*]\s+/)?.[0] ?? "" : "";
+    const content = prefix ? line.slice(prefix.length) : line;
+    const sentences = content.split(/(?<=[.!?])\s+/).filter(Boolean);
+
+    for (const sentence of sentences) {
+      if (sentenceCount >= 4) return limited.join("\n");
+      limited.push(`${prefix}${sentence}`);
+      sentenceCount += 1;
+    }
+  }
+
+  return limited.join("\n");
 }
 
 function extractLabeledValue(roleText: string, labels: string[], fallback: string): string {
@@ -100,10 +187,13 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         };
       }
 
-      const normalizedModel = normalizeGeminiModel(model);
       const prompt = [
         "You are Shani Nakash-Gomel's portfolio conversation agent.",
         "Answer in the user's active language when clear.",
+        "Keep normal conversation to no more than four short sentences.",
+        "When structure helps, use at most three short bullets.",
+        "Ask only one focused clarification question at a time.",
+        "Do not repeat information the user already provided.",
         "Use only the approved context below for professional claims.",
         "Do not invent achievements, metrics, clients, recommendations, rankings, or hiring decisions.",
         "Do not generate a role-fit report in chat. If the user asks for a report or fit analysis, explain that the role details must be validated and explicitly confirmed first.",
@@ -112,44 +202,32 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         `User message:\n${input.message}`,
       ].join("\n\n");
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normalizedModel)}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: input.maxOutputTokens,
-            temperature: 0.25,
-          },
-        }),
+      const response = await generateGeminiContent({
+        apiKey,
+        models: getCandidateModels(model),
+        prompt,
+        maxOutputTokens: input.maxOutputTokens,
+        temperature: 0.25,
       });
 
       if (!response.ok) {
         return {
           ok: false,
           provider: "gemini",
-          model: normalizedModel,
+          model: response.model,
           error: "provider-error",
           safeMessageKey: "model.google_ai_studio_provider_error",
-          detail: `${response.status} ${response.statusText}`,
+          detail: response.detail,
         };
       }
 
-      const data = (await response.json()) as GeminiResponse;
-      const answer = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
+      const answer = response.data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
 
       if (!answer) {
         return {
           ok: false,
           provider: "gemini",
-          model: normalizedModel,
+          model: response.model,
           error: "invalid-output",
           safeMessageKey: "model.google_ai_studio_empty_output",
         };
@@ -158,8 +236,8 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
       return {
         ok: true,
         provider: "gemini",
-        model: normalizedModel,
-        answer,
+        model: response.model,
+        answer: limitChatAnswer(answer),
       };
     },
     async generateReport(input: RoleFitModelInput): Promise<RoleFitModelResult> {
@@ -176,7 +254,6 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         };
       }
 
-      const normalizedModel = normalizeGeminiModel(model);
       const prompt = [
         "Answer in one concise paragraph.",
         "This is a server-side connectivity check for a portfolio Role Fit Agent vertical slice.",
@@ -186,44 +263,32 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         `Role text:\n${input.roleText}`,
       ].join("\n\n");
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normalizedModel)}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: input.maxOutputTokens,
-            temperature: 0.2,
-          },
-        }),
+      const response = await generateGeminiContent({
+        apiKey,
+        models: getCandidateModels(model),
+        prompt,
+        maxOutputTokens: input.maxOutputTokens,
+        temperature: 0.2,
       });
 
       if (!response.ok) {
         return {
           ok: false,
           provider: "gemini",
-          model: normalizedModel,
+          model: response.model,
           error: "provider-error",
           safeMessageKey: "model.google_ai_studio_provider_error",
-          detail: `${response.status} ${response.statusText}`,
+          detail: response.detail,
         };
       }
 
-      const data = (await response.json()) as GeminiResponse;
-      const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
+      const text = response.data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
 
       if (!text) {
         return {
           ok: false,
           provider: "gemini",
-          model: normalizedModel,
+          model: response.model,
           error: "invalid-output",
           safeMessageKey: "model.google_ai_studio_empty_output",
         };
@@ -232,8 +297,8 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
       return {
         ok: true,
         provider: "gemini",
-        model: normalizedModel,
-        report: createEvidenceLimitedReport(input, normalizedModel, text),
+        model: response.model,
+        report: createEvidenceLimitedReport(input, response.model, text),
       };
     },
   };

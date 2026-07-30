@@ -227,6 +227,11 @@
   padding: 8px 18px;
 }
 
+.submitBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .chipsRow {
   display: flex;
   gap: 12px;
@@ -277,6 +282,7 @@
   line-height: 1.6;
   max-width: 90%;
   padding: 14px 18px;
+  white-space: pre-wrap;
 }
 
 .userBubble {
@@ -289,6 +295,23 @@
   align-self: flex-start;
   background: var(--rf-surface);
   border: 1px solid var(--rf-border);
+}
+
+.thinkingIndicator {
+  align-self: flex-end;
+  display: flex;
+  justify-content: center;
+  margin-right: 10px;
+  margin-top: -8px;
+  width: 24px;
+}
+
+.thinkingIndicator span {
+  animation: thinkingPulse 1s ease-in-out infinite;
+  background: var(--rf-rose-500);
+  border-radius: 50%;
+  height: 8px;
+  width: 8px;
 }
 
 .canvasPane {
@@ -983,6 +1006,19 @@
   }
 }
 
+@keyframes thinkingPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
 @keyframes pulseHint {
   0%,
   100% {
@@ -1152,7 +1188,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .genBar,
-  .skeletonHint div {
+  .skeletonHint div,
+  .thinkingIndicator span {
     animation: none;
   }
 

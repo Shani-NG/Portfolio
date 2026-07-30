@@ -16,6 +16,7 @@ export type RoleFitLiveState =
   | "recoverable-error";
 
 export type RoleFitLiveSession = {
+  sessionId: string;
   conversationId: string;
   createdAt: number;
   lastActivityAt: number;
@@ -48,6 +49,7 @@ function createSession(): RoleFitLiveSession {
   const timestamp = now();
 
   return {
+    sessionId: createId("session"),
     conversationId: createId("conv"),
     createdAt: timestamp,
     lastActivityAt: timestamp,

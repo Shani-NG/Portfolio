@@ -1,5 +1,29 @@
 import { createRoleValidationResult } from "./eligibility.ts";
 
+type RoleSectionKind = "description" | "responsibilities" | "requirements" | "preferred";
+
+const roleSectionHeadings: Array<{ kind: RoleSectionKind; labels: string[] }> = [
+  { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity"] },
+  { kind: "responsibilities", labels: ["What You'll Do", "What You’ll Do", "What You Will Do", "Responsibilities", "Your Responsibilities"] },
+  {
+    kind: "requirements",
+    labels: ["Requirements", "What We're Looking For", "What We’re Looking For", "What You Have", "Qualifications", "Required Qualifications", "Must Have"],
+  },
+  { kind: "preferred", labels: ["Nice to Have", "Preferred Qualifications", "Bonus Points", "Preferred"] },
+];
+
+const normalizedHeadingEntries = roleSectionHeadings.flatMap((section) =>
+  section.labels.map((label) => ({ kind: section.kind, label: label.replaceAll("’", "'") })),
+);
+
+const headingPattern = new RegExp(
+  normalizedHeadingEntries
+    .map(({ label }) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .sort((a, b) => b.length - a.length)
+    .join("|"),
+  "gi",
+);
+
 function roleField(originalValue: string, sourceId: string) {
   return {
     originalValue,
@@ -12,35 +36,49 @@ function roleField(originalValue: string, sourceId: string) {
   };
 }
 
+function normalizeRoleText(roleText: string) {
+  return roleText.replaceAll("’", "'").replaceAll("–", "-").replaceAll("—", "-");
+}
+
 function extractSection(roleText: string, labels: string[]): string {
-  const lines = roleText.split(/\r?\n/).map((line) => line.trim());
+  const lines = normalizeRoleText(roleText).split(/\r?\n/).map((line) => line.trim());
 
   for (const label of labels) {
-    const match = lines.find((line) => line.toLowerCase().startsWith(`${label.toLowerCase()}:`));
-    if (match) return match.slice(label.length + 1).trim();
+    const normalizedLabel = label.replaceAll("’", "'");
+    const match = lines.find((line) => line.toLowerCase().startsWith(`${normalizedLabel.toLowerCase()}:`));
+    if (match) return match.slice(normalizedLabel.length + 1).trim();
   }
 
   return "";
 }
 
-function extractBlock(roleText: string, startLabels: string[], endLabels: string[]): string {
-  const lines = roleText.split(/\r?\n/);
-  const startIndex = lines.findIndex((line) => startLabels.some((label) => line.trim().toLowerCase() === label.toLowerCase()));
+function extractSectionBlocks(roleText: string): Record<RoleSectionKind, string[]> {
+  const normalizedText = normalizeRoleText(roleText);
+  const matches = Array.from(normalizedText.matchAll(headingPattern));
+  const blocks: Record<RoleSectionKind, string[]> = {
+    description: [],
+    responsibilities: [],
+    requirements: [],
+    preferred: [],
+  };
 
-  if (startIndex < 0) return "";
+  matches.forEach((match, index) => {
+    const heading = normalizedHeadingEntries.find(({ label }) => label.toLowerCase() === match[0].toLowerCase());
+    if (!heading || match.index === undefined) return;
 
-  const endIndex = lines.findIndex((line, index) => index > startIndex && endLabels.some((label) => line.trim().toLowerCase() === label.toLowerCase()));
-  return lines
-    .slice(startIndex + 1, endIndex > startIndex ? endIndex : undefined)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .join("\n");
+    const blockStart = match.index + match[0].length;
+    const blockEnd = matches[index + 1]?.index ?? normalizedText.length;
+    const block = normalizedText.slice(blockStart, blockEnd).replace(/^[\s:.-]+/, "").trim();
+    if (block) blocks[heading.kind].push(block);
+  });
+
+  return blocks;
 }
 
 function splitBlockItems(block: string): string[] {
   return block
-    .split(/\n|;|•/)
-    .map((item) => item.trim())
+    .split(/\r?\n|;|•|·/)
+    .map((item) => item.replace(/^\s*[-*]\s*/, "").trim())
     .filter(Boolean);
 }
 
@@ -55,7 +93,10 @@ function inferTitle(roleText: string): string {
   const labeledTitle = extractSection(roleText, ["title", "role"]);
   if (labeledTitle) return labeledTitle;
 
-  const firstMeaningfulLine = roleText
+  const normalizedText = normalizeRoleText(roleText);
+  const firstHeadingIndex = normalizedText.search(headingPattern);
+  const titleSource = firstHeadingIndex > 0 ? normalizedText.slice(0, firstHeadingIndex) : normalizedText;
+  const firstMeaningfulLine = titleSource
     .split(/\r?\n/)
     .map((line) => line.trim())
     .find((line) => line && !line.startsWith("http") && !line.includes("applicants") && !line.includes("District"));
@@ -75,17 +116,19 @@ export function createRoleDraftFromText(roleText: string) {
   const sourceId = "role_input_current_request";
   const company = inferCompany(roleText);
   const title = inferTitle(roleText);
+  const blocks = extractSectionBlocks(roleText);
   const description =
     extractSection(roleText, ["description", "summary"]) ||
-    extractBlock(roleText, ["About the job"], ["What You'll Do", "What You’ll Do", "What We're Looking For", "What We’re Looking For", "Nice to Have", "What We Offer"]);
+    blocks.description.join("\n");
   const labeledResponsibilities = extractList(roleText, ["responsibilities", "responsibility"]);
   const labeledRequirements = extractList(roleText, ["requirements", "must have", "required"]);
   const responsibilities = labeledResponsibilities.length > 0
     ? labeledResponsibilities
-    : splitBlockItems(extractBlock(roleText, ["What You'll Do", "What You’ll Do"], ["What We're Looking For", "What We’re Looking For", "Nice to Have", "What We Offer"]));
+    : blocks.responsibilities.flatMap(splitBlockItems);
   const requirements = labeledRequirements.length > 0
     ? labeledRequirements
-    : splitBlockItems(extractBlock(roleText, ["What We're Looking For", "What We’re Looking For"], ["Nice to Have", "What We Offer"]));
+    : blocks.requirements.flatMap(splitBlockItems);
+  const preferredQualifications = blocks.preferred.flatMap(splitBlockItems);
 
   return {
     company: roleField(company, sourceId),
@@ -93,8 +136,25 @@ export function createRoleDraftFromText(roleText: string) {
     description: roleField(description, sourceId),
     responsibilities: responsibilities.map((item) => roleField(item, sourceId)),
     requirements: requirements.map((item) => roleField(item, sourceId)),
-    preferredQualifications: [],
+    preferredQualifications: preferredQualifications.map((item) => roleField(item, sourceId)),
   };
+}
+
+export function inferRoleFamily(title: string) {
+  const normalizedTitle = title.toLowerCase();
+
+  if (/\b(ai|artificial intelligence)\b/.test(normalizedTitle) && /\b(implementation|integration|adoption)\b/.test(normalizedTitle)) return "ai-implementation";
+  if (/\b(ai|artificial intelligence)\b/.test(normalizedTitle) && /\b(product|strategy|manager|lead)\b/.test(normalizedTitle)) return "ai-product";
+  if (/\bux\b/.test(normalizedTitle) && /\b(strategy|strategist)\b/.test(normalizedTitle)) return "ux-strategy";
+  if (/\bproduct design/.test(normalizedTitle)) return "product-design";
+  if (/\b(ux|user experience|designer|design)\b/.test(normalizedTitle)) return "ux-design";
+  if (/\binnovation\b/.test(normalizedTitle)) return "innovation";
+  if (/\bresearch\b/.test(normalizedTitle)) return "research";
+  if (/\bproduct\b/.test(normalizedTitle)) return "product";
+  if (/\b(manager|management|director|head|vp|vice president)\b/.test(normalizedTitle)) return "management";
+  if (/\b(system|systems|engineer|engineering)\b/.test(normalizedTitle)) return "systems-engineering";
+
+  return "other";
 }
 
 export function validateRoleText(input: {
@@ -116,9 +176,9 @@ export function looksLikeReportIntent(message: string) {
 }
 
 export function looksLikeRoleInput(message: string) {
-  const lower = message.toLowerCase();
+  const lower = normalizeRoleText(message).toLowerCase();
   const labeledFieldCount = ["company:", "organization:", "title:", "role:", "description:", "responsibilities:", "requirements:"].filter((label) => lower.includes(label)).length;
-  const linkedInSectionCount = ["about the job", "what you'll do", "what you’ll do", "what we're looking for", "what we’re looking for"].filter((label) => lower.includes(label)).length;
+  const linkedInSectionCount = normalizedHeadingEntries.filter(({ label }) => lower.includes(label.toLowerCase())).length;
 
   return labeledFieldCount >= 2 || linkedInSectionCount >= 2 || /responsibilities|requirements|qualifications|job description/i.test(message) || /דרישות|אחריות|תיאור משרה|תיאור תפקיד/.test(message);
 }

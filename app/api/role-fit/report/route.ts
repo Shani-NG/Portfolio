@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
+import { logRoleFitEvent, logRoleFitReportSummary, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { evaluateReportEligibility } from "@/lib/role-fit/server/eligibility";
-import { validateRoleText } from "@/lib/role-fit/server/role-understanding";
+import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
 
 const requestSchema = z
   .object({
@@ -11,6 +12,7 @@ const requestSchema = z
     approved: z.boolean(),
     completedReportCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(0),
     conversationId: z.string().optional(),
+    sessionId: z.string().optional(),
     language: z.enum(["he", "en", "mixed"]).default("en"),
   })
   .strict();
@@ -18,6 +20,7 @@ const requestSchema = z
 export async function POST(request: Request) {
   const policy = getRoleFitPolicy();
   const parsedRequest = requestSchema.safeParse(await request.json().catch(() => null));
+  const startedAt = Date.now();
 
   if (!parsedRequest.success) {
     return NextResponse.json(
@@ -29,7 +32,23 @@ export async function POST(request: Request) {
     );
   }
 
+  const traceId = crypto.randomUUID();
+  const conversationId = parsedRequest.data.conversationId ?? crypto.randomUUID();
+  const sessionId = parsedRequest.data.sessionId;
+
   if (parsedRequest.data.roleText.length > policy.maxInputChars) {
+    after(() =>
+      logRoleFitEvent({
+        eventName: "role.validation_failed",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "failure",
+        metadata: { safeMessageKey: "role.input_too_long" },
+      }),
+    );
+
     return NextResponse.json(
       {
         state: "validation-failed",
@@ -55,6 +74,21 @@ export async function POST(request: Request) {
       report: undefined,
     });
 
+    after(() =>
+      logRoleFitEvent({
+        eventName: "report.limit_blocked",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "blocked",
+        metadata: {
+          completedReportCount: parsedRequest.data.completedReportCount,
+          maxReportsPerSession: policy.maxReportsPerSession,
+        },
+      }),
+    );
+
     return NextResponse.json({ state: "blocked", eligibility }, { status: 429 });
   }
 
@@ -71,11 +105,21 @@ export async function POST(request: Request) {
       report: undefined,
     });
 
+    after(() =>
+      logRoleFitEvent({
+        eventName: "report.failed",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "blocked",
+        metadata: { reason: "approval-missing" },
+      }),
+    );
+
     return NextResponse.json({ state: "blocked", eligibility }, { status: 409 });
   }
 
-  const traceId = crypto.randomUUID();
-  const conversationId = parsedRequest.data.conversationId ?? crypto.randomUUID();
   const validation = validateRoleText({
     conversationId,
     traceId,
@@ -84,6 +128,21 @@ export async function POST(request: Request) {
   });
 
   if (validation.parseStatus !== "valid-complete") {
+    after(() =>
+      logRoleFitEvent({
+        eventName: "role.validation_failed",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "failure",
+        metadata: {
+          parseStatus: validation.parseStatus,
+          missingFieldCount: validation.missingFields.length,
+        },
+      }),
+    );
+
     return NextResponse.json(
       {
         state: "validation-failed",
@@ -94,6 +153,21 @@ export async function POST(request: Request) {
     );
   }
 
+  after(() =>
+    logRoleFitEvent({
+      eventName: "report.generation_started",
+      conversationId,
+      sessionId,
+      traceId,
+      mode: "fit-analysis",
+      outcome: "success",
+      metadata: {
+        completedReportCount: parsedRequest.data.completedReportCount,
+        language: parsedRequest.data.language,
+      },
+    }),
+  );
+
   const provider = getRoleFitModelProvider();
   const modelResult = await provider.generateReport({
     roleText: parsedRequest.data.roleText,
@@ -103,6 +177,23 @@ export async function POST(request: Request) {
   });
 
   if (!modelResult.ok) {
+    after(() =>
+      logRoleFitEvent({
+        eventName: "report.failed",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "failure",
+        durationMs: Date.now() - startedAt,
+        metadata: {
+          error: modelResult.error,
+          provider: modelResult.provider,
+          safeMessageKey: modelResult.safeMessageKey,
+        },
+      }),
+    );
+
     return NextResponse.json(
       {
         state: "model-unavailable",
@@ -126,6 +217,53 @@ export async function POST(request: Request) {
     },
     evidenceState: "ready",
     report: modelResult.report,
+  });
+
+  after(async () => {
+    const reportId = modelResult.report.reportId;
+    const title = validation.roleDraft.title?.originalValue ?? "";
+    await Promise.all([
+      logRoleFitEvent({
+        eventName: "report.completed",
+        conversationId,
+        sessionId,
+        reportId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: eligibility.state === "ready" ? "success" : "failure",
+        durationMs: Date.now() - startedAt,
+        metadata: {
+          provider: modelResult.provider,
+          model: modelResult.model,
+          fitMode: modelResult.report.overallFitVisual.mode,
+          evidenceConfidence: modelResult.report.evidenceConfidence.level,
+        },
+      }),
+      logRoleFitReportSummary({
+        conversationId,
+        sessionId,
+        reportId,
+        provider: modelResult.provider,
+        model: modelResult.model,
+        fitMode: modelResult.report.overallFitVisual.mode,
+        fitLabel: modelResult.report.overallFitVisual.label,
+        evidenceStatus: modelResult.report.evidenceConfidence.level,
+      }),
+      logRoleFitSessionSummary({
+        conversationId,
+        sessionId,
+        language: parsedRequest.data.language,
+        executiveSummary: "Validated report request completed and a report summary was stored.",
+        intentPath: "role-fit",
+        lastMode: "fit-analysis",
+        lastOutcome: eligibility.state === "ready" ? "success" : "failure",
+        roleStatus: validation.parseStatus,
+        roleFamily: inferRoleFamily(title),
+        companyName: validation.roleDraft.company?.originalValue,
+        reportStatus: eligibility.state === "ready" ? "ready" : "failed",
+        reportId,
+      }),
+    ]);
   });
 
   return NextResponse.json({

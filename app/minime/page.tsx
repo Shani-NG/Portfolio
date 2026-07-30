@@ -289,6 +289,10 @@ const matchTones: Record<MatchType, "success" | "secondary" | "warning"> = {
   insufficient: "warning",
 };
 
+function normalizeRepeatedInput(value: string) {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 export default function RoleFitPage() {
   const [displayMode, setDisplayMode] = useState<RoleFitDisplayMode>("live");
   const [screenState, setScreenState] = useState<RoleFitScreenState>("home");
@@ -297,6 +301,7 @@ export default function RoleFitPage() {
   const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => getRoleFitLiveSession());
   const [roleInput, setRoleInput] = useState("");
   const [apiStatusMessage, setApiStatusMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const [liveReportState, setLiveReportState] = useState<LiveReportState | null>(null);
   const fit = fitModes[fitMode];
   const selectedProject = activeProject === null ? null : evidenceProjects[activeProject];
@@ -329,13 +334,25 @@ export default function RoleFitPage() {
 
   async function submitLiveMessage(textOverride?: string) {
     const submittedText = (textOverride ?? roleInput).trim();
-    if (!submittedText) return;
-    const messageForAgent = liveSession.state === "awaiting-role-completion" && liveSession.activeRoleText
+    if (!submittedText || isSending) return;
+    const normalizedSubmittedText = normalizeRepeatedInput(submittedText);
+    const normalizedActiveRoleText = normalizeRepeatedInput(liveSession.activeRoleText);
+    const repeatedInput = Boolean(
+      normalizedActiveRoleText &&
+      (
+        normalizedSubmittedText === normalizedActiveRoleText ||
+        (normalizedSubmittedText.length > 80 && normalizedActiveRoleText.includes(normalizedSubmittedText))
+      ),
+    );
+    const messageForAgent = repeatedInput
+      ? liveSession.activeRoleText
+      : liveSession.state === "awaiting-role-completion" && liveSession.activeRoleText
       ? `${liveSession.activeRoleText}\n${submittedText}`
       : submittedText;
 
     const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
     setRoleInput("");
+    setIsSending(true);
     setApiStatusMessage("");
     setLiveReportState(null);
     syncLiveSession({
@@ -351,8 +368,10 @@ export default function RoleFitPage() {
         },
         body: JSON.stringify({
           conversationId: sessionAfterUser.conversationId,
+          sessionId: sessionAfterUser.sessionId,
           message: messageForAgent,
-          language: "en",
+          language: /[\u0590-\u05ff]/.test(messageForAgent) ? "he" : "en",
+          repeatedInput,
         }),
       });
 
@@ -371,6 +390,8 @@ export default function RoleFitPage() {
     } catch {
       appendLiveMessage({ role: "agent", content: "The live conversation service is currently unavailable. Please try again in a moment." });
       syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: false });
+    } finally {
+      setIsSending(false);
     }
   }
 
@@ -406,7 +427,8 @@ export default function RoleFitPage() {
           approved: true,
           completedReportCount: liveSession.completedReportCount,
           conversationId: liveSession.conversationId,
-          language: "en",
+          sessionId: liveSession.sessionId,
+          language: /[\u0590-\u05ff]/.test(liveSession.activeRoleText) ? "he" : "en",
         }),
       });
 
@@ -522,7 +544,7 @@ export default function RoleFitPage() {
               <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                 <span className={styles.msi} aria-hidden="true">add</span>
               </button>
-              <button className={styles.submitBtn} type="button" onClick={() => isLiveMode ? void submitLiveMessage() : setScreenState("conversation")}>
+              <button className={styles.submitBtn} type="button" disabled={isLiveMode && (isSending || !roleInput.trim())} onClick={() => isLiveMode ? void submitLiveMessage() : setScreenState("conversation")}>
                 <span>Send</span>
                 <span className={styles.msi} aria-hidden="true">arrow_forward</span>
               </button>
@@ -530,13 +552,13 @@ export default function RoleFitPage() {
           </div>
 
           <div className={styles.chipsRow}>
-            <Chip className={styles.chipItem} icon="upload_file" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to upload a job description for validation.") : setScreenState("conversation")} tone="primary">
+            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="upload_file" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to upload a job description for validation.") : setScreenState("conversation")} tone="primary">
               Upload a job description
             </Chip>
-            <Chip className={styles.chipItem} icon="content_paste" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to paste job details for validation.") : setScreenState("conversation")} tone="primary">
+            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="content_paste" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to paste job details for validation.") : setScreenState("conversation")} tone="primary">
               Paste job details
             </Chip>
-            <Chip className={styles.chipItem} icon="travel_explore" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("Explore my experience") : setScreenState("conversation")} tone="primary">
+            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="travel_explore" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("Explore my experience") : setScreenState("conversation")} tone="primary">
               Explore my experience
             </Chip>
           </div>
@@ -550,6 +572,11 @@ export default function RoleFitPage() {
                   {message.content}
                 </div>
               ))}
+              {isLiveMode && isSending ? (
+                <div className={styles.thinkingIndicator} role="status" aria-label="Agent is thinking">
+                  <span aria-hidden="true" />
+                </div>
+              ) : null}
             </div>
 
             <div className={styles.chatBoxContainer}>
@@ -563,7 +590,7 @@ export default function RoleFitPage() {
                 <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                   <span className={styles.msi} aria-hidden="true">add</span>
                 </button>
-                <button className={styles.submitBtn} type="button" onClick={() => isLiveMode ? void submitLiveMessage() : requestReport()}>
+                <button className={styles.submitBtn} type="button" disabled={isLiveMode && (isSending || !roleInput.trim())} onClick={() => isLiveMode ? void submitLiveMessage() : requestReport()}>
                   <span>Send</span>
                   <span className={styles.msi} aria-hidden="true">arrow_forward</span>
                 </button>
