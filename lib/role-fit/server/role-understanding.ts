@@ -3,17 +3,20 @@ import { createRoleValidationResult } from "./eligibility.ts";
 type RoleSectionKind = "description" | "responsibilities" | "requirements" | "preferred";
 
 const roleSectionHeadings: Array<{ kind: RoleSectionKind; labels: string[] }> = [
-  { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity"] },
-  { kind: "responsibilities", labels: ["What You'll Do", "What You’ll Do", "What You Will Do", "Responsibilities", "Your Responsibilities"] },
+  { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity", "Overview"] },
+  { kind: "responsibilities", labels: ["What You'll Do", "What You Will Do", "Responsibilities", "Key Responsibilities", "Your Responsibilities", "The Role"] },
   {
     kind: "requirements",
-    labels: ["Requirements", "What We're Looking For", "What We’re Looking For", "What You Have", "Qualifications", "Required Qualifications", "Must Have"],
+    labels: ["Requirements", "What We're Looking For", "What You Have", "Qualifications", "Required Qualifications", "Key Qualifications", "Must Have", "Skills"],
   },
   { kind: "preferred", labels: ["Nice to Have", "Preferred Qualifications", "Bonus Points", "Preferred"] },
 ];
 
 const normalizedHeadingEntries = roleSectionHeadings.flatMap((section) =>
-  section.labels.map((label) => ({ kind: section.kind, label: label.replaceAll("’", "'") })),
+  section.labels.flatMap((label) => [
+    { kind: section.kind, label },
+    { kind: section.kind, label: label.replaceAll("'", "’") },
+  ]),
 );
 
 const headingPattern = new RegExp(
@@ -37,16 +40,22 @@ function roleField(originalValue: string, sourceId: string) {
 }
 
 function normalizeRoleText(roleText: string) {
-  return roleText.replaceAll("’", "'").replaceAll("–", "-").replaceAll("—", "-");
+  return roleText
+    .replaceAll("â€™", "'")
+    .replaceAll("’", "'")
+    .replaceAll("â€“", "-")
+    .replaceAll("â€”", "-")
+    .replaceAll("•", "\n")
+    .replaceAll("·", "\n");
 }
 
 function extractSection(roleText: string, labels: string[]): string {
   const lines = normalizeRoleText(roleText).split(/\r?\n/).map((line) => line.trim());
 
   for (const label of labels) {
-    const normalizedLabel = label.replaceAll("’", "'");
-    const match = lines.find((line) => line.toLowerCase().startsWith(`${normalizedLabel.toLowerCase()}:`));
-    if (match) return match.slice(normalizedLabel.length + 1).trim();
+    const variants = [label, label.replaceAll("'", "’")].map((value) => value.toLowerCase());
+    const match = lines.find((line) => variants.some((variant) => line.toLowerCase().startsWith(`${variant}:`)));
+    if (match) return match.slice(match.indexOf(":") + 1).trim();
   }
 
   return "";
@@ -77,8 +86,8 @@ function extractSectionBlocks(roleText: string): Record<RoleSectionKind, string[
 
 function splitBlockItems(block: string): string[] {
   return block
-    .split(/\r?\n|;|•|·/)
-    .map((item) => item.replace(/^\s*[-*]\s*/, "").trim())
+    .split(/\r?\n|;|(?=\s[-*]\s)|(?=\s\d+[.)]\s)/)
+    .map((item) => item.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").trim())
     .filter(Boolean);
 }
 
@@ -87,6 +96,12 @@ function extractList(roleText: string, labels: string[]): string[] {
   if (!value) return [];
 
   return splitBlockItems(value);
+}
+
+function inferListBySignals(roleText: string, signals: RegExp[]): string[] {
+  return splitBlockItems(normalizeRoleText(roleText))
+    .filter((item) => item.length >= 18)
+    .filter((item) => signals.some((signal) => signal.test(item)));
 }
 
 function inferTitle(roleText: string): string {
@@ -120,22 +135,28 @@ export function createRoleDraftFromText(roleText: string) {
   const description =
     extractSection(roleText, ["description", "summary"]) ||
     blocks.description.join("\n");
-  const labeledResponsibilities = extractList(roleText, ["responsibilities", "responsibility"]);
-  const labeledRequirements = extractList(roleText, ["requirements", "must have", "required"]);
+  const labeledResponsibilities = extractList(roleText, ["responsibilities", "responsibility", "key responsibilities"]);
+  const labeledRequirements = extractList(roleText, ["requirements", "must have", "required", "qualifications", "skills"]);
   const responsibilities = labeledResponsibilities.length > 0
     ? labeledResponsibilities
     : blocks.responsibilities.flatMap(splitBlockItems);
   const requirements = labeledRequirements.length > 0
     ? labeledRequirements
     : blocks.requirements.flatMap(splitBlockItems);
+  const inferredResponsibilities = responsibilities.length > 0 ? responsibilities : inferListBySignals(roleText, [
+    /\b(lead|own|manage|drive|define|create|build|develop|collaborate|partner|work with|deliver|support|shape)\b/i,
+  ]);
+  const inferredRequirements = requirements.length > 0 ? requirements : inferListBySignals(roleText, [
+    /\b(experience|years|proven|strong|excellent|ability|knowledge|familiar|expertise|background|degree|portfolio|figma|ux|product)\b/i,
+  ]);
   const preferredQualifications = blocks.preferred.flatMap(splitBlockItems);
 
   return {
     company: roleField(company, sourceId),
     title: roleField(title, sourceId),
     description: roleField(description, sourceId),
-    responsibilities: responsibilities.map((item) => roleField(item, sourceId)),
-    requirements: requirements.map((item) => roleField(item, sourceId)),
+    responsibilities: inferredResponsibilities.map((item) => roleField(item, sourceId)),
+    requirements: inferredRequirements.map((item) => roleField(item, sourceId)),
     preferredQualifications: preferredQualifications.map((item) => roleField(item, sourceId)),
   };
 }
@@ -172,13 +193,13 @@ export function validateRoleText(input: {
 }
 
 export function looksLikeReportIntent(message: string) {
-  return /\b(report|fit|match|role fit|analy[sz]e|analysis)\b/i.test(message) || /דוח|התאמה|מתאימ|נתח|משרה|תפקיד/.test(message);
+  return /\b(report|fit|match|role fit|analy[sz]e|analysis)\b/i.test(message) || /דוח|דו"ח|דו״ח|התאמה|מתאימ|נתח|משרה|תפקיד/.test(message);
 }
 
 export function looksLikeRoleInput(message: string) {
   const lower = normalizeRoleText(message).toLowerCase();
-  const labeledFieldCount = ["company:", "organization:", "title:", "role:", "description:", "responsibilities:", "requirements:"].filter((label) => lower.includes(label)).length;
+  const labeledFieldCount = ["company:", "organization:", "title:", "role:", "description:", "responsibilities:", "requirements:", "qualifications:", "skills:"].filter((label) => lower.includes(label)).length;
   const linkedInSectionCount = normalizedHeadingEntries.filter(({ label }) => lower.includes(label.toLowerCase())).length;
 
-  return labeledFieldCount >= 2 || linkedInSectionCount >= 2 || /responsibilities|requirements|qualifications|job description/i.test(message) || /דרישות|אחריות|תיאור משרה|תיאור תפקיד/.test(message);
+  return labeledFieldCount >= 2 || linkedInSectionCount >= 2 || /responsibilities|key responsibilities|requirements|qualifications|job description/i.test(message) || /דרישות|אחריות|תיאור משרה|תיאור תפקיד/.test(message);
 }

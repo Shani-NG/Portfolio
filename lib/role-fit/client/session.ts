@@ -25,6 +25,11 @@ export type RoleFitLiveSession = {
   messages: RoleFitMessage[];
   draftInput: string;
   activeRoleText: string;
+  activeRoleTitle: string;
+  activeRoleCompany: string;
+  reportPayload: unknown | null;
+  reportProvider: string;
+  reportModel: string;
   completedReportCount: 0 | 1 | 2;
   pendingReportConfirmation: boolean;
 };
@@ -58,6 +63,11 @@ function createSession(): RoleFitLiveSession {
     messages: [],
     draftInput: "",
     activeRoleText: "",
+    activeRoleTitle: "",
+    activeRoleCompany: "",
+    reportPayload: null,
+    reportProvider: "",
+    reportModel: "",
     completedReportCount: 0,
     pendingReportConfirmation: false,
   };

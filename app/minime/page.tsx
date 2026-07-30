@@ -2,6 +2,7 @@
 
 import { Chip } from "@/components/ui/chip";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import type { ReportUIPayload } from "@/lib/role-fit/contracts";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
 import { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
@@ -14,8 +15,7 @@ type MatchType = "direct" | "semantic" | "transferable" | "partial" | "insuffici
 type LiveReportState = {
   provider?: string;
   model?: string;
-  label?: string;
-  rationale?: string;
+  report?: ReportUIPayload;
 };
 
 const screenOptions: { value: RoleFitDisplayMode; label: string }[] = [
@@ -293,6 +293,16 @@ function normalizeRepeatedInput(value: string) {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+function isReportConfirmationText(value: string) {
+  return /^(yes|yep|sure|ok|okay|go ahead|generate|continue|confirm|great|nice|sounds good|יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך)$/i.test(value.trim());
+}
+
+function detectSessionLanguage(message: string, session: RoleFitLiveSession) {
+  if (/[\u0590-\u05ff]/.test(message)) return "he";
+  const hadHebrewConversation = session.messages.some((item) => /[\u0590-\u05ff]/.test(item.content));
+  return hadHebrewConversation ? "he" : "en";
+}
+
 export default function RoleFitPage() {
   const [displayMode, setDisplayMode] = useState<RoleFitDisplayMode>("live");
   const [screenState, setScreenState] = useState<RoleFitScreenState>("home");
@@ -307,6 +317,7 @@ export default function RoleFitPage() {
   const selectedProject = activeProject === null ? null : evidenceProjects[activeProject];
   const reportLimitReached = liveSession.completedReportCount >= 2;
   const isLiveMode = displayMode === "live";
+  const hasLiveReport = Boolean(liveSession.reportPayload);
   const liveSplitCanvas = liveSession.state === "generating-report" || liveSession.state === "recoverable-error" || liveSession.state === "report-ready";
 
   const simulationSplitCanvas = screenState === "generating" || screenState === "error" || screenState === "report";
@@ -314,6 +325,8 @@ export default function RoleFitPage() {
   const hasConversation = isLiveMode ? liveSession.messages.length > 0 || liveSession.state !== "initial" : screenState !== "home";
   const reportActionLabel = reportLimitReached
     ? "Sorry, that is it for now. You are welcome to contact me."
+    : isLiveMode && hasLiveReport
+      ? "Show report"
     : isLiveMode && liveSession.pendingReportConfirmation
       ? "Generate confirmed report"
       : !isLiveMode && screenState === "report"
@@ -335,6 +348,12 @@ export default function RoleFitPage() {
   async function submitLiveMessage(textOverride?: string) {
     const submittedText = (textOverride ?? roleInput).trim();
     if (!submittedText || isSending) return;
+    if (isLiveMode && liveSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
+      appendLiveMessage({ role: "user", content: submittedText });
+      setRoleInput("");
+      await requestReport();
+      return;
+    }
     const normalizedSubmittedText = normalizeRepeatedInput(submittedText);
     const normalizedActiveRoleText = normalizeRepeatedInput(liveSession.activeRoleText);
     const repeatedInput = Boolean(
@@ -370,7 +389,7 @@ export default function RoleFitPage() {
           conversationId: sessionAfterUser.conversationId,
           sessionId: sessionAfterUser.sessionId,
           message: messageForAgent,
-          language: /[\u0590-\u05ff]/.test(messageForAgent) ? "he" : "en",
+          language: detectSessionLanguage(submittedText, sessionAfterUser),
           repeatedInput,
         }),
       });
@@ -381,6 +400,8 @@ export default function RoleFitPage() {
       syncLiveSession({
         state: nextState,
         activeRoleText: nextState === "awaiting-role-completion" || nextState === "awaiting-report-confirmation" ? messageForAgent : liveSession.activeRoleText,
+        activeRoleTitle: result.validation?.roleDraft?.title?.originalValue ?? liveSession.activeRoleTitle,
+        activeRoleCompany: result.validation?.roleDraft?.company?.originalValue ?? liveSession.activeRoleCompany,
         pendingReportConfirmation: nextState === "awaiting-report-confirmation",
       });
 
@@ -402,10 +423,14 @@ export default function RoleFitPage() {
     }
 
     if (reportLimitReached) return;
+    if (hasLiveReport) {
+      syncLiveSession({ state: "report-ready" });
+      return;
+    }
     if (!liveSession.pendingReportConfirmation || !liveSession.activeRoleText.trim()) {
       appendLiveMessage({
         role: "agent",
-        content: "I can create a report only after the role details are validated and you explicitly confirm report generation.",
+        content: "אני יכולה ליצור דוח רק אחרי שיש מספיק פרטי משרה ואישור מפורש להמשיך.",
       });
       syncLiveSession({ state: "awaiting-role-completion", pendingReportConfirmation: false });
       return;
@@ -428,7 +453,7 @@ export default function RoleFitPage() {
           completedReportCount: liveSession.completedReportCount,
           conversationId: liveSession.conversationId,
           sessionId: liveSession.sessionId,
-          language: /[\u0590-\u05ff]/.test(liveSession.activeRoleText) ? "he" : "en",
+          language: detectSessionLanguage(liveSession.activeRoleText, liveSession),
         }),
       });
 
@@ -445,12 +470,14 @@ export default function RoleFitPage() {
       setLiveReportState({
         provider: result.provider,
         model: result.model,
-        label: report?.overallFitVisual?.label,
-        rationale: report?.overallFitVisual?.rationale,
+        report,
       });
-      appendLiveMessage({ role: "agent", content: "The report is ready. You can review it on the report canvas and continue asking follow-up questions in this same session." });
+      appendLiveMessage({ role: "agent", content: "הדוח מוכן. אפשר לראות אותו באזור הדוח ולהמשיך לשאול כאן באותה שיחה." });
       syncLiveSession({
         state: "report-ready",
+        reportPayload: report,
+        reportProvider: result.provider,
+        reportModel: result.model,
         completedReportCount: (liveSession.completedReportCount + 1) as 1 | 2,
         pendingReportConfirmation: false,
       });
@@ -515,11 +542,11 @@ export default function RoleFitPage() {
         className={splitCanvas ? `${styles.stickyReportChip} ${styles.canvasActiveAction}` : styles.stickyReportChip}
         aria-label={reportActionLabel}
         type="button"
-        disabled={isLiveMode ? reportLimitReached || !liveSession.pendingReportConfirmation : false}
+        disabled={isLiveMode ? reportLimitReached || (!liveSession.pendingReportConfirmation && !hasLiveReport) : false}
         title={reportActionLabel}
         onClick={requestReport}
       >
-        <span className={styles.msi} aria-hidden="true">{!isLiveMode && screenState === "report" ? "add" : "arrow_forward"}</span>
+        <span className={styles.msi} aria-hidden="true">{isLiveMode && hasLiveReport ? "article" : !isLiveMode && screenState === "report" ? "add" : "arrow_forward"}</span>
       </button>
       {splitCanvas ? (
         <button className={styles.mobileBackChip} type="button" onClick={() => isLiveMode ? syncLiveSession({ state: "general-qa" }) : setScreenState("conversation")}>
@@ -616,7 +643,13 @@ export default function RoleFitPage() {
                   <p>{apiStatusMessage || (isLiveMode ? "The session is preserved. Please continue in the chat or try again." : "The job description does not include enough role requirements or responsibility context for an evidence-based fit report.")}</p>
                 </div>
               ) : isLiveMode ? (
-                <LiveReportCanvas liveReportState={liveReportState} />
+                <LiveReportCanvas
+                  liveReportState={{
+                    report: liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined,
+                    provider: liveReportState?.provider ?? liveSession.reportProvider,
+                    model: liveReportState?.model ?? liveSession.reportModel,
+                  }}
+                />
               ) : (
                 <RoleFitReport fitMode={fitMode} setFitMode={setFitMode} fit={fit} selectedProject={selectedProject} activeProject={activeProject} setActiveProject={setActiveProject} />
               )}
@@ -629,14 +662,34 @@ export default function RoleFitPage() {
 }
 
 function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportState | null }) {
+  const report = liveReportState?.report;
+  const confidenceLabel = report?.evidenceConfidence.level.replaceAll("-", " ");
+
   return (
     <div className={`${styles.reportShell} ${styles.liveReportCanvas}`} id="role-fit-live-report">
-      <section className={styles.bentoCard} aria-label="Live Role Fit report status">
-        <span className={styles.reportEyebrow}>Live report status</span>
-        <h2>{liveReportState?.label || "Live model connection confirmed"}</h2>
-        <p>{liveReportState?.rationale || "The server returned a valid response. Full evidence retrieval and final report composition remain gated by the approved Role Fit contracts."}</p>
+      <section className={`${styles.bentoCard} ${styles.roleSnapshot}`} aria-label="Live Role Fit report">
+        <div className={styles.snapshotTop}>
+          <div>
+            <span className={styles.reportEyebrow}>Role Fit Report</span>
+            <h2>{report?.roleSnapshot.title || "Submitted role"}</h2>
+            <p>{report?.roleSnapshot.company || "Submitted company"}</p>
+          </div>
+          <Chip className={styles.fitBadge} kind="info">{report?.overallFitVisual.label || "Report ready"}</Chip>
+        </div>
+        <p className={styles.fitSummary}>{report?.overallFitVisual.rationale || "The report response is ready, but no display payload was returned."}</p>
+      </section>
+
+      <section className={styles.bentoCard}>
+        <span className={styles.reportEyebrow}>Evidence Confidence</span>
+        <h3>{confidenceLabel || "Unknown"}</h3>
+        <p>{report?.evidenceConfidence.rationale || "Evidence confidence was not returned."}</p>
+      </section>
+
+      <section className={styles.bentoCard}>
+        <span className={styles.reportEyebrow}>Report Boundary</span>
+        <p>{report?.disclaimer.text || "This report must remain grounded in approved portfolio evidence."}</p>
         <small>
-          Provider: {liveReportState?.provider || "unknown"} - Model: {liveReportState?.model || "unknown"}
+          Provider: {liveReportState?.provider || "unknown"} | Model: {liveReportState?.model || "unknown"}
         </small>
       </section>
     </div>

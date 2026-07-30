@@ -61,4 +61,48 @@ describe("Role Fit pasted job understanding", () => {
 
     assert.equal(result.parseStatus, "valid-complete");
   });
+
+  it("maps key responsibilities and qualifications into required role fields", () => {
+    const roleText = [
+      "Product Designer",
+      "KEY RESPONSIBILITIES",
+      "Lead product discovery with product and engineering",
+      "Create user flows and prototypes for complex workflows",
+      "QUALIFICATIONS",
+      "Strong UX and Figma experience",
+      "Ability to communicate clearly with stakeholders",
+    ].join("\n");
+
+    const result = validateRoleText({
+      conversationId: "conv_test",
+      traceId: "trace_test",
+      roleText,
+      detectedLanguage: "en",
+    });
+
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.equal(result.roleDraft.responsibilities.length, 2);
+    assert.equal(result.roleDraft.requirements.length, 2);
+  });
+
+  it("infers responsibilities and requirements from item content when headings are weak", () => {
+    const roleText = [
+      "UX Strategy Lead",
+      "Lead discovery and align product direction with engineering teams",
+      "Deliver prototypes and support decision-making in complex workflows",
+      "Strong product UX experience",
+      "Figma",
+    ].join("\n");
+
+    const result = validateRoleText({
+      conversationId: "conv_test",
+      traceId: "trace_test",
+      roleText,
+      detectedLanguage: "en",
+    });
+
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.ok(result.roleDraft.responsibilities.length >= 1);
+    assert.ok(result.roleDraft.requirements.length >= 1);
+  });
 });

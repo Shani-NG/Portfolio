@@ -33,11 +33,55 @@ async function loadApprovedConversationContext() {
   return contents.join("\n\n---\n\n");
 }
 
-function missingFieldQuestion(missingField: string | undefined) {
+function isHebrew(language: "he" | "en" | "mixed") {
+  return language === "he" || language === "mixed";
+}
+
+function missingFieldQuestion(missingField: string | undefined, language: "he" | "en" | "mixed") {
+  if (isHebrew(language)) {
+    if (missingField === "title") return "מה שם המשרה?";
+    if (missingField === "responsibilities") return "אפשר להוסיף את תחומי האחריות המרכזיים?";
+    if (missingField === "requirements") return "אפשר להוסיף את הדרישות או הכישורים המרכזיים?";
+    return "איזה פרט מרכזי חסר במשרה?";
+  }
+
   if (missingField === "title") return "What is the role title?";
   if (missingField === "responsibilities") return "Please add the main responsibilities section.";
-  if (missingField === "requirements") return "Please add the main requirements section.";
+  if (missingField === "requirements") return "Please add the main requirements or qualifications.";
   return "What key role detail is still missing?";
+}
+
+function readyForReportAnswer(input: { title: string; companyName?: string; language: "he" | "en" | "mixed"; repeatedInput: boolean }) {
+  if (isHebrew(input.language)) {
+    const roleLabel = input.title ? ` עבור "${input.title}"` : "";
+    const companyLabel = input.companyName ? ` ב-${input.companyName}` : "";
+    return input.repeatedInput
+      ? `יש לי כבר מספיק מידע${roleLabel}${companyLabel}. שנמשיך לדוח?`
+      : `יש לי את כל מה שאני צריכה כדי לייצר דוח${roleLabel}${companyLabel}. שנמשיך?`;
+  }
+
+  const roleLabel = input.title ? ` for "${input.title}"` : "";
+  const companyLabel = input.companyName ? ` at ${input.companyName}` : "";
+  return input.repeatedInput
+    ? `I already have enough role detail${roleLabel}${companyLabel}. Shall I generate the report?`
+    : `I have everything I need to generate a report${roleLabel}${companyLabel}. Shall we continue?`;
+}
+
+function missingDetailsAnswer(input: { missingField: string | undefined; language: "he" | "en" | "mixed"; repeatedInput: boolean }) {
+  const question = missingFieldQuestion(input.missingField, input.language);
+  if (isHebrew(input.language)) {
+    return input.repeatedInput
+      ? `זה נראה אותו טקסט. ${question}`
+      : `אני יכולה לנתח את המשרה, אבל חסר פרט אחד. ${question}`;
+  }
+
+  return input.repeatedInput
+    ? `This appears unchanged. ${question}`
+    : `I can analyze this role, but one key detail is still missing. ${question}`;
+}
+
+function looksLikeRoleSubmissionSetup(message: string) {
+  return /\b(upload|paste|provide|add|send)\b.*\b(job|role|description|jd|details)\b/i.test(message) || /להעלות|להדביק|להזין|לשלוח|משרה|תיאור תפקיד/.test(message);
 }
 
 export async function POST(request: Request) {
@@ -70,6 +114,16 @@ export async function POST(request: Request) {
   const hasReportIntent = looksLikeReportIntent(parsedRequest.data.message);
   const hasRoleInput = looksLikeRoleInput(parsedRequest.data.message);
   const { conversationId, sessionId } = parsedRequest.data;
+
+  if (!hasRoleInput && looksLikeRoleSubmissionSetup(parsedRequest.data.message)) {
+    return NextResponse.json({
+      state: "awaiting-role-completion",
+      answer: isHebrew(parsedRequest.data.language)
+        ? "מעולה. אפשר להעלות קובץ או להדביק כאן את טקסט המשרה, ואני אקח את זה משם."
+        : "Great. You can upload a file or paste the role text here, and I will take it from there.",
+      safeMessageKey: "role.awaiting_input",
+    });
+  }
 
   if (hasReportIntent || hasRoleInput) {
     const validation = validateRoleText({
@@ -114,9 +168,12 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         state: "awaiting-report-confirmation",
-        answer: parsedRequest.data.repeatedInput
-          ? "The role details are already complete. Confirm report generation when you are ready."
-          : "I found enough role detail. Please confirm if you want me to generate an evidence-based Role Fit report.",
+        answer: readyForReportAnswer({
+          title,
+          companyName,
+          language: parsedRequest.data.language,
+          repeatedInput: parsedRequest.data.repeatedInput,
+        }),
         validation,
         safeMessageKey: "role.ready_for_confirmation",
       });
@@ -156,9 +213,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       state: "awaiting-role-completion",
-      answer: parsedRequest.data.repeatedInput
-        ? `This appears unchanged. ${missingFieldQuestion(missingField)}`
-        : `I can analyze this role, but one key detail is still missing. ${missingFieldQuestion(missingField)}`,
+      answer: missingDetailsAnswer({
+        missingField,
+        language: parsedRequest.data.language,
+        repeatedInput: parsedRequest.data.repeatedInput,
+      }),
       validation,
       safeMessageKey: "role.missing_required_fields",
     });
