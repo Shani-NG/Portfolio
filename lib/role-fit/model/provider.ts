@@ -7,6 +7,10 @@ export type RoleFitModelInput = {
   language: "he" | "en" | "mixed";
   task: "chat" | "analysis";
   maxOutputTokens: number;
+  mode?: "fit-analysis" | "report-follow-up";
+  runtimeState?: string;
+  approvedEvidence?: string;
+  conversationContext?: string;
 };
 
 export type RoleFitChatInput = {
@@ -14,6 +18,9 @@ export type RoleFitChatInput = {
   language: "he" | "en" | "mixed";
   maxOutputTokens: number;
   approvedContext: string;
+  mode?: "general-chat" | "report-follow-up";
+  runtimeState?: string;
+  conversationContext?: string;
 };
 
 export type RoleFitModelResult =

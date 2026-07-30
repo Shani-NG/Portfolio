@@ -1,4 +1,5 @@
 import { reportUIPayloadSchema } from "../contracts/index.ts";
+import { buildPortfolioAgentPrompt } from "../prompts/assembly.ts";
 import { getGoogleAiStudioModel } from "../runtime/policy.ts";
 import type { RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
 
@@ -187,23 +188,14 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         };
       }
 
-      const prompt = [
-        "You are Shani Nakash-Gomel's portfolio conversation agent.",
-        "Answer in the user's active language when clear.",
-        "Use only these name spellings: Hebrew 'שני' and English 'Shani'.",
-        "When answering in Hebrew, the agent speaks about herself in feminine form and addresses the user in gender-neutral wording unless the user's gender is explicit.",
-        "If the user asks to provide a job description, answer contextually: they can upload a file or paste text and you will continue from there.",
-        "Keep normal conversation to no more than four short sentences.",
-        "When structure helps, use at most three short bullets.",
-        "Ask only one focused clarification question at a time.",
-        "Do not repeat information the user already provided.",
-        "Use only the approved context below for professional claims.",
-        "Do not invent achievements, metrics, clients, recommendations, rankings, or hiring decisions.",
-        "Do not generate a role-fit report in chat. If the user asks for a report or fit analysis, explain that the role details must be validated and explicitly confirmed first.",
-        "For unclear general questions, ask one focused clarifying question or answer with a brief relevant direction.",
-        `Approved context:\n${input.approvedContext}`,
-        `User message:\n${input.message}`,
-      ].join("\n\n");
+      const prompt = buildPortfolioAgentPrompt({
+        mode: input.mode ?? "general-chat",
+        language: input.language,
+        runtimeState: input.runtimeState,
+        approvedEvidence: input.approvedContext,
+        conversationContext: input.conversationContext,
+        userInput: input.message,
+      });
 
       const response = await generateGeminiContent({
         apiKey,
@@ -257,14 +249,16 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         };
       }
 
-      const prompt = [
-        "Answer in one concise paragraph.",
-        "This is a server-side connectivity check for a portfolio Role Fit Agent vertical slice.",
-        "Do not include a visible numeric score, percentage, ranking, or hiring recommendation.",
-        "Do not invent portfolio evidence, claims, metrics, clients, or project details.",
-        "State that approved evidence retrieval is still required before a real qualitative fit report can be produced.",
-        `Role text:\n${input.roleText}`,
-      ].join("\n\n");
+      const prompt = buildPortfolioAgentPrompt({
+        mode: input.mode ?? "fit-analysis",
+        language: input.language,
+        runtimeState:
+          input.runtimeState ??
+          "Server-side connectivity check for the Role Fit Agent vertical slice. Approved evidence retrieval is still required before a real qualitative fit report can be produced.",
+        approvedEvidence: input.approvedEvidence,
+        conversationContext: input.conversationContext,
+        userInput: input.roleText,
+      });
 
       const response = await generateGeminiContent({
         apiKey,

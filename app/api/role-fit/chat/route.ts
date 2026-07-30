@@ -18,14 +18,13 @@ const requestSchema = z
   .strict();
 
 async function loadApprovedConversationContext() {
-  const root = process.cwd();
   const files = [
-    "PORTFOLIO_IMPLEMENTATION/role-fit-agent/docs/canonical/General_Profile_Knowledge.md",
-    "PORTFOLIO_IMPLEMENTATION/role-fit-agent/docs/canonical/Portfolio_Knowledge_Index.md",
+    join(process.cwd(), "PORTFOLIO_IMPLEMENTATION", "role-fit-agent", "docs", "canonical", "General_Profile_Knowledge.md"),
+    join(process.cwd(), "PORTFOLIO_IMPLEMENTATION", "role-fit-agent", "docs", "canonical", "Portfolio_Knowledge_Index.md"),
   ];
   const contents = await Promise.all(
     files.map(async (file) => {
-      const content = await readFile(join(root, file), "utf8");
+      const content = await readFile(file, "utf8");
       return content.slice(0, 12000);
     }),
   );
