@@ -6,6 +6,8 @@ export type RoleFitMessage = {
   content: string;
 };
 
+export type RoleFitPendingField = "company" | "title" | "responsibilities" | "requirements";
+
 export type RoleFitLiveState =
   | "initial"
   | "general-qa"
@@ -27,6 +29,7 @@ export type RoleFitLiveSession = {
   activeRoleText: string;
   activeRoleTitle: string;
   activeRoleCompany: string;
+  pendingRoleField: RoleFitPendingField | null;
   reportPayload: unknown | null;
   reportProvider: string;
   reportModel: string;
@@ -65,6 +68,7 @@ function createSession(): RoleFitLiveSession {
     activeRoleText: "",
     activeRoleTitle: "",
     activeRoleCompany: "",
+    pendingRoleField: null,
     reportPayload: null,
     reportProvider: "",
     reportModel: "",

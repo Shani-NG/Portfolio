@@ -4,6 +4,7 @@ import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { logRoleFitEvent, logRoleFitReportSummary, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
+import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
 import { evaluateReportEligibility } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
 
@@ -170,13 +171,15 @@ export async function POST(request: Request) {
   );
 
   const provider = getRoleFitModelProvider();
+  const approvedEvidence = await loadApprovedEvidence(parsedRequest.data.roleText);
+  const roleItems = getRoleAnalysisItems(validation.roleDraft);
   const modelResult = await provider.generateReport({
     roleText: parsedRequest.data.roleText,
     language: parsedRequest.data.language,
     task: "analysis",
     maxOutputTokens: policy.maxOutputTokens,
-    runtimeState: JSON.stringify(validation),
-    approvedEvidence: await loadApprovedEvidence(parsedRequest.data.roleText),
+    runtimeState: JSON.stringify({ validation, roleItems }),
+    approvedEvidence: approvedEvidence.promptContext,
   });
 
   if (!modelResult.ok) {
@@ -193,6 +196,7 @@ export async function POST(request: Request) {
           error: modelResult.error,
           provider: modelResult.provider,
           safeMessageKey: modelResult.safeMessageKey,
+          diagnostic: modelResult.detail,
         },
       }),
     );
@@ -210,6 +214,49 @@ export async function POST(request: Request) {
     );
   }
 
+  const composition = "report" in modelResult
+    ? { ok: true as const, report: modelResult.report }
+    : composeReportUIPayload({
+        analysis: modelResult.analysis,
+        roleDraft: validation.roleDraft,
+        evidence: approvedEvidence,
+        language: parsedRequest.data.language,
+      });
+
+  if (!composition.ok) {
+    after(() =>
+      logRoleFitEvent({
+        eventName: "report.failed",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "failure",
+        durationMs: Date.now() - startedAt,
+        metadata: {
+          error: "invalid-output",
+          provider: modelResult.provider,
+          safeMessageKey: "model.google_ai_studio_invalid_report_payload",
+          diagnostic: composition.diagnostic,
+        },
+      }),
+    );
+
+    return NextResponse.json(
+      {
+        state: "model-unavailable",
+        provider: modelResult.provider,
+        model: modelResult.model,
+        error: "invalid-output",
+        safeMessageKey: "model.google_ai_studio_invalid_report_payload",
+        detail: composition.diagnostic,
+      },
+      { status: 502 },
+    );
+  }
+
+  const report = composition.report;
+
   const eligibility = evaluateReportEligibility({
     session: {
       status: "active",
@@ -219,11 +266,11 @@ export async function POST(request: Request) {
       approved: parsedRequest.data.approved,
     },
     evidenceState: "ready",
-    report: modelResult.report,
+    report,
   });
 
   after(async () => {
-    const reportId = modelResult.report.reportId;
+    const reportId = report.reportId;
     const title = validation.roleDraft.title?.originalValue ?? "";
     await Promise.all([
       logRoleFitEvent({
@@ -238,8 +285,8 @@ export async function POST(request: Request) {
         metadata: {
           provider: modelResult.provider,
           model: modelResult.model,
-          fitMode: modelResult.report.overallFitVisual.mode,
-          evidenceConfidence: modelResult.report.evidenceConfidence.level,
+          fitMode: report.overallFitVisual.mode,
+          evidenceConfidence: report.evidenceConfidence.level,
         },
       }),
       logRoleFitReportSummary({
@@ -248,9 +295,9 @@ export async function POST(request: Request) {
         reportId,
         provider: modelResult.provider,
         model: modelResult.model,
-        fitMode: modelResult.report.overallFitVisual.mode,
-        fitLabel: modelResult.report.overallFitVisual.label,
-        evidenceStatus: modelResult.report.evidenceConfidence.level,
+        fitMode: report.overallFitVisual.mode,
+        fitLabel: report.overallFitVisual.label,
+        evidenceStatus: report.evidenceConfidence.level,
       }),
       logRoleFitSessionSummary({
         conversationId,
@@ -274,6 +321,6 @@ export async function POST(request: Request) {
     provider: modelResult.provider,
     model: modelResult.model,
     eligibility,
-    report: modelResult.report,
+    report,
   });
 }

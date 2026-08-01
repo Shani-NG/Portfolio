@@ -376,8 +376,6 @@ export default function RoleFitPage() {
     );
     const messageForAgent = repeatedInput
       ? liveSession.activeRoleText
-      : liveSession.state === "awaiting-role-completion" && liveSession.activeRoleText
-      ? `${liveSession.activeRoleText}\n${submittedText}`
       : submittedText;
 
     const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
@@ -404,19 +402,30 @@ export default function RoleFitPage() {
           repeatedInput,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)),
           reportContext: liveSession.reportPayload ? JSON.stringify(liveSession.reportPayload).slice(0, 18000) : undefined,
+          roleContext: liveSession.pendingRoleField && liveSession.activeRoleText
+            ? {
+                roleText: liveSession.activeRoleText,
+                pendingField: liveSession.pendingRoleField,
+              }
+            : undefined,
         }),
       });
 
       const result = await response.json();
       const nextState = (result.state ?? "general-qa") as RoleFitLiveState;
       appendLiveMessage({ role: "agent", content: result.answer ?? "I need a little more context before I can answer safely." });
-      syncLiveSession({
+      const nextSession = syncLiveSession({
         state: nextState,
-        activeRoleText: nextState === "awaiting-role-completion" || nextState === "awaiting-report-confirmation" ? messageForAgent : liveSession.activeRoleText,
+        activeRoleText: result.roleText ?? liveSession.activeRoleText,
         activeRoleTitle: result.validation?.roleDraft?.title?.originalValue ?? liveSession.activeRoleTitle,
         activeRoleCompany: result.validation?.roleDraft?.company?.originalValue ?? liveSession.activeRoleCompany,
+        pendingRoleField: result.pendingField !== undefined ? result.pendingField : liveSession.pendingRoleField,
         pendingReportConfirmation: nextState === "awaiting-report-confirmation",
       });
+
+      if (result.autoApproveReport) {
+        await requestReport(nextSession);
+      }
 
       if (!response.ok) {
         setApiStatusMessage(result.safeMessageKey ?? "The live conversation service is currently unavailable.");
@@ -429,21 +438,34 @@ export default function RoleFitPage() {
     }
   }
 
-  async function requestReport() {
+  async function requestReport(sessionOverride?: RoleFitLiveSession) {
     if (!isLiveMode) {
       setScreenState("report");
       return;
     }
 
-    if (reportLimitReached) return;
-    if (hasLiveReport) {
+    const reportSession = sessionOverride ?? liveSession;
+
+    if (reportSession.completedReportCount >= 2) return;
+    if (reportSession.reportPayload) {
       syncLiveSession({ state: "report-ready" });
       return;
     }
-    if (!liveSession.pendingReportConfirmation || !liveSession.activeRoleText.trim()) {
+    if (!reportSession.pendingReportConfirmation || !reportSession.activeRoleText.trim()) {
+      const missingFieldGuidance = {
+        company: "The company name is still missing. Please enter the company name so I can complete the role details.",
+        title: "The role title is still missing. Please enter the job title so I can complete the role details.",
+        responsibilities: "The role responsibilities are still missing. Please paste the main responsibilities or expected outcomes.",
+        requirements: "The role requirements are still missing. Please paste the required skills, experience, or qualifications.",
+      } as const;
+      const guidance = reportSession.pendingRoleField
+        ? missingFieldGuidance[reportSession.pendingRoleField]
+        : reportSession.activeRoleText.trim()
+          ? "I still need complete role details and your confirmation before generating the report. Please add the role title, responsibilities, and requirements; include the company when available."
+          : "To generate a report, paste the job description or upload its details here. I need the role title, responsibilities, and requirements; include the company when available.";
       appendLiveMessage({
         role: "agent",
-        content: "אני יכולה ליצור דוח רק אחרי שיש מספיק פרטי משרה ואישור מפורש להמשיך.",
+        content: guidance,
       });
       syncLiveSession({ state: "awaiting-role-completion", pendingReportConfirmation: false });
       return;
@@ -461,12 +483,12 @@ export default function RoleFitPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          roleText: liveSession.activeRoleText,
+          roleText: reportSession.activeRoleText,
           approved: true,
-          completedReportCount: liveSession.completedReportCount,
-          conversationId: liveSession.conversationId,
-          sessionId: liveSession.sessionId,
-          language: detectSessionLanguage(liveSession.activeRoleText, liveSession),
+          completedReportCount: reportSession.completedReportCount,
+          conversationId: reportSession.conversationId,
+          sessionId: reportSession.sessionId,
+          language: detectSessionLanguage(reportSession.activeRoleText, reportSession),
         }),
       });
 
@@ -491,7 +513,7 @@ export default function RoleFitPage() {
         reportPayload: report,
         reportProvider: result.provider,
         reportModel: result.model,
-        completedReportCount: (liveSession.completedReportCount + 1) as 1 | 2,
+        completedReportCount: (reportSession.completedReportCount + 1) as 1 | 2,
         pendingReportConfirmation: false,
       });
     } catch {
@@ -509,6 +531,17 @@ export default function RoleFitPage() {
     const uploadPrefix = pendingInput.fileName ? `Uploaded file: ${pendingInput.fileName}` : "";
     void submitLiveMessage([uploadPrefix, submittedText].filter(Boolean).join("\n\n"));
   }, []);
+
+  useEffect(() => {
+    if (!isLiveMode || !liveSplitCanvas) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isLiveMode, liveSplitCanvas]);
 
   const chatMessages = useMemo(() => {
     if (isLiveMode) return liveSession.messages;
@@ -531,7 +564,7 @@ export default function RoleFitPage() {
   }, [apiStatusMessage, isLiveMode, liveSession.messages, screenState]);
 
   return (
-    <main className={styles.roleFitPage}>
+    <main className={isLiveMode && liveSplitCanvas ? `${styles.roleFitPage} ${styles.liveSplitPage}` : styles.roleFitPage}>
       <section className={styles.stateBar} aria-label="Role Fit preview state">
         <select
           id="role-fit-state"
@@ -552,14 +585,14 @@ export default function RoleFitPage() {
       </section>
 
       <button
-        className={splitCanvas ? `${styles.stickyReportChip} ${styles.canvasActiveAction}` : styles.stickyReportChip}
+        className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, isLiveMode && styles.liveReportAction].filter(Boolean).join(" ")}
         aria-label={reportActionLabel}
         type="button"
-        disabled={isLiveMode ? reportLimitReached || (!liveSession.pendingReportConfirmation && !hasLiveReport) : false}
+        disabled={isLiveMode ? reportLimitReached : false}
         title={reportActionLabel}
-        onClick={requestReport}
+        onClick={() => void requestReport()}
       >
-        <span className={styles.msi} aria-hidden="true">{isLiveMode && hasLiveReport ? "article" : !isLiveMode && screenState === "report" ? "add" : "arrow_forward"}</span>
+        {isLiveMode ? "Generate Report" : <span className={styles.msi} aria-hidden="true">{screenState === "report" ? "add" : "arrow_forward"}</span>}
       </button>
       {splitCanvas ? (
         <button className={styles.mobileBackChip} type="button" onClick={() => isLiveMode ? syncLiveSession({ state: "general-qa" }) : setScreenState("conversation")}>
@@ -584,27 +617,26 @@ export default function RoleFitPage() {
               <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                 <span className={styles.msi} aria-hidden="true">add</span>
               </button>
-              <button className={styles.submitBtn} type="button" disabled={isLiveMode && (isSending || !roleInput.trim())} onClick={() => isLiveMode ? void submitLiveMessage() : setScreenState("conversation")}>
-                <span>Send</span>
+              <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isLiveMode && (isSending || !roleInput.trim())} onClick={() => isLiveMode ? void submitLiveMessage() : setScreenState("conversation")}>
                 <span className={styles.msi} aria-hidden="true">arrow_forward</span>
               </button>
             </div>
           </div>
 
           <div className={styles.chipsRow}>
-            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="upload_file" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to upload a job description for validation.") : setScreenState("conversation")} tone="primary">
-              Upload a job description
+            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="upload_file" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to upload a job description for validation.") : setScreenState("conversation")} title="Upload a job description" tone="primary">
+              <span className={styles.fullChipLabel}>Upload a job description</span><span className={styles.shortChipLabel} aria-hidden="true">Upload</span>
             </Chip>
-            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="content_paste" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to paste job details for validation.") : setScreenState("conversation")} tone="primary">
-              Paste job details
+            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="content_paste" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to paste job details for validation.") : setScreenState("conversation")} title="Paste job details" tone="primary">
+              <span className={styles.fullChipLabel}>Paste job details</span><span className={styles.shortChipLabel} aria-hidden="true">Paste</span>
             </Chip>
-            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="travel_explore" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("Explore my experience") : setScreenState("conversation")} tone="primary">
-              Explore my experience
+            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="travel_explore" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("Explore my experience") : setScreenState("conversation")} title="Explore my experience" tone="primary">
+              <span className={styles.fullChipLabel}>Explore my experience</span><span className={styles.shortChipLabel} aria-hidden="true">Explore</span>
             </Chip>
           </div>
         </section>
       ) : (
-        <section className={styles.agentViewContainer} id="role-fit-workspace" aria-label="Role Fit workspace">
+        <section className={isLiveMode && liveSplitCanvas ? `${styles.agentViewContainer} ${styles.liveSplitWorkspace}` : styles.agentViewContainer} id="role-fit-workspace" aria-label="Role Fit workspace">
           <div className={`${styles.chatPane} ${splitCanvas ? styles.compactHiddenChat : styles.fullWidth}`}>
             <div className={styles.chatHistory}>
               {chatMessages.map((message, index) => (
@@ -630,8 +662,7 @@ export default function RoleFitPage() {
                 <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                   <span className={styles.msi} aria-hidden="true">add</span>
                 </button>
-                <button className={styles.submitBtn} type="button" disabled={isLiveMode && (isSending || !roleInput.trim())} onClick={() => isLiveMode ? void submitLiveMessage() : requestReport()}>
-                  <span>Send</span>
+                <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isLiveMode && (isSending || !roleInput.trim())} onClick={() => isLiveMode ? void submitLiveMessage() : requestReport()}>
                   <span className={styles.msi} aria-hidden="true">arrow_forward</span>
                 </button>
               </div>

@@ -179,8 +179,9 @@ export function AgentComposer({
       {actions.length > 0 ? (
         <div className={styles.quickActions} aria-label="Role Fit quick actions">
           {actions.map((action) => (
-            <Chip className={styles.quickAction} disabled={isDisabled || action.disabled} icon={action.icon} key={action.label} kind="action" onClick={() => void handleQuickAction(action)} tone="primary">
-              {action.label}
+            <Chip className={styles.quickAction} disabled={isDisabled || action.disabled} icon={action.icon} key={action.label} kind="action" onClick={() => void handleQuickAction(action)} title={action.label} tone="primary">
+              <span className={styles.fullActionLabel}>{action.label}</span>
+              <span className={styles.shortActionLabel} aria-hidden="true">{action.label.split(" ")[0]}</span>
             </Chip>
           ))}
         </div>

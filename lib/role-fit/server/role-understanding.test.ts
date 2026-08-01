@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createRoleDraftFromText, looksLikeRoleInput, validateRoleText } from "./role-understanding.ts";
+import { createRoleDraftFromText, looksLikeRoleInput, mergeRoleClarification, validateRoleText } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -104,5 +104,41 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(result.parseStatus, "valid-complete");
     assert.ok(result.roleDraft.responsibilities.length >= 1);
     assert.ok(result.roleDraft.requirements.length >= 1);
+  });
+
+  it("does not promote setup instructions to the role title", () => {
+    const roleText = [
+      "Great, I am going to upload a role",
+      "Responsibilities: Lead product discovery and align stakeholders",
+      "Requirements: Strong UX strategy and research experience",
+    ].join("\n");
+
+    const result = validateRoleText({
+      conversationId: "conv_test",
+      traceId: "trace_test",
+      roleText,
+      detectedLanguage: "en",
+    });
+
+    assert.equal(result.roleDraft.title?.originalValue, "");
+    assert.deepEqual(result.missingFields, ["title"]);
+  });
+
+  it("merges a requested title as a labeled deterministic clarification", () => {
+    const initialRole = [
+      "Responsibilities: Lead product discovery and align stakeholders",
+      "Requirements: Strong UX strategy and research experience",
+    ].join("\n");
+    const clarifiedRole = mergeRoleClarification(initialRole, "title", "Senior UX Strategist");
+
+    const result = validateRoleText({
+      conversationId: "conv_test",
+      traceId: "trace_test",
+      roleText: clarifiedRole,
+      detectedLanguage: "en",
+    });
+
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.equal(result.roleDraft.title?.originalValue, "Senior UX Strategist");
   });
 });

@@ -2,6 +2,24 @@ import type { ReportUIPayload } from "../contracts/index.ts";
 
 export type RoleFitModelProviderName = "mock" | "gemini";
 
+export type QualitativeReportAnalysis = {
+  fitLevel: "strong" | "good" | "partial" | "insufficient" | "out-of-scope";
+  fitRationale: string;
+  evidenceConfidence: "high" | "medium" | "low" | "insufficient";
+  evidenceConfidenceRationale: string;
+  skillsCoverageLabel: string;
+  items: Array<{
+    roleItemIndex: number;
+    displayLabel: string;
+    importance: "must-have" | "core" | "supporting";
+    matchType: "direct" | "semantic" | "transferable" | "partial" | "insufficient-evidence" | "real-gap";
+    impact: "strength" | "gap" | "neutral";
+    evidenceConfidence: "high" | "medium" | "low" | "insufficient";
+    shortRationale: string;
+    evidenceSourceIds: string[];
+  }>;
+};
+
 export type RoleFitModelInput = {
   roleText: string;
   language: "he" | "en" | "mixed";
@@ -29,6 +47,12 @@ export type RoleFitModelResult =
       provider: RoleFitModelProviderName;
       model: string;
       report: ReportUIPayload;
+    }
+  | {
+      ok: true;
+      provider: RoleFitModelProviderName;
+      model: string;
+      analysis: QualitativeReportAnalysis;
     }
   | {
       ok: false;

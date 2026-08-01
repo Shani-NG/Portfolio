@@ -1,6 +1,7 @@
 import { createRoleValidationResult } from "./eligibility.ts";
 
 type RoleSectionKind = "description" | "responsibilities" | "requirements" | "preferred";
+export type RoleClarificationField = "company" | "title" | "responsibilities" | "requirements";
 
 const roleSectionHeadings: Array<{ kind: RoleSectionKind; labels: string[] }> = [
   { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity", "Overview"] },
@@ -104,6 +105,20 @@ function inferListBySignals(roleText: string, signals: RegExp[]): string[] {
     .filter((item) => signals.some((signal) => signal.test(item)));
 }
 
+const roleTitleSignal = /\b(ux|ui|user experience|product|design(?:er)?|research(?:er)?|strateg(?:y|ist)|manager|management|lead|director|head|vice president|vp|chief|engineer|developer|architect|analyst|specialist|consultant|coordinator|innovation|implementation|operations)\b/i;
+const setupInstructionSignal = /\b(upload|paste|provide|send|share|attach|going to|want to|would like to|job description|role details)\b/i;
+
+export function isPlausibleRoleTitle(value: string): boolean {
+  const title = value.trim();
+  const words = title.split(/\s+/);
+
+  if (!title || title.length > 100 || words.length > 12) return false;
+  if (/[.!?]$/.test(title) || setupInstructionSignal.test(title)) return false;
+  if (/^(about|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(title)) return false;
+
+  return roleTitleSignal.test(title);
+}
+
 function inferTitle(roleText: string): string {
   const labeledTitle = extractSection(roleText, ["title", "role"]);
   if (labeledTitle) return labeledTitle;
@@ -111,12 +126,37 @@ function inferTitle(roleText: string): string {
   const normalizedText = normalizeRoleText(roleText);
   const firstHeadingIndex = normalizedText.search(headingPattern);
   const titleSource = firstHeadingIndex > 0 ? normalizedText.slice(0, firstHeadingIndex) : normalizedText;
-  const firstMeaningfulLine = titleSource
+  const inferredTitle = titleSource
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .find((line) => line && !line.startsWith("http") && !line.includes("applicants") && !line.includes("District"));
+    .find((line) =>
+      line &&
+      !line.startsWith("http") &&
+      !line.includes("applicants") &&
+      !line.includes("District") &&
+      isPlausibleRoleTitle(line),
+    );
 
-  return firstMeaningfulLine ?? "";
+  return inferredTitle ?? "";
+}
+
+const clarificationLabels: Record<RoleClarificationField, string> = {
+  company: "Company",
+  title: "Title",
+  responsibilities: "Responsibilities",
+  requirements: "Requirements",
+};
+
+export function isValidRoleClarificationAnswer(field: RoleClarificationField, value: string): boolean {
+  const answer = value.trim();
+  if (!answer || answer.length > 1000) return false;
+  if (field === "title") return isPlausibleRoleTitle(answer);
+  if (field === "company") return answer.length <= 120 && !/[.!?]\s/.test(answer);
+  return answer.length >= 8;
+}
+
+export function mergeRoleClarification(roleText: string, field: RoleClarificationField, value: string): string {
+  return [roleText.trim(), `${clarificationLabels[field]}: ${value.trim()}`].filter(Boolean).join("\n");
 }
 
 function inferCompany(roleText: string): string {

@@ -192,7 +192,7 @@
 .quickActions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--chip-row-gap) var(--chip-gap);
+  gap: 24px;
   width: 100%;
   align-items: center;
   justify-content: center;
@@ -200,6 +200,10 @@
 
 .quickAction {
   flex: 0 1 auto;
+}
+
+.shortActionLabel {
+  display: none;
 }
 
 @keyframes composerPulse {
@@ -222,6 +226,24 @@
 
   .quickAction {
     flex: 0 1 auto;
+  }
+
+  .quickActions {
+    gap: 12px;
+  }
+
+  .fullActionLabel {
+    display: none;
+  }
+
+  .shortActionLabel {
+    display: inline;
+  }
+}
+
+@media (max-width: 28rem) {
+  .quickActions {
+    gap: 8px;
   }
 }
 

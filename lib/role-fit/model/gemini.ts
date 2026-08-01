@@ -1,8 +1,7 @@
 import { z } from "zod";
-import { reportUIPayloadSchema, type ReportUIPayload } from "../contracts/index.ts";
 import { buildPortfolioAgentPrompt } from "../prompts/assembly.ts";
 import { getGoogleAiStudioModel } from "../runtime/policy.ts";
-import type { RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
+import type { QualitativeReportAnalysis, RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
 
 type GeminiCandidate = {
   content?: {
@@ -24,7 +23,34 @@ type GeminiCallResult =
   | { ok: true; model: string; data: GeminiResponse }
   | { ok: false; model: string; detail: string };
 
-const reportJsonSchema = JSON.stringify(z.toJSONSchema(reportUIPayloadSchema));
+const qualitativeReportAnalysisSchema = z
+  .object({
+    fitLevel: z.enum(["strong", "good", "partial", "insufficient", "out-of-scope"]),
+    fitRationale: z.string().min(1),
+    evidenceConfidence: z.enum(["high", "medium", "low", "insufficient"]),
+    evidenceConfidenceRationale: z.string().min(1),
+    skillsCoverageLabel: z.string().min(1),
+    items: z
+      .array(
+        z
+          .object({
+            roleItemIndex: z.number().int().nonnegative(),
+            displayLabel: z.string().min(1),
+            importance: z.enum(["must-have", "core", "supporting"]),
+            matchType: z.enum(["direct", "semantic", "transferable", "partial", "insufficient-evidence", "real-gap"]),
+            impact: z.enum(["strength", "gap", "neutral"]),
+            evidenceConfidence: z.enum(["high", "medium", "low", "insufficient"]),
+            shortRationale: z.string().min(1),
+            evidenceSourceIds: z.array(z.string()),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+
+const reportAnalysisJsonSchema = JSON.stringify(z.toJSONSchema(qualitativeReportAnalysisSchema));
 
 function normalizeGeminiModel(model: string): string {
   return model.replace(/^models\//, "");
@@ -34,35 +60,11 @@ function getCandidateModels(model: string): string[] {
   return [normalizeGeminiModel(model)];
 }
 
-function reportUsesOnlyApprovedEvidence(report: ReportUIPayload, approvedEvidence: string | undefined) {
-  const approvedSourceIds = new Set(
-    Array.from(approvedEvidence?.matchAll(/^### APPROVED_SOURCE_ID: ([a-z0-9-]+)$/gim) ?? [], (match) => match[1]),
-  );
-  const clusterIds = new Set(report.evidencePanel.clusters.map((cluster) => cluster.clusterId));
-  const reportItems = [
-    ...report.skillsMatch.items,
-    ...report.requirementMapping.items,
-  ];
-  const reportItemsById = new Map(reportItems.map((item) => [item.itemId, item]));
-
-  if (report.evidencePanel.clusters.some((cluster) => cluster.evidenceIds.length === 0 || cluster.evidenceIds.some((id) => !approvedSourceIds.has(id)))) {
-    return false;
-  }
-
-  const referencesAreValid = reportItems.every((item) => {
-    if (item.clusterIds.some((clusterId) => !clusterIds.has(clusterId))) return false;
-    const requiresEvidence = ["direct", "semantic", "transferable", "partial"].includes(item.matchType);
-    return !requiresEvidence || item.clusterIds.length > 0;
-  });
-
-  const strengthsAreDerived = report.topStrengths.items.every((item) => reportItemsById.get(item.itemId)?.impact === "strength");
-  const gapsAreDerived = report.keyGaps.items.every((item) => reportItemsById.get(item.itemId)?.impact === "gap");
-  const visibleLimitsAreValid =
-    report.requirementMapping.items.length <= 5 &&
-    report.topStrengths.items.length <= 5 &&
-    report.keyGaps.items.length <= 3;
-
-  return referencesAreValid && strengthsAreDerived && gapsAreDerived && visibleLimitsAreValid;
+function safeSchemaDiagnostic(error: z.ZodError) {
+  return error.issues
+    .slice(0, 6)
+    .map((issue) => `${issue.path.join(".") || "root"}:${issue.code}`)
+    .join(",");
 }
 
 async function readProviderError(response: Response): Promise<string> {
@@ -233,13 +235,12 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
 
       const reportPrompt = [
         prompt,
-        "Return only one JSON object matching the browser-facing ReportUIPayload contract.",
-        "Required top-level keys: schemaVersion, reportId, createdAt, language, state, roleSnapshot, overallFitVisual, evidenceConfidence, skillsMatch, requirementMapping, evidencePanel, topStrengths, keyGaps, disclaimer, contactCta.",
-        `Exact JSON Schema: ${reportJsonSchema}`,
-        "Use only evidence present in Retrieved Approved Evidence. In evidencePanel clusters, evidenceIds must contain only the exact APPROVED_SOURCE_ID values supplied by the application. Every positive or partial item must reference a valid clusterId.",
-        "Keep requirementMapping to at most 5 items, topStrengths to 3-5 evidence-backed items when available, and keyGaps to at most 3 items. Top strengths and key gaps must reuse the same itemId and object content from skillsMatch or requirementMapping; do not generate them independently.",
-        "Do not return markdown, explanations outside JSON, numeric scores as visible text, or fields not in the contract.",
-        "If evidence is insufficient, use overallFitVisual.mode=insufficient and keep unsupported items empty; do not invent evidence.",
+        "Return only qualitative report analysis. The application owns IDs, timestamps, links, evidence clusters, UI composition, and final schema validation.",
+        `Exact qualitative analysis JSON Schema: ${reportAnalysisJsonSchema}`,
+        "roleItemIndex must reference the zero-based roleItems list in Runtime State. Do not rewrite or add role requirements.",
+        "Use only exact APPROVED_SOURCE_ID values supplied in Retrieved Approved Evidence. Positive or partial matches require at least one supporting evidenceSourceId; gaps may use an empty list.",
+        "Do not create links, destinations, cluster IDs, report IDs, timestamps, UI payload fields, markdown, or explanations outside JSON.",
+        "Keep the analysis to at most five role items. Strength and gap wording must be expressed through displayLabel and shortRationale on those same items, not through separate lists.",
       ].join("\n\n");
 
       const response = await generateGeminiContent({
@@ -275,18 +276,19 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
       }
 
       try {
-        const parsed = reportUIPayloadSchema.safeParse(extractJson(text));
-        if (!parsed.success || !reportUsesOnlyApprovedEvidence(parsed.data, input.approvedEvidence)) {
+        const parsed = qualitativeReportAnalysisSchema.safeParse(extractJson(text));
+        if (!parsed.success) {
           return {
             ok: false,
             provider: "gemini",
             model: response.model,
             error: "invalid-output",
             safeMessageKey: "model.google_ai_studio_invalid_report_payload",
+            detail: `qualitative-analysis-schema:${safeSchemaDiagnostic(parsed.error)}`,
           };
         }
 
-        return { ok: true, provider: "gemini", model: response.model, report: parsed.data };
+        return { ok: true, provider: "gemini", model: response.model, analysis: parsed.data satisfies QualitativeReportAnalysis };
       } catch {
         return {
           ok: false,
@@ -294,6 +296,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           model: response.model,
           error: "invalid-output",
           safeMessageKey: "model.google_ai_studio_invalid_report_payload",
+          detail: "qualitative-analysis-json:invalid-json",
         };
       }
     },

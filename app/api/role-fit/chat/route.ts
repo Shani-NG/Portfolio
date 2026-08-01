@@ -5,7 +5,9 @@ import { z } from "zod";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { logRoleFitEvent, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
-import { inferRoleFamily, looksLikeReportIntent, looksLikeRoleInput, validateRoleText } from "@/lib/role-fit/server/role-understanding";
+import { inferRoleFamily, isValidRoleClarificationAnswer, looksLikeReportIntent, looksLikeRoleInput, mergeRoleClarification, validateRoleText } from "@/lib/role-fit/server/role-understanding";
+
+const pendingFieldSchema = z.enum(["company", "title", "responsibilities", "requirements"]);
 
 const requestSchema = z
   .object({
@@ -16,6 +18,13 @@ const requestSchema = z
     repeatedInput: z.boolean().optional().default(false),
     conversationContext: z.string().optional(),
     reportContext: z.string().optional(),
+    roleContext: z
+      .object({
+        roleText: z.string(),
+        pendingField: pendingFieldSchema,
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -114,9 +123,40 @@ export async function POST(request: Request) {
   const traceId = crypto.randomUUID();
   const hasReportIntent = looksLikeReportIntent(parsedRequest.data.message);
   const hasRoleInput = looksLikeRoleInput(parsedRequest.data.message);
+  const roleContext = parsedRequest.data.roleContext;
+  const isFieldClarification = Boolean(roleContext && !hasRoleInput);
   const { conversationId, sessionId } = parsedRequest.data;
 
-  if (!parsedRequest.data.reportContext && !hasRoleInput && looksLikeRoleSubmissionSetup(parsedRequest.data.message)) {
+  if (roleContext && isFieldClarification && !isValidRoleClarificationAnswer(roleContext.pendingField, parsedRequest.data.message)) {
+    return NextResponse.json({
+      state: "awaiting-role-completion",
+      answer: missingDetailsAnswer({
+        missingField: roleContext.pendingField,
+        language: parsedRequest.data.language,
+        repeatedInput: false,
+      }),
+      roleText: roleContext.roleText,
+      pendingField: roleContext.pendingField,
+      safeMessageKey: "role.invalid_clarification",
+    });
+  }
+
+  const roleTextForValidation = roleContext && isFieldClarification
+    ? mergeRoleClarification(roleContext.roleText, roleContext.pendingField, parsedRequest.data.message)
+    : parsedRequest.data.message;
+
+  if (roleTextForValidation.length > policy.maxInputChars) {
+    return NextResponse.json(
+      {
+        state: "recoverable-error",
+        answer: "The combined role description is too long. Please shorten the role details before continuing.",
+        safeMessageKey: "conversation.input_too_long",
+      },
+      { status: 413 },
+    );
+  }
+
+  if (!parsedRequest.data.reportContext && !roleContext && !hasRoleInput && looksLikeRoleSubmissionSetup(parsedRequest.data.message)) {
     return NextResponse.json({
       state: "awaiting-role-completion",
       answer: isHebrew(parsedRequest.data.language)
@@ -126,17 +166,18 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!parsedRequest.data.reportContext && (hasReportIntent || hasRoleInput)) {
+  if (!parsedRequest.data.reportContext && (hasReportIntent || hasRoleInput || isFieldClarification)) {
     const validation = validateRoleText({
       conversationId,
       traceId,
-      roleText: parsedRequest.data.message,
+      roleText: roleTextForValidation,
       detectedLanguage: parsedRequest.data.language,
     });
 
     if (validation.parseStatus === "valid-complete") {
       const title = validation.roleDraft.title?.originalValue ?? "";
       const companyName = validation.roleDraft.company?.originalValue;
+      const autoApproveReport = isFieldClarification;
       after(async () => {
         await Promise.all([
           logRoleFitEvent({
@@ -169,13 +210,20 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         state: "awaiting-report-confirmation",
-        answer: readyForReportAnswer({
-          title,
-          companyName,
-          language: parsedRequest.data.language,
-          repeatedInput: parsedRequest.data.repeatedInput,
-        }),
+        answer: autoApproveReport
+          ? isHebrew(parsedRequest.data.language)
+            ? "תודה, כל הפרטים הנדרשים הושלמו. אני מפיקה את הדוח עכשיו."
+            : "Thanks, all required details are complete. I am generating the report now."
+          : readyForReportAnswer({
+              title,
+              companyName,
+              language: parsedRequest.data.language,
+              repeatedInput: parsedRequest.data.repeatedInput,
+            }),
         validation,
+        roleText: roleTextForValidation,
+        pendingField: null,
+        autoApproveReport,
         safeMessageKey: "role.ready_for_confirmation",
       });
     }
@@ -220,6 +268,8 @@ export async function POST(request: Request) {
         repeatedInput: parsedRequest.data.repeatedInput,
       }),
       validation,
+      roleText: roleTextForValidation,
+      pendingField: missingField,
       safeMessageKey: "role.missing_required_fields",
     });
   }
