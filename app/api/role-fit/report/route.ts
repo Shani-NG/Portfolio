@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       {
         state: "validation-failed",
         safeMessageKey: "role.invalid_request",
+        safeMessage: "The report request was incomplete. Please return to the chat and confirm the role details again.",
       },
       { status: 400 },
     );
@@ -150,6 +151,7 @@ export async function POST(request: Request) {
         state: "validation-failed",
         validation,
         safeMessageKey: "role.missing_required_fields",
+        safeMessage: "The saved role is missing a required field. Please add the requested detail in the chat before retrying.",
       },
       { status: 422 },
     );
@@ -208,6 +210,7 @@ export async function POST(request: Request) {
         model: modelResult.model,
         error: modelResult.error,
         safeMessageKey: modelResult.safeMessageKey,
+        safeMessage: "I could not complete a reliable evidence-based report. Your role details are preserved, so you can try again.",
         detail: modelResult.detail,
       },
       { status: modelResult.error === "missing-configuration" ? 503 : 502 },
@@ -249,6 +252,7 @@ export async function POST(request: Request) {
         model: modelResult.model,
         error: "invalid-output",
         safeMessageKey: "model.google_ai_studio_invalid_report_payload",
+        safeMessage: "I could not complete a reliable evidence-based report. Your role details are preserved, so you can try again.",
         detail: composition.diagnostic,
       },
       { status: 502 },

@@ -2,9 +2,9 @@
 
 import { Chip } from "@/components/ui/chip";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
-import type { ReportUIPayload } from "@/lib/role-fit/contracts";
+import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 
 type RoleFitScreenState = "home" | "conversation" | "missing-details" | "generating" | "error" | "report";
@@ -34,6 +34,32 @@ const screenOptions: { value: RoleFitDisplayMode; label: string }[] = [
   { value: "error", label: "Simulation - report generation failed" },
   { value: "report", label: "Simulation - fit report" },
 ];
+
+const reportRequestTimeoutMs = 65_000;
+
+type ReportFailureResult = {
+  state?: string;
+  safeMessage?: string;
+  eligibility?: { reason?: string };
+  validation?: { missingFields?: string[] };
+};
+
+function reportFailureMessage(result: ReportFailureResult): string {
+  if (result.state === "validation-failed") {
+    const missingField = result.validation?.missingFields?.[0];
+    return missingField
+      ? `The saved role is missing ${missingField}. Please add that detail in the chat before retrying.`
+      : "The saved role details are incomplete. Please add the requested detail in the chat before retrying.";
+  }
+
+  if (result.state === "blocked") {
+    return result.eligibility?.reason === "report-limit-reached"
+      ? "The report limit for this session has been reached."
+      : "The report cannot be generated until the role is complete and approved.";
+  }
+
+  return result.safeMessage ?? "I could not complete a reliable evidence-based report. Your role details are preserved, so you can try again.";
+}
 
 const evidenceProjects = [
   {
@@ -323,7 +349,9 @@ export default function RoleFitPage() {
   const [roleInput, setRoleInput] = useState("");
   const [apiStatusMessage, setApiStatusMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isReportRequestInFlight, setIsReportRequestInFlight] = useState(false);
   const [liveReportState, setLiveReportState] = useState<LiveReportState | null>(null);
+  const reportRequestInFlightRef = useRef(false);
   const fit = fitModes[fitMode];
   const selectedProject = activeProject === null ? null : evidenceProjects[activeProject];
   const reportLimitReached = liveSession.completedReportCount >= 2;
@@ -384,7 +412,7 @@ export default function RoleFitPage() {
     setApiStatusMessage("");
     setLiveReportState(null);
     syncLiveSession({
-      state: "general-qa",
+      state: liveSession.reportPayload ? "report-ready" : "general-qa",
       draftInput: "",
     });
 
@@ -402,17 +430,18 @@ export default function RoleFitPage() {
           repeatedInput,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)),
           reportContext: liveSession.reportPayload ? JSON.stringify(liveSession.reportPayload).slice(0, 18000) : undefined,
-          roleContext: liveSession.pendingRoleField && liveSession.activeRoleText
+          roleContext: liveSession.activeRoleText
             ? {
                 roleText: liveSession.activeRoleText,
-                pendingField: liveSession.pendingRoleField,
+                ...(liveSession.pendingRoleField ? { pendingField: liveSession.pendingRoleField } : {}),
               }
             : undefined,
         }),
       });
 
       const result = await response.json();
-      const nextState = (result.state ?? "general-qa") as RoleFitLiveState;
+      const responseState = (result.state ?? "general-qa") as RoleFitLiveState;
+      const nextState = liveSession.reportPayload && responseState === "general-qa" ? "report-ready" : responseState;
       appendLiveMessage({ role: "agent", content: result.answer ?? "I need a little more context before I can answer safely." });
       const nextSession = syncLiveSession({
         state: nextState,
@@ -446,6 +475,7 @@ export default function RoleFitPage() {
 
     const reportSession = sessionOverride ?? liveSession;
 
+    if (reportRequestInFlightRef.current) return;
     if (reportSession.completedReportCount >= 2) return;
     if (reportSession.reportPayload) {
       syncLiveSession({ state: "report-ready" });
@@ -474,7 +504,11 @@ export default function RoleFitPage() {
     setActiveProject(null);
     setApiStatusMessage("");
     setLiveReportState(null);
+    reportRequestInFlightRef.current = true;
+    setIsReportRequestInFlight(true);
     syncLiveSession({ state: "generating-report" });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), reportRequestTimeoutMs);
 
     try {
       const response = await fetch("/api/role-fit/report", {
@@ -490,18 +524,37 @@ export default function RoleFitPage() {
           sessionId: reportSession.sessionId,
           language: detectSessionLanguage(reportSession.activeRoleText, reportSession),
         }),
+        signal: controller.signal,
       });
 
-      const result = await response.json();
+      const result = await response.json().catch(() => ({
+        state: "malformed-output",
+        safeMessage: "The report service returned an unreadable response. Your role details are preserved, so you can try again.",
+      }));
 
       if (!response.ok || result.state !== "ready") {
-        setApiStatusMessage(result.safeMessageKey ?? result.eligibility?.safeMessageKey ?? "Report generation is not ready yet.");
-        appendLiveMessage({ role: "agent", content: result.safeMessageKey ?? result.eligibility?.safeMessageKey ?? "Report generation is not ready yet." });
-        syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: result.state === "validation-failed" });
+        const message = reportFailureMessage(result);
+        const missingField = result.validation?.missingFields?.[0] ?? null;
+        setApiStatusMessage(message);
+        appendLiveMessage({ role: "agent", content: message });
+        syncLiveSession({
+          state: "recoverable-error",
+          pendingRoleField: missingField ?? reportSession.pendingRoleField,
+          pendingReportConfirmation: !missingField,
+        });
         return;
       }
 
-      const report = result.report ?? result.eligibility?.report;
+      const parsedReport = reportUIPayloadSchema.safeParse(result.report ?? result.eligibility?.report);
+      if (!parsedReport.success) {
+        const message = "The report response was incomplete and was not displayed. Your role details are preserved, so you can try again.";
+        setApiStatusMessage(message);
+        appendLiveMessage({ role: "agent", content: message });
+        syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
+        return;
+      }
+
+      const report = parsedReport.data;
       setLiveReportState({
         provider: result.provider,
         model: result.model,
@@ -514,12 +567,21 @@ export default function RoleFitPage() {
         reportProvider: result.provider,
         reportModel: result.model,
         completedReportCount: (reportSession.completedReportCount + 1) as 1 | 2,
+        pendingRoleField: null,
         pendingReportConfirmation: false,
       });
-    } catch {
-      setApiStatusMessage("The report service is currently unavailable.");
-      appendLiveMessage({ role: "agent", content: "The report service is currently unavailable. The role context is still preserved for this session." });
-      syncLiveSession({ state: "recoverable-error" });
+    } catch (error) {
+      const timedOut = error instanceof Error && error.name === "AbortError";
+      const message = timedOut
+        ? "Report generation took too long and was stopped safely. Your role details are preserved, so you can try again."
+        : "The report service is currently unavailable. Your role details are preserved, so you can try again.";
+      setApiStatusMessage(message);
+      appendLiveMessage({ role: "agent", content: message });
+      syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
+    } finally {
+      window.clearTimeout(timeoutId);
+      reportRequestInFlightRef.current = false;
+      setIsReportRequestInFlight(false);
     }
   }
 
@@ -588,7 +650,7 @@ export default function RoleFitPage() {
         className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, isLiveMode && styles.liveReportAction].filter(Boolean).join(" ")}
         aria-label={reportActionLabel}
         type="button"
-        disabled={isLiveMode ? reportLimitReached : false}
+        disabled={isLiveMode ? reportLimitReached || isReportRequestInFlight : false}
         title={reportActionLabel}
         onClick={() => void requestReport()}
       >
@@ -672,7 +734,7 @@ export default function RoleFitPage() {
           {splitCanvas ? (
             <aside className={styles.canvasPane} aria-label="Role Fit report canvas">
               {(isLiveMode ? liveSession.state === "generating-report" : screenState === "generating") ? (
-                <div className={styles.generatingState} id="role-fit-generating">
+                <div className={styles.generatingState} id="role-fit-generating" role={isLiveMode ? "status" : undefined} aria-live={isLiveMode ? "polite" : undefined}>
                   <div className={styles.generatingBars} aria-hidden="true">
                     <div className={styles.genBar} />
                     <div className={styles.genBar} />
@@ -681,7 +743,7 @@ export default function RoleFitPage() {
                   <p>Analyzing job requirements & matching Evidence Cards...</p>
                 </div>
               ) : (isLiveMode ? liveSession.state === "recoverable-error" : screenState === "error") ? (
-                <div className={styles.errorState} id="role-fit-error">
+                <div className={styles.errorState} id="role-fit-error" role={isLiveMode ? "alert" : undefined}>
                   <span className={styles.msi} aria-hidden="true">error</span>
                   <h2>{isLiveMode ? "The live agent needs attention" : "Report could not be generated"}</h2>
                   <p>{apiStatusMessage || (isLiveMode ? "The session is preserved. Please continue in the chat or try again." : "The job description does not include enough role requirements or responsibility context for an evidence-based fit report.")}</p>

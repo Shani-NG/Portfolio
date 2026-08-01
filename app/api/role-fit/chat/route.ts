@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { logRoleFitEvent, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
-import { inferRoleFamily, isValidRoleClarificationAnswer, looksLikeReportIntent, looksLikeRoleInput, mergeRoleClarification, validateRoleText } from "@/lib/role-fit/server/role-understanding";
+import { inferRoleFamily, isValidRoleClarificationAnswer, looksLikeReportIntent, looksLikeRoleInput, resolveRoleTextForValidation, validateRoleText } from "@/lib/role-fit/server/role-understanding";
 
 const pendingFieldSchema = z.enum(["company", "title", "responsibilities", "requirements"]);
 
@@ -21,7 +21,7 @@ const requestSchema = z
     roleContext: z
       .object({
         roleText: z.string(),
-        pendingField: pendingFieldSchema,
+        pendingField: pendingFieldSchema.optional(),
       })
       .strict()
       .optional(),
@@ -124,26 +124,31 @@ export async function POST(request: Request) {
   const hasReportIntent = looksLikeReportIntent(parsedRequest.data.message);
   const hasRoleInput = looksLikeRoleInput(parsedRequest.data.message);
   const roleContext = parsedRequest.data.roleContext;
-  const isFieldClarification = Boolean(roleContext && !hasRoleInput);
+  const pendingRoleField = roleContext?.pendingField;
+  const isFieldClarification = Boolean(roleContext && pendingRoleField && !hasRoleInput);
   const { conversationId, sessionId } = parsedRequest.data;
 
-  if (roleContext && isFieldClarification && !isValidRoleClarificationAnswer(roleContext.pendingField, parsedRequest.data.message)) {
+  if (roleContext && pendingRoleField && isFieldClarification && !isValidRoleClarificationAnswer(pendingRoleField, parsedRequest.data.message)) {
     return NextResponse.json({
       state: "awaiting-role-completion",
       answer: missingDetailsAnswer({
-        missingField: roleContext.pendingField,
+        missingField: pendingRoleField,
         language: parsedRequest.data.language,
         repeatedInput: false,
       }),
       roleText: roleContext.roleText,
-      pendingField: roleContext.pendingField,
+      pendingField: pendingRoleField,
       safeMessageKey: "role.invalid_clarification",
     });
   }
 
-  const roleTextForValidation = roleContext && isFieldClarification
-    ? mergeRoleClarification(roleContext.roleText, roleContext.pendingField, parsedRequest.data.message)
-    : parsedRequest.data.message;
+  const roleTextForValidation = resolveRoleTextForValidation({
+    message: parsedRequest.data.message,
+    savedRoleText: roleContext?.roleText,
+    pendingField: pendingRoleField,
+    hasRoleInput,
+    hasReportIntent,
+  });
 
   if (roleTextForValidation.length > policy.maxInputChars) {
     return NextResponse.json(
@@ -279,7 +284,7 @@ export async function POST(request: Request) {
   const modelResult = await provider.generateChat({
     message: parsedRequest.data.message,
     language: parsedRequest.data.language,
-    maxOutputTokens: Math.min(policy.maxOutputTokens, 350),
+    maxOutputTokens: Math.max(800, Math.min(policy.maxOutputTokens, 1200)),
     approvedContext,
     mode: parsedRequest.data.reportContext ? "report-follow-up" : "general-chat",
     runtimeState: parsedRequest.data.reportContext ? "An existing validated report is active. Answer only about that report." : undefined,

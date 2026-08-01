@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createRoleDraftFromText, looksLikeRoleInput, mergeRoleClarification, validateRoleText } from "./role-understanding.ts";
+import { createRoleDraftFromText, looksLikeRoleInput, mergeRoleClarification, resolveRoleTextForValidation, validateRoleText } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -140,5 +140,32 @@ describe("Role Fit pasted job understanding", () => {
 
     assert.equal(result.parseStatus, "valid-complete");
     assert.equal(result.roleDraft.title?.originalValue, "Senior UX Strategist");
+  });
+
+  it("keeps the approved role draft when a report-status follow-up is not a new role", () => {
+    const savedRoleText = [
+      "Company: Example Systems",
+      "Title: Senior UX / Human Factors Specialist",
+      "Description: Shape complex operational products",
+      "Responsibilities: Lead UX research and product alignment",
+      "Requirements: Human factors and complex-system UX experience",
+    ].join("\n");
+
+    const selectedRoleText = resolveRoleTextForValidation({
+      message: "I don't see the report",
+      savedRoleText,
+      hasRoleInput: false,
+      hasReportIntent: true,
+    });
+    const result = validateRoleText({
+      conversationId: "conv_test",
+      traceId: "trace_test",
+      roleText: selectedRoleText,
+      detectedLanguage: "en",
+    });
+
+    assert.equal(selectedRoleText, savedRoleText);
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.equal(result.roleDraft.title?.originalValue, "Senior UX / Human Factors Specialist");
   });
 });

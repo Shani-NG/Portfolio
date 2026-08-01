@@ -7,6 +7,7 @@ type GeminiCandidate = {
   content?: {
     parts?: Array<{ text?: string }>;
   };
+  finishReason?: string;
 };
 
 type GeminiResponse = {
@@ -85,29 +86,49 @@ async function generateGeminiContent(input: {
   maxOutputTokens: number;
   temperature: number;
   responseMimeType?: "application/json";
+  thinkingLevel?: "low" | "medium" | "high";
 }): Promise<GeminiCallResult> {
   let lastError: GeminiCallResult | undefined;
 
   for (const model of input.models) {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${input.apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: input.prompt }] }],
-        generationConfig: {
-          maxOutputTokens: input.maxOutputTokens,
-          temperature: input.temperature,
-          ...(input.responseMimeType ? { responseMimeType: input.responseMimeType } : {}),
-        },
-      }),
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${input.apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: input.prompt }] }],
+          generationConfig: {
+            maxOutputTokens: input.maxOutputTokens,
+            temperature: input.temperature,
+            ...(input.responseMimeType ? { responseMimeType: input.responseMimeType } : {}),
+            ...(input.thinkingLevel && model.startsWith("gemini-3")
+              ? { thinkingConfig: { thinkingLevel: input.thinkingLevel } }
+              : {}),
+          },
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+    } catch (error) {
+      const isTimeout = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
+      return {
+        ok: false,
+        model,
+        detail: isTimeout ? "provider-request:timeout" : "provider-request:network-error",
+      };
+    }
 
     if (response.ok) {
-      return {
-        ok: true,
-        model,
-        data: (await response.json()) as GeminiResponse,
-      };
+      try {
+        return {
+          ok: true,
+          model,
+          data: (await response.json()) as GeminiResponse,
+        };
+      } catch {
+        return { ok: false, model, detail: "provider-response:invalid-json" };
+      }
     }
 
     lastError = {
@@ -126,24 +147,28 @@ async function generateGeminiContent(input: {
   };
 }
 
-function limitChatAnswer(answer: string): string {
-  const lines = answer.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const limited: string[] = [];
-  let sentenceCount = 0;
+function candidateText(response: GeminiResponse): string {
+  return response.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim() ?? "";
+}
 
-  for (const line of lines) {
-    const prefix = /^[-*]\s+/.test(line) ? line.match(/^[-*]\s+/)?.[0] ?? "" : "";
-    const content = prefix ? line.slice(prefix.length) : line;
-    const sentences = content.split(/(?<=[.!?])\s+/).filter(Boolean);
+function candidateFinishReason(response: GeminiResponse): string {
+  return response.candidates?.[0]?.finishReason ?? "FINISH_REASON_UNSPECIFIED";
+}
 
-    for (const sentence of sentences) {
-      if (sentenceCount >= 4) return limited.join("\n");
-      limited.push(`${prefix}${sentence}`);
-      sentenceCount += 1;
-    }
+export function completeChatAnswer(answer: string): string | null {
+  const normalized = answer.replace(/\s+/g, " ").trim();
+  const completeSentences = normalized.match(/[^.!?…]+[.!?…]+/gu)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
+
+  if (completeSentences.length < 2) return null;
+  return completeSentences.slice(0, 5).join(" ");
+}
+
+function safeChatFallback(language: RoleFitChatInput["language"]): string {
+  if (language === "he" || language === "mixed") {
+    return "לא הצלחתי להשלים תשובה אמינה ברגע זה. אפשר לנסות שוב, והקשר השיחה יישמר.";
   }
 
-  return limited.join("\n");
+  return "I could not complete a reliable answer just now. Please try again, and I will preserve the conversation context.";
 }
 
 export function createGeminiRoleFitProvider(): RoleFitModelProvider {
@@ -172,12 +197,13 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         userInput: input.message,
       });
 
-      const response = await generateGeminiContent({
+      let response = await generateGeminiContent({
         apiKey,
         models: getCandidateModels(model),
         prompt,
         maxOutputTokens: input.maxOutputTokens,
         temperature: 0.25,
+        thinkingLevel: "low",
       });
 
       if (!response.ok) {
@@ -191,23 +217,38 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         };
       }
 
-      const answer = response.data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
+      let rawAnswer = candidateText(response.data);
+      let answer = completeChatAnswer(rawAnswer);
+      const shouldRetry = candidateFinishReason(response.data) === "MAX_TOKENS" || !answer;
+
+      if (shouldRetry) {
+        const retry = await generateGeminiContent({
+          apiKey,
+          models: getCandidateModels(model),
+          prompt: `${prompt}\n\n---\n\nReturn a fresh, concise answer of 2-5 short complete sentences. End every sentence with punctuation and do not stop mid-sentence.`,
+          maxOutputTokens: Math.max(input.maxOutputTokens * 2, 1800),
+          temperature: 0.2,
+          thinkingLevel: "low",
+        });
+
+        if (!retry.ok) {
+          return { ok: true, provider: "gemini", model: response.model, answer: safeChatFallback(input.language) };
+        }
+
+        response = retry;
+        rawAnswer = candidateText(response.data);
+        answer = completeChatAnswer(rawAnswer);
+      }
 
       if (!answer) {
-        return {
-          ok: false,
-          provider: "gemini",
-          model: response.model,
-          error: "invalid-output",
-          safeMessageKey: "model.google_ai_studio_empty_output",
-        };
+        return { ok: true, provider: "gemini", model: response.model, answer: safeChatFallback(input.language) };
       }
 
       return {
         ok: true,
         provider: "gemini",
         model: response.model,
-        answer: limitChatAnswer(answer),
+        answer,
       };
     },
     async generateReport(input: RoleFitModelInput): Promise<RoleFitModelResult> {
@@ -243,7 +284,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         "Keep the analysis to at most five role items. Strength and gap wording must be expressed through displayLabel and shortRationale on those same items, not through separate lists.",
       ].join("\n\n");
 
-      const response = await generateGeminiContent({
+      let response = await generateGeminiContent({
         apiKey,
         models: getCandidateModels(model),
         prompt: reportPrompt,
@@ -251,6 +292,17 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         temperature: 0.15,
         responseMimeType: "application/json",
       });
+
+      if (response.ok && candidateFinishReason(response.data) === "MAX_TOKENS") {
+        response = await generateGeminiContent({
+          apiKey,
+          models: getCandidateModels(model),
+          prompt: `${reportPrompt}\n\nThe previous attempt reached its token limit. Return one complete JSON object that satisfies the schema; keep each rationale concise.`,
+          maxOutputTokens: Math.max(input.maxOutputTokens * 2, 4000),
+          temperature: 0.1,
+          responseMimeType: "application/json",
+        });
+      }
 
       if (!response.ok) {
         return {
@@ -260,6 +312,17 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           error: "provider-error",
           safeMessageKey: "model.google_ai_studio_provider_error",
           detail: response.detail,
+        };
+      }
+
+      if (candidateFinishReason(response.data) === "MAX_TOKENS") {
+        return {
+          ok: false,
+          provider: "gemini",
+          model: response.model,
+          error: "invalid-output",
+          safeMessageKey: "model.google_ai_studio_invalid_report_payload",
+          detail: "qualitative-analysis-finish-reason:MAX_TOKENS",
         };
       }
 
@@ -299,6 +362,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           detail: "qualitative-analysis-json:invalid-json",
         };
       }
+
     },
   };
 }

@@ -159,6 +159,24 @@ export function mergeRoleClarification(roleText: string, field: RoleClarificatio
   return [roleText.trim(), `${clarificationLabels[field]}: ${value.trim()}`].filter(Boolean).join("\n");
 }
 
+export function resolveRoleTextForValidation(input: {
+  message: string;
+  savedRoleText?: string;
+  pendingField?: RoleClarificationField;
+  hasRoleInput: boolean;
+  hasReportIntent: boolean;
+}): string {
+  if (input.savedRoleText && input.pendingField && !input.hasRoleInput) {
+    return mergeRoleClarification(input.savedRoleText, input.pendingField, input.message);
+  }
+
+  if (input.savedRoleText && !input.pendingField && input.hasReportIntent && !input.hasRoleInput) {
+    return input.savedRoleText;
+  }
+
+  return input.message;
+}
+
 function inferCompany(roleText: string): string {
   const labeledCompany = extractSection(roleText, ["company", "organization"]);
   if (labeledCompany) return labeledCompany;
