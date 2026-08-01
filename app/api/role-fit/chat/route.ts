@@ -14,6 +14,8 @@ const requestSchema = z
     message: z.string().min(1),
     language: z.enum(["he", "en", "mixed"]).default("en"),
     repeatedInput: z.boolean().optional().default(false),
+    conversationContext: z.string().optional(),
+    reportContext: z.string().optional(),
   })
   .strict();
 
@@ -114,7 +116,7 @@ export async function POST(request: Request) {
   const hasRoleInput = looksLikeRoleInput(parsedRequest.data.message);
   const { conversationId, sessionId } = parsedRequest.data;
 
-  if (!hasRoleInput && looksLikeRoleSubmissionSetup(parsedRequest.data.message)) {
+  if (!parsedRequest.data.reportContext && !hasRoleInput && looksLikeRoleSubmissionSetup(parsedRequest.data.message)) {
     return NextResponse.json({
       state: "awaiting-role-completion",
       answer: isHebrew(parsedRequest.data.language)
@@ -124,7 +126,7 @@ export async function POST(request: Request) {
     });
   }
 
-  if (hasReportIntent || hasRoleInput) {
+  if (!parsedRequest.data.reportContext && (hasReportIntent || hasRoleInput)) {
     const validation = validateRoleText({
       conversationId,
       traceId,
@@ -229,6 +231,9 @@ export async function POST(request: Request) {
     language: parsedRequest.data.language,
     maxOutputTokens: Math.min(policy.maxOutputTokens, 350),
     approvedContext,
+    mode: parsedRequest.data.reportContext ? "report-follow-up" : "general-chat",
+    runtimeState: parsedRequest.data.reportContext ? "An existing validated report is active. Answer only about that report." : undefined,
+    conversationContext: [parsedRequest.data.conversationContext, parsedRequest.data.reportContext].filter(Boolean).join("\n\n"),
   });
 
   if (!modelResult.ok) {

@@ -1,4 +1,5 @@
-import { reportUIPayloadSchema } from "../contracts/index.ts";
+import { z } from "zod";
+import { reportUIPayloadSchema, type ReportUIPayload } from "../contracts/index.ts";
 import { buildPortfolioAgentPrompt } from "../prompts/assembly.ts";
 import { getGoogleAiStudioModel } from "../runtime/policy.ts";
 import type { RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
@@ -13,18 +14,55 @@ type GeminiResponse = {
   candidates?: GeminiCandidate[];
 };
 
+function extractJson(text: string): unknown {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  return JSON.parse(fenced?.[1] ?? trimmed);
+}
+
 type GeminiCallResult =
   | { ok: true; model: string; data: GeminiResponse }
   | { ok: false; model: string; detail: string };
 
-const geminiFallbackModels = ["gemini-2.5-flash", "gemini-1.5-flash"];
+const reportJsonSchema = JSON.stringify(z.toJSONSchema(reportUIPayloadSchema));
 
 function normalizeGeminiModel(model: string): string {
   return model.replace(/^models\//, "");
 }
 
 function getCandidateModels(model: string): string[] {
-  return Array.from(new Set([normalizeGeminiModel(model), ...geminiFallbackModels]));
+  return [normalizeGeminiModel(model)];
+}
+
+function reportUsesOnlyApprovedEvidence(report: ReportUIPayload, approvedEvidence: string | undefined) {
+  const approvedSourceIds = new Set(
+    Array.from(approvedEvidence?.matchAll(/^### APPROVED_SOURCE_ID: ([a-z0-9-]+)$/gim) ?? [], (match) => match[1]),
+  );
+  const clusterIds = new Set(report.evidencePanel.clusters.map((cluster) => cluster.clusterId));
+  const reportItems = [
+    ...report.skillsMatch.items,
+    ...report.requirementMapping.items,
+  ];
+  const reportItemsById = new Map(reportItems.map((item) => [item.itemId, item]));
+
+  if (report.evidencePanel.clusters.some((cluster) => cluster.evidenceIds.length === 0 || cluster.evidenceIds.some((id) => !approvedSourceIds.has(id)))) {
+    return false;
+  }
+
+  const referencesAreValid = reportItems.every((item) => {
+    if (item.clusterIds.some((clusterId) => !clusterIds.has(clusterId))) return false;
+    const requiresEvidence = ["direct", "semantic", "transferable", "partial"].includes(item.matchType);
+    return !requiresEvidence || item.clusterIds.length > 0;
+  });
+
+  const strengthsAreDerived = report.topStrengths.items.every((item) => reportItemsById.get(item.itemId)?.impact === "strength");
+  const gapsAreDerived = report.keyGaps.items.every((item) => reportItemsById.get(item.itemId)?.impact === "gap");
+  const visibleLimitsAreValid =
+    report.requirementMapping.items.length <= 5 &&
+    report.topStrengths.items.length <= 5 &&
+    report.keyGaps.items.length <= 3;
+
+  return referencesAreValid && strengthsAreDerived && gapsAreDerived && visibleLimitsAreValid;
 }
 
 async function readProviderError(response: Response): Promise<string> {
@@ -44,6 +82,7 @@ async function generateGeminiContent(input: {
   prompt: string;
   maxOutputTokens: number;
   temperature: number;
+  responseMimeType?: "application/json";
 }): Promise<GeminiCallResult> {
   let lastError: GeminiCallResult | undefined;
 
@@ -56,6 +95,7 @@ async function generateGeminiContent(input: {
         generationConfig: {
           maxOutputTokens: input.maxOutputTokens,
           temperature: input.temperature,
+          ...(input.responseMimeType ? { responseMimeType: input.responseMimeType } : {}),
         },
       }),
     });
@@ -102,73 +142,6 @@ function limitChatAnswer(answer: string): string {
   }
 
   return limited.join("\n");
-}
-
-function extractLabeledValue(roleText: string, labels: string[], fallback: string): string {
-  const lines = roleText.split(/\r?\n/).map((line) => line.trim());
-
-  for (const label of labels) {
-    const match = lines.find((line) => line.toLowerCase().startsWith(`${label.toLowerCase()}:`));
-    if (match) return match.slice(label.length + 1).trim() || fallback;
-  }
-
-  return fallback;
-}
-
-function createEvidenceLimitedReport(input: RoleFitModelInput, model: string, modelText: string) {
-  const now = new Date().toISOString();
-  const company = extractLabeledValue(input.roleText, ["company", "organization"], "Submitted company");
-  const title = extractLabeledValue(input.roleText, ["title", "role"], "Submitted role");
-  const rationale = modelText.length > 900 ? `${modelText.slice(0, 897)}...` : modelText;
-
-  return reportUIPayloadSchema.parse({
-    schemaVersion: "1.0",
-    reportId: `rpt_gemini_${Date.now()}`,
-    createdAt: now,
-    language: input.language === "he" ? "he" : "en",
-    state: "ready",
-    roleSnapshot: {
-      company,
-      title,
-    },
-    overallFitVisual: {
-      mode: "insufficient",
-      label: "Live model connected; evidence analysis pending",
-      rationale,
-    },
-    evidenceConfidence: {
-      level: "insufficient",
-      rationale: `Gemini responded through the server-side provider (${model}), but approved portfolio evidence retrieval is not enabled in this vertical slice yet.`,
-    },
-    skillsMatch: {
-      items: [],
-      visualCoverage: {
-        mode: "qualitative",
-        label: "Pending approved evidence mapping",
-      },
-    },
-    requirementMapping: {
-      items: [],
-    },
-    evidencePanel: {
-      clusters: [],
-    },
-    topStrengths: {
-      items: [],
-    },
-    keyGaps: {
-      items: [],
-    },
-    disclaimer: {
-      copyKey: "report.disclaimer.v1",
-      text: "This qualitative report must be based only on approved portfolio evidence. The current response confirms the live model connection and does not yet represent a completed evidence-based fit report.",
-    },
-    contactCta: {
-      variant: "insufficient",
-      label: "Contact Shani",
-      enabled: true,
-    },
-  });
 }
 
 export function createGeminiRoleFitProvider(): RoleFitModelProvider {
@@ -252,20 +225,30 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
       const prompt = buildPortfolioAgentPrompt({
         mode: input.mode ?? "fit-analysis",
         language: input.language,
-        runtimeState:
-          input.runtimeState ??
-          "Server-side connectivity check for the Role Fit Agent vertical slice. Approved evidence retrieval is still required before a real qualitative fit report can be produced.",
+        runtimeState: input.runtimeState ?? "The role was validated by the deterministic server runtime.",
         approvedEvidence: input.approvedEvidence,
         conversationContext: input.conversationContext,
         userInput: input.roleText,
       });
 
+      const reportPrompt = [
+        prompt,
+        "Return only one JSON object matching the browser-facing ReportUIPayload contract.",
+        "Required top-level keys: schemaVersion, reportId, createdAt, language, state, roleSnapshot, overallFitVisual, evidenceConfidence, skillsMatch, requirementMapping, evidencePanel, topStrengths, keyGaps, disclaimer, contactCta.",
+        `Exact JSON Schema: ${reportJsonSchema}`,
+        "Use only evidence present in Retrieved Approved Evidence. In evidencePanel clusters, evidenceIds must contain only the exact APPROVED_SOURCE_ID values supplied by the application. Every positive or partial item must reference a valid clusterId.",
+        "Keep requirementMapping to at most 5 items, topStrengths to 3-5 evidence-backed items when available, and keyGaps to at most 3 items. Top strengths and key gaps must reuse the same itemId and object content from skillsMatch or requirementMapping; do not generate them independently.",
+        "Do not return markdown, explanations outside JSON, numeric scores as visible text, or fields not in the contract.",
+        "If evidence is insufficient, use overallFitVisual.mode=insufficient and keep unsupported items empty; do not invent evidence.",
+      ].join("\n\n");
+
       const response = await generateGeminiContent({
         apiKey,
         models: getCandidateModels(model),
-        prompt,
+        prompt: reportPrompt,
         maxOutputTokens: input.maxOutputTokens,
-        temperature: 0.2,
+        temperature: 0.15,
+        responseMimeType: "application/json",
       });
 
       if (!response.ok) {
@@ -291,12 +274,28 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         };
       }
 
-      return {
-        ok: true,
-        provider: "gemini",
-        model: response.model,
-        report: createEvidenceLimitedReport(input, response.model, text),
-      };
+      try {
+        const parsed = reportUIPayloadSchema.safeParse(extractJson(text));
+        if (!parsed.success || !reportUsesOnlyApprovedEvidence(parsed.data, input.approvedEvidence)) {
+          return {
+            ok: false,
+            provider: "gemini",
+            model: response.model,
+            error: "invalid-output",
+            safeMessageKey: "model.google_ai_studio_invalid_report_payload",
+          };
+        }
+
+        return { ok: true, provider: "gemini", model: response.model, report: parsed.data };
+      } catch {
+        return {
+          ok: false,
+          provider: "gemini",
+          model: response.model,
+          error: "invalid-output",
+          safeMessageKey: "model.google_ai_studio_invalid_report_payload",
+        };
+      }
     },
   };
 }

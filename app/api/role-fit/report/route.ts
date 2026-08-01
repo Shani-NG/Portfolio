@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { logRoleFitEvent, logRoleFitReportSummary, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
+import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
 import { evaluateReportEligibility } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
 
@@ -174,6 +175,8 @@ export async function POST(request: Request) {
     language: parsedRequest.data.language,
     task: "analysis",
     maxOutputTokens: policy.maxOutputTokens,
+    runtimeState: JSON.stringify(validation),
+    approvedEvidence: await loadApprovedEvidence(parsedRequest.data.roleText),
   });
 
   if (!modelResult.ok) {
@@ -271,5 +274,6 @@ export async function POST(request: Request) {
     provider: modelResult.provider,
     model: modelResult.model,
     eligibility,
+    report: modelResult.report,
   });
 }

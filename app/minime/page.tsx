@@ -402,6 +402,8 @@ export default function RoleFitPage() {
           message: messageForAgent,
           language: detectSessionLanguage(submittedText, sessionAfterUser),
           repeatedInput,
+          conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)),
+          reportContext: liveSession.reportPayload ? JSON.stringify(liveSession.reportPayload).slice(0, 18000) : undefined,
         }),
       });
 
@@ -477,7 +479,7 @@ export default function RoleFitPage() {
         return;
       }
 
-      const report = result.eligibility?.report;
+      const report = result.report ?? result.eligibility?.report;
       setLiveReportState({
         provider: result.provider,
         model: result.model,
