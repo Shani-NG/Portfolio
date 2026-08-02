@@ -646,7 +646,7 @@ export default function RoleFitPage() {
         </select>
       </section>
 
-      <button
+      {!(isLiveMode && hasLiveReport) ? <button
         className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, isLiveMode && styles.liveReportAction].filter(Boolean).join(" ")}
         aria-label={reportActionLabel}
         type="button"
@@ -655,7 +655,7 @@ export default function RoleFitPage() {
         onClick={() => void requestReport()}
       >
         {isLiveMode ? "Generate Report" : <span className={styles.msi} aria-hidden="true">{screenState === "report" ? "add" : "arrow_forward"}</span>}
-      </button>
+      </button> : null}
       {splitCanvas ? (
         <button className={styles.mobileBackChip} type="button" onClick={() => isLiveMode ? syncLiveSession({ state: "general-qa" }) : setScreenState("conversation")}>
           <span className={styles.msi} aria-hidden="true">arrow_back</span>
@@ -769,7 +769,21 @@ export default function RoleFitPage() {
 
 function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportState | null }) {
   const report = liveReportState?.report;
-  const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
+  const [openRequirementIds, setOpenRequirementIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!report) {
+      setOpenRequirementIds(new Set());
+      return;
+    }
+
+    const defaultRequirementId =
+      report.requirementMapping.items.find((item) =>
+        item.clusterIds.includes(report.evidencePanel.defaultClusterId ?? ""),
+      )?.itemId ?? report.requirementMapping.items[0]?.itemId;
+
+    setOpenRequirementIds(defaultRequirementId ? new Set([defaultRequirementId]) : new Set());
+  }, [report?.reportId]);
 
   if (!report) {
     return (
@@ -803,15 +817,6 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
   const requirements = report.requirementMapping.items;
   const evidenceClusters = report.evidencePanel.clusters;
 
-  const defaultClusterId =
-    selectedClusterId ??
-    report.evidencePanel.defaultClusterId ??
-    evidenceClusters[0]?.clusterId ??
-    null;
-
-  const selectedCluster =
-    evidenceClusters.find((cluster) => cluster.clusterId === defaultClusterId) ?? null;
-
   const strengths = report.topStrengths.items.map(
     (item) => item.displayLabel || item.originalText,
   );
@@ -841,21 +846,44 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
     );
   }
 
+  const fitValue = report.overallFitVisual.mode === "fit" ? report.overallFitVisual.fitVisualValue : 0;
+  const progressOffset = 327 - (327 * Math.min(100, Math.max(0, fitValue))) / 100;
+  const fitIllustration = fitLevel === "strong" ? "account_tree" : fitLevel === "good" ? "schema" : "alt_route";
+  const additionalSkillCount = Math.max(0, skills.length - 5);
+  const visibleSkills = skills.slice(0, 5);
+  const remainingSkills = skills.slice(5).map((skill) => skill.displayLabel || skill.originalText).join(" · ");
+  const locationValue = [report.roleSnapshot.location, report.roleSnapshot.workModel].filter(Boolean).join(" · ") || "Not specified";
+  const experienceValue = report.roleSnapshot.yearsOfExperience
+    ? `${report.roleSnapshot.yearsOfExperience}+ years`
+    : report.roleSnapshot.seniority || "Not specified";
+
   return (
     <div
       className={`${styles.reportShell} ${styles.liveReportCanvas} ${reportToneClass}`}
+      dir={report.language === "he" ? "rtl" : "ltr"}
       id="role-fit-live-report"
     >
       <header className={styles.reportHeader}>
-        <div>
+        <div className={styles.reportIdentity}>
           <div className={styles.reportBrand}>
             <div className={styles.avatar}>S</div>
-            <h1>Shani Nakash-Gomel - Smart Role Fit</h1>
+            <div>
+              <h1>Shani Nakash-Gomel - Smart Role Fit</h1>
+              <p>A concise role-fit report grounded in verified portfolio evidence.</p>
+            </div>
           </div>
-          <p>
-            Smart Role Fit engine linking real job requirements directly to
-            verified portfolio case studies
-          </p>
+        </div>
+        <div className={styles.fitLevelChips} aria-label={`Fit level: ${report.overallFitVisual.label}`}>
+          {(["strong", "good", "partial"] as const).map((level) => (
+            <span
+              aria-current={fitLevel === level ? "true" : undefined}
+              className={`${styles.fitLevelChip} ${fitLevel === level ? styles.fitLevelSelected : ""}`}
+              key={level}
+              title={level}
+            >
+              {level}
+            </span>
+          ))}
         </div>
       </header>
 
@@ -866,7 +894,7 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
           aria-label="Live Role Fit report"
         >
           <div className={styles.snapshotTop}>
-            <div>
+            <div className={styles.snapshotCopy}>
               <span className={styles.reportEyebrow}>Analyzed Job Profile</span>
               <h2>{report.roleSnapshot.title}</h2>
               <p>
@@ -877,9 +905,6 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
               </p>
             </div>
 
-            <Chip className={styles.fitBadge} kind="info">
-              {report.overallFitVisual.label}
-            </Chip>
           </div>
 
           <p className={styles.fitSummary}>
@@ -888,24 +913,24 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
 
           <div className={styles.statsGrid}>
             <Stat
+              icon="business"
+              label="Company"
+              value={report.roleSnapshot.company}
+            />
+            <Stat
+              icon="workspace_premium"
+              label="Required experience"
+              value={experienceValue}
+            />
+            <Stat
+              icon="location_on"
+              label="Location & work model"
+              value={locationValue}
+            />
+            <Stat
               icon="verified"
-              label="Evidence Confidence"
+              label="Evidence confidence"
               value={confidenceLabel}
-            />
-            <Stat
-              icon="psychology"
-              label="Skills Coverage"
-              value={skillsCoverageLabel}
-            />
-            <Stat
-              icon="fact_check"
-              label="Mapped Requirements"
-              value={String(requirements.length)}
-            />
-            <Stat
-              icon="folder_open"
-              label="Evidence Clusters"
-              value={String(evidenceClusters.length)}
             />
           </div>
         </section>
@@ -914,15 +939,34 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
           className={`${styles.bentoCard} ${styles.skillsCard}`}
           id="live-skills-match"
         >
-          <span className={styles.reportEyebrow}>Skills Match</span>
-          <h3>{skillsCoverageLabel}</h3>
+          <div className={styles.progressWrap} aria-label={`${report.overallFitVisual.label}: ${skillsCoverageLabel}`}>
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle cx="60" cy="60" r="52" className={styles.progressTrack} />
+              <circle
+                cx="60"
+                cy="60"
+                r="52"
+                className={styles.progressCircle}
+                strokeDasharray="327"
+                strokeDashoffset={progressOffset}
+              />
+            </svg>
+            <div className={styles.fitIllustration} aria-hidden="true">
+              <span className={styles.msi}>{fitIllustration}</span>
+              <i />
+              <i />
+            </div>
+          </div>
+          <h3>Core Matching Skills</h3>
+          <p className={styles.skillsSubtitle}>The strongest capabilities supporting this fit.</p>
 
           <div className={styles.skillsList}>
-            {skills.map((skill) => (
+            {visibleSkills.map((skill) => (
               <Chip className={styles.skillChip} kind="info" key={skill.itemId}>
                 {skill.displayLabel || skill.originalText}
               </Chip>
             ))}
+            {additionalSkillCount ? <span className={styles.moreSkillsChip} title={remainingSkills}>+{additionalSkillCount} more</span> : null}
           </div>
         </section>
 
@@ -935,7 +979,7 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
               <span className={styles.reportEyebrow}>
                 Requirements & Evidence Mapping
               </span>
-              <h3>Role requirements matched to verified portfolio evidence</h3>
+              <h3>Evidence Behind the Match</h3>
             </div>
 
             <Chip
@@ -943,51 +987,50 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
               icon="touch_app"
               kind="info"
             >
-              Tap a requirement to see the matching proof
+              Tap a requirement to view its portfolio evidence
             </Chip>
           </div>
 
-          <div className={styles.evidenceGrid}>
-            <div className={styles.requirementsList}>
+          <div className={styles.requirementsList}>
               {requirements.map((requirement) => {
                 const cluster = findClusterForItem(requirement.clusterIds);
-                const isActive =
-                  cluster?.clusterId === selectedCluster?.clusterId;
+                const isOpen = openRequirementIds.has(requirement.itemId);
 
                 return (
-                  <div
-                    className={styles.requirementDisclosure}
+                  <article
+                    className={`${styles.requirementDisclosure} ${isOpen ? styles.activeRequirement : ""}`}
                     key={requirement.itemId}
                   >
                     <button
-                      className={
-                        isActive
-                          ? `${styles.requirementItem} ${styles.activeRequirement}`
-                          : styles.requirementItem
-                      }
+                      className={styles.requirementItem}
                       type="button"
-                      aria-expanded={isActive}
-                      disabled={!cluster}
+                      aria-expanded={isOpen}
+                      aria-controls={`evidence-${requirement.itemId}`}
                       onClick={() => {
-                        if (cluster) {
-                          setSelectedClusterId(cluster.clusterId);
-                        }
+                        setOpenRequirementIds((current) => {
+                          const next = new Set(current);
+                          if (next.has(requirement.itemId)) next.delete(requirement.itemId);
+                          else next.add(requirement.itemId);
+                          return next;
+                        });
                       }}
                     >
-                      <span className={styles.msi} aria-hidden="true">
+                      <span className={styles.requirementIcon} aria-hidden="true">
+                        <span className={styles.msi}>
                         {requirement.impact === "gap"
                           ? "warning"
                           : requirement.matchType === "direct"
                             ? "verified"
                             : "link"}
+                        </span>
                       </span>
 
-                      <span>
-                        <strong>
+                      <span className={styles.requirementCopy}>
+                        <strong title={requirement.displayLabel || requirement.originalText}>
                           {requirement.displayLabel || requirement.originalText}
                         </strong>
 
-                        <small>{requirement.shortRationale}</small>
+                        <small title={requirement.shortRationale}>{requirement.shortRationale}</small>
 
                         <Chip
                           className={styles.matchChip}
@@ -999,45 +1042,26 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
                         </Chip>
                       </span>
 
-                      <span className={styles.msi} aria-hidden="true">
-                        {isActive ? "expand_more" : "chevron_right"}
+                      <span className={`${styles.msi} ${styles.requirementChevron}`} aria-hidden="true">
+                        expand_more
                       </span>
                     </button>
 
-                    {isActive && cluster ? (
-                      <div className={styles.inlineProjectPanel}>
-                        <LiveEvidencePanel cluster={cluster} />
+                    <div className={styles.requirementPanelWrap} id={`evidence-${requirement.itemId}`} aria-hidden={!isOpen}>
+                      <div className={styles.requirementPanelInner}>
+                        {cluster ? <LiveEvidencePanel cluster={cluster} /> : (
+                          <div className={styles.noEvidenceState}>
+                            <span className={styles.msi} aria-hidden="true">search_off</span>
+                            <strong>No verified portfolio evidence found</strong>
+                            <p>This requirement is not supported by the approved portfolio evidence.</p>
+                          </div>
+                        )}
                       </div>
-                    ) : null}
-                  </div>
+                    </div>
+                  </article>
                 );
               })}
             </div>
-
-            <div className={styles.projectPanel}>
-              {selectedCluster ? (
-                <LiveEvidencePanel cluster={selectedCluster} />
-              ) : (
-                <div className={styles.emptyProjectState}>
-                  <div className={styles.skeletonHint}>
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <div>
-                      <span className={styles.msi} aria-hidden="true">
-                        touch_app
-                      </span>
-                    </div>
-                  </div>
-                  <p>No linked portfolio evidence is available</p>
-                  <small>
-                    This report remains limited to verified evidence.
-                  </small>
-                </div>
-              )}
-            </div>
-          </div>
         </section>
 
         <ListCard
@@ -1056,26 +1080,17 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
           tone="gap"
         />
 
-        <section className={styles.bentoCard}>
-          <span className={styles.reportEyebrow}>Evidence Confidence</span>
-          <h3>{confidenceLabel}</h3>
-          <p>{report.evidenceConfidence.rationale}</p>
-        </section>
-
         <section className={styles.ctaSection} id="live-role-fit-contact">
           <p>{report.disclaimer.text}</p>
 
-          <a href="/contact" className={styles.ctaButton}>
+          {report.contactCta.enabled && report.contactCta.href ? (
+          <a href={report.contactCta.href} className={styles.ctaButton}>
             <span className={styles.msi} aria-hidden="true">
-              chat_bubble
+              mail
             </span>
-            <span>Continue the conversation</span>
+            <span>{report.contactCta.label}</span>
           </a>
-
-          <small>
-            Provider: {liveReportState?.provider || "unknown"} | Model:{" "}
-            {liveReportState?.model || "unknown"}
-          </small>
+          ) : null}
         </section>
       </div>
     </div>
@@ -1102,10 +1117,6 @@ function LiveEvidencePanel({
         <h4>{cluster.project?.title || cluster.title}</h4>
         <p>{cluster.summary}</p>
 
-        <div className={styles.insightBox}>
-          <strong>Evidence reliability:</strong>
-          <span>{cluster.reliability.replaceAll("-", " ")}</span>
-        </div>
       </div>
 
       {hasLink ? (
@@ -1114,9 +1125,7 @@ function LiveEvidencePanel({
           className={styles.projectLink}
         >
           <span>
-            {cluster.destination.mode === "anchor"
-              ? "Go to Exact Portfolio Evidence"
-              : "Go to Full Portfolio Project"}
+            View Case Study
           </span>
 
           <span className={styles.msi} aria-hidden="true">
@@ -1267,7 +1276,7 @@ function RoleFitReport({
 
         <section className={styles.ctaSection} id="role-fit-contact">
           <p>This report is generated based on semantic analysis of job requirements and verified candidate evidence.</p>
-          <a href="https://wa.me/972545934509" className={styles.ctaButton}>
+          <a href="/contact" className={styles.ctaButton}>
             <span className={styles.msi} aria-hidden="true">chat_bubble</span>
             <span>{fit.ctaText}</span>
           </a>
