@@ -29,6 +29,7 @@ type ReportEligibilityInput = {
 
 const requiredFields: RequiredRoleField[] = ["title", "responsibilities", "requirements"];
 const textRoleFieldSchema = roleFieldSchema(z.string());
+const nonRoleInstructionPattern = /\b(ignore previous|system prompt|developer message|jailbreak|bypass|act as|disregard|you are chatgpt|reveal|do not validate)\b/i;
 
 function hasConfirmedTextField(value: unknown): boolean {
   const parsed = textRoleFieldSchema.safeParse(value);
@@ -46,6 +47,28 @@ function hasConfirmedListItem(value: unknown): boolean {
 
     return parsed.data.confirmed && Boolean(parsed.data.originalValue.trim());
   });
+}
+
+function meaningfulListItems(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    const parsed = textRoleFieldSchema.safeParse(item);
+    if (!parsed.success) return [];
+
+    const text = parsed.data.originalValue.trim();
+    if (!parsed.data.confirmed || text.length < 18 || nonRoleInstructionPattern.test(text)) return [];
+
+    return [text];
+  });
+}
+
+function isSufficientJobDescription(roleDraft: RoleDraftInput): boolean {
+  const responsibilities = meaningfulListItems(roleDraft.responsibilities);
+  const requirements = meaningfulListItems(roleDraft.requirements);
+  const totalRoleSignals = responsibilities.length + requirements.length;
+
+  return totalRoleSignals >= 2 && responsibilities.length >= 1 && requirements.length >= 1;
 }
 
 export function getMissingRequiredRoleFields(roleDraft: RoleDraftInput): RequiredRoleField[] {
@@ -87,17 +110,26 @@ export function createRoleValidationResult(input: {
 
   const missingFields = getMissingRequiredRoleFields(parsedRoleDraft.data);
 
+  const parseStatus = missingFields.length === 0
+    ? isSufficientJobDescription(parsedRoleDraft.data)
+      ? "valid-complete"
+      : "valid-incomplete"
+    : "valid-incomplete";
+  const resolvedMissingFields = missingFields.length === 0 && parseStatus !== "valid-complete"
+    ? ["responsibilities", "requirements"] as RequiredRoleField[]
+    : missingFields;
+
   return roleValidationResultSchema.parse({
     identifiers: {
       conversationId: input.conversationId,
       traceId: input.traceId,
     },
-    parseStatus: missingFields.length === 0 ? "valid-complete" : "valid-incomplete",
+    parseStatus,
     roleDraft: parsedRoleDraft.data,
-    missingFields,
+    missingFields: resolvedMissingFields,
     detectedLanguage: input.detectedLanguage,
-    recommendedNextAction: missingFields.length === 0 ? "role-ready" : "ask-for-missing-field",
-    nextQuestionKey: missingFields.length === 0 ? undefined : "role.missing_required_fields",
+    recommendedNextAction: parseStatus === "valid-complete" ? "role-ready" : "ask-for-missing-field",
+    nextQuestionKey: parseStatus === "valid-complete" ? undefined : "role.missing_required_fields",
   });
 }
 

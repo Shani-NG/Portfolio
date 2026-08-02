@@ -279,7 +279,10 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         "Return only qualitative report analysis. The application owns IDs, timestamps, links, evidence clusters, UI composition, and final schema validation.",
         `Exact qualitative analysis JSON Schema: ${reportAnalysisJsonSchema}`,
         "roleItemIndex must reference the zero-based roleItems list in Runtime State. Do not rewrite or add role requirements.",
-        "Use only exact APPROVED_SOURCE_ID values supplied in Retrieved Approved Evidence. Positive or partial matches require at least one supporting evidenceSourceId; gaps may use an empty list.",
+        "Use only exact APPROVED_SOURCE_ID values supplied in Retrieved Approved Evidence. Prefer case-study evidence over CV/profile evidence whenever both support the same claim. Positive or partial matches require at least one supporting evidenceSourceId; gaps may use an empty list.",
+        "Each displayLabel must be a short capability name, not a sentence. Each shortRationale must be one concrete evidence-based insight and must not repeat the displayLabel.",
+        "fitRationale must be maximum two short sentences: sentence 1 says what the role is looking for; sentence 2 says why Shani's profile does or does not fit. Do not use inflated language or unsupported metrics.",
+        "Do not repeat the same APPROVED_SOURCE_ID for multiple items unless it is clearly the strongest evidence for each item. Prefer varied public case-study evidence when available.",
         "Do not create links, destinations, cluster IDs, report IDs, timestamps, UI payload fields, markdown, or explanations outside JSON.",
         "Keep the analysis to at most five role items. Strength and gap wording must be expressed through displayLabel and shortRationale on those same items, not through separate lists.",
       ].join("\n\n");

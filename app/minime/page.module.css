@@ -1423,10 +1423,10 @@
 
 .statCard span,
 .statCard strong {
-  overflow: hidden;
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding-inline-start: var(--ds-space-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .statCard strong {
@@ -1604,6 +1604,12 @@
 .projectContent p { max-width: 68ch; }
 .verifiedLabel { color: var(--rf-fit-color); margin-top: var(--ds-space-xs); }
 .projectLink { align-self: flex-end; border-radius: var(--ds-radius-sm); margin-top: var(--ds-space-sm); }
+.sourceLabel {
+  align-self: flex-start;
+  border-color: var(--rf-border);
+  color: var(--rf-text-secondary);
+  cursor: default;
+}
 
 .noEvidenceState {
   color: var(--rf-text-secondary);
@@ -1614,6 +1620,36 @@
 .noEvidenceState strong { color: var(--rf-text-primary); }
 
 .listCard { padding: var(--ds-space-xl); }
+.listCard li > span:last-child {
+  min-width: 0;
+}
+.listCard li strong {
+  color: var(--rf-text-primary);
+  display: block;
+  font-size: var(--ds-type-body-14-size);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.listCard li small {
+  color: var(--rf-text-secondary);
+  display: block;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin-top: var(--ds-space-2xs);
+  overflow-wrap: anywhere;
+}
+.emptyGapState {
+  color: var(--rf-text-secondary);
+  display: grid;
+  gap: var(--ds-space-xs);
+}
+.emptyGapState strong {
+  color: var(--rf-text-primary);
+  font-size: var(--ds-type-heading-18-size);
+}
+.emptyGapState p {
+  margin: 0;
+}
 .ctaSection { align-items: center; grid-column: span 12; padding-top: var(--ds-space-sm); text-align: center; }
 .ctaSection p { max-width: 52rem; }
 .ctaButton { background: transparent; border: 1px solid var(--rf-rose-500); border-radius: var(--ds-radius-sm); color: var(--rf-rose-500); font-size: var(--ds-type-button-16-size); padding: var(--ds-space-sm) var(--ds-space-lg); }

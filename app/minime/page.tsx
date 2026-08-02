@@ -817,13 +817,8 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
   const requirements = report.requirementMapping.items;
   const evidenceClusters = report.evidencePanel.clusters;
 
-  const strengths = report.topStrengths.items.map(
-    (item) => item.displayLabel || item.originalText,
-  );
-
-  const gaps = report.keyGaps.items.map(
-    (item) => item.displayLabel || item.originalText,
-  );
+  const strengths = report.topStrengths.items;
+  const gaps = report.keyGaps.items;
 
   const skillsCoverageLabel = (() => {
     const coverage = report.skillsMatch.visualCoverage;
@@ -1078,6 +1073,8 @@ function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportStat
           title="Key Gaps"
           items={gaps}
           tone="gap"
+          emptyTitle="No material gaps detected"
+          emptyBody="Based on the submitted role and available evidence."
         />
 
         <section className={styles.ctaSection} id="live-role-fit-contact">
@@ -1133,8 +1130,8 @@ function LiveEvidencePanel({
           </span>
         </a>
       ) : (
-        <p className={styles.projectLink}>
-          No public portfolio link is available for this evidence.
+        <p className={`${styles.projectLink} ${styles.sourceLabel}`}>
+          Source: {cluster.title}
         </p>
       )}
     </div>
@@ -1316,21 +1313,56 @@ function Stat({ icon, label, value }: { icon: string; label: string; value: stri
   );
 }
 
-function ListCard({ id, icon, title, items, tone }: { id: string; icon: string; title: string; items: string[]; tone: "strength" | "gap" }) {
+type ReportListItem = string | Pick<ReportUIPayload["requirementMapping"]["items"][number], "displayLabel" | "originalText" | "shortRationale">;
+
+function ListCard({
+  id,
+  icon,
+  title,
+  items,
+  tone,
+  emptyTitle,
+  emptyBody,
+}: {
+  id: string;
+  icon: string;
+  title: string;
+  items: ReportListItem[];
+  tone: "strength" | "gap";
+  emptyTitle?: string;
+  emptyBody?: string;
+}) {
+  const hasItems = items.length > 0;
+
   return (
     <section className={`${styles.bentoCard} ${styles.listCard}`} id={id}>
       <h3 className={tone === "strength" ? styles.strengthTitle : styles.gapTitle}>
         <span className={styles.msi} aria-hidden="true">{icon}</span>
         {title}
       </h3>
-      <ul>
-        {items.map((item) => (
-          <li key={item}>
+      {hasItems ? (
+        <ul>
+        {items.map((item) => {
+          const label = typeof item === "string" ? item : item.displayLabel || item.originalText;
+          const rationale = typeof item === "string" ? "" : item.shortRationale;
+
+          return (
+          <li key={`${label}-${rationale}`}>
             <span className={styles.msi} aria-hidden="true">{tone === "strength" ? "check_circle" : "error"}</span>
-            <span>{item}</span>
+            <span>
+              <strong>{label}</strong>
+              {rationale ? <small>{rationale}</small> : null}
+            </span>
           </li>
-        ))}
+          );
+        })}
       </ul>
+      ) : (
+        <div className={styles.emptyGapState}>
+          <strong>{emptyTitle ?? "No items to show"}</strong>
+          {emptyBody ? <p>{emptyBody}</p> : null}
+        </div>
+      )}
     </section>
   );
 }

@@ -39,6 +39,30 @@ const fitPresentation = {
   partial: { value: 45, illustrationKey: "fit-partial", colorToken: "fit.partial", label: "Partial fit" },
 } as const;
 
+function splitSentences(value: string): string[] {
+  return value.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) ?? [];
+}
+
+function conciseSentences(value: string, maxSentences: number, maxChars: number) {
+  const sentences = splitSentences(value).slice(0, maxSentences);
+  const text = (sentences.length ? sentences.join(" ") : value.replace(/\s+/g, " ").trim()).slice(0, maxChars).trim();
+  return text.replace(/[,:;–-]\s*$/, ".");
+}
+
+function normalizeItemText(value: string, fallback: string, maxChars: number) {
+  const normalized = conciseSentences(value, 1, maxChars);
+  return normalized || fallback;
+}
+
+function isNearDuplicate(a: string, b: string) {
+  const normalize = (value: string) => new Set(value.toLowerCase().match(/[a-z0-9]{4,}|[\u0590-\u05ff]{3,}/g) ?? []);
+  const left = normalize(a);
+  const right = normalize(b);
+  if (left.size === 0 || right.size === 0) return false;
+  const overlap = [...left].filter((term) => right.has(term)).length;
+  return overlap / Math.min(left.size, right.size) > 0.72;
+}
+
 export function composeReportUIPayload(input: {
   analysis: QualitativeReportAnalysis;
   roleDraft: RoleDraft;
@@ -72,16 +96,22 @@ export function composeReportUIPayload(input: {
       return { ok: false, diagnostic: "evidence:positive-item-without-source" };
     }
 
+    const displayLabel = normalizeItemText(analysisItem.displayLabel, roleItem.originalText, 64);
+    const rawRationale = normalizeItemText(analysisItem.shortRationale, "Supported by approved evidence.", 150);
+    const shortRationale = isNearDuplicate(displayLabel, rawRationale)
+      ? normalizeItemText(roleItem.originalText, rawRationale, 150)
+      : rawRationale;
+
     reportItems.push({
       itemId: `role-item-${position + 1}`,
       originalText: roleItem.originalText,
-      displayLabel: analysisItem.displayLabel,
+      displayLabel,
       source: roleItem.source,
       importance: analysisItem.importance,
       matchType: analysisItem.matchType,
       impact: analysisItem.impact,
       evidenceConfidence: analysisItem.evidenceConfidence,
-      shortRationale: analysisItem.shortRationale,
+      shortRationale,
       clusterIds: evidenceSourceIds.map((sourceId) => `evidence-${sourceId}`),
     });
   }
@@ -90,22 +120,28 @@ export function composeReportUIPayload(input: {
   const clusters: ReportUIPayload["evidencePanel"]["clusters"] = referencedSourceIds.map((sourceId) => {
     const source = sourceById.get(sourceId)!;
     const supportedItems = reportItems.filter((item) => item.clusterIds.includes(`evidence-${sourceId}`));
-    const summary = [...new Set(supportedItems.map((item) => item.shortRationale))].slice(0, 2).join(" ");
+    const summary = source.claim ?? [...new Set(supportedItems.map((item) => item.shortRationale))].slice(0, 2).join(" ");
 
     return {
       clusterId: `evidence-${sourceId}`,
       title: source.label,
-      summary: summary || `Approved evidence from ${source.label}.`,
+      summary: conciseSentences(summary || `Approved evidence from ${source.label}.`, 2, 220),
       supportedItemIds: supportedItems.map((item) => item.itemId),
       evidenceIds: [sourceId],
       ...(source.project ? { project: { slug: source.project.slug, title: source.project.title } } : {}),
       destination: source.project
-        ? {
+        ? source.project.anchorId
+          ? {
             mode: "anchor" as const,
             href: `/experience/${source.project.slug}#${source.project.anchorId}`,
             anchorId: source.project.anchorId,
             dedupeKey: sourceId,
           }
+          : {
+              mode: "project-top" as const,
+              href: `/experience/${source.project.slug}`,
+              dedupeKey: sourceId,
+            }
         : { mode: "no-link" as const, dedupeKey: sourceId },
       reliability: "high" as const,
     };
@@ -119,7 +155,7 @@ export function composeReportUIPayload(input: {
     ? {
         mode: fitLevel,
         label: fitLevel === "insufficient" ? "Insufficient evidence" : "Outside the supported role scope",
-        rationale: input.analysis.fitRationale,
+        rationale: conciseSentences(input.analysis.fitRationale, 2, 260),
       }
     : {
         mode: "fit" as const,
@@ -128,7 +164,7 @@ export function composeReportUIPayload(input: {
         illustrationKey: fitPresentation[fitLevel].illustrationKey,
         colorToken: fitPresentation[fitLevel].colorToken,
         label: fitPresentation[fitLevel].label,
-        rationale: input.analysis.fitRationale,
+        rationale: conciseSentences(input.analysis.fitRationale, 2, 260),
         ...(input.analysis.evidenceConfidence === "low" || input.analysis.evidenceConfidence === "insufficient"
           ? { qualifiers: ["evidence-limited" as const] }
           : {}),
@@ -147,7 +183,7 @@ export function composeReportUIPayload(input: {
     overallFitVisual,
     evidenceConfidence: {
       level: input.analysis.evidenceConfidence,
-      rationale: input.analysis.evidenceConfidenceRationale,
+      rationale: conciseSentences(input.analysis.evidenceConfidenceRationale, 2, 220),
     },
     skillsMatch: {
       items: strengths,

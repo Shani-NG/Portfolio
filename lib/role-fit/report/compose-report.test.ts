@@ -12,6 +12,8 @@ const evidence: ApprovedEvidenceBundle = {
       id: "c4i",
       label: "C4I case study",
       content: "Approved evidence about complex-system UX strategy.",
+      sourceType: "case-study",
+      claim: "The project required aligning product, design, development, and stakeholders before solving individual screens.",
       project: {
         slug: "c4i-beyond-clarity",
         title: "C4I - Beyond Clarity",
