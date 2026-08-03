@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { MaterialIcon } from "@/components/ui/material-icon";
-import { projectCards } from "@/lib/portfolio-content";
+import { experienceProjectCards } from "@/lib/portfolio-content";
 import styles from "./page.module.css";
 
 const designSystemCard = {
@@ -13,21 +13,21 @@ const designSystemCard = {
 } as const;
 
 export default function ExperiencePage() {
-  const selectedWorkCards = [...projectCards, designSystemCard];
+  const selectedWorkCards = [...experienceProjectCards, designSystemCard];
 
   return (
     <main className={styles.page}>
       <section className={styles.hero}>
         <p className={styles.eyebrow}>Experience</p>
         <h1>Selected work.</h1>
-        <p>Five case studies and one design-system foundation from complex systems, product learning, operational clarity, and AI-ready knowledge work.</p>
+      <p>Six case studies and one design-system foundation from complex systems, product learning, operational clarity, and AI-ready knowledge work.</p>
       </section>
       <section className={styles.projectGrid} aria-label="Case studies">
         {selectedWorkCards.map((project) => (
           <Link className={styles.projectCard} href={project.href} key={project.href}>
             {"image" in project ? (
               <div className={styles.projectThumb}>
-                <Image src={project.image} alt={project.imageAlt} fill sizes="(max-width: 48rem) 100vw, (max-width: 72rem) 50vw, 20vw" />
+                <Image src={project.image} alt={project.imageAlt} fill sizes="(max-width: 48rem) 100vw, (max-width: 72rem) 50vw, 33vw" />
               </div>
             ) : (
               <div className={`${styles.projectThumb} ${styles.designSystemThumb}`} aria-hidden="true">
