@@ -1,69 +1,95 @@
 .main {
-  width: min(100%, var(--ds-layout-content-max));
-  min-height: 60vh;
-  margin-inline: auto;
-  padding: clamp(5rem, 10vw, 8rem) var(--ds-grid-gutter);
+  min-height: 100vh;
+  padding: 4.5rem var(--ds-grid-gutter);
+  background:
+    radial-gradient(
+      circle at 50% 18%,
+      color-mix(in srgb, var(--ds-color-action-primary) 14%, transparent),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 88% 72%,
+      color-mix(in srgb, var(--ds-color-action-secondary) 9%, transparent),
+      transparent 30%
+    ),
+    var(--ds-color-canvas);
 }
 
 .section {
-  display: grid;
-  width: 100%;
-  max-width: 48rem;
+  display: flex;
+  width: min(100%, 67.5rem);
   margin-inline: auto;
-  gap: var(--ds-space-type-label-to-heading);
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
-.eyebrow,
 .title,
 .copy,
+.sentence,
 .fieldMessage,
 .statusMessage {
   margin: 0;
 }
 
-.eyebrow {
-  color: var(--ds-color-action-primary-hover);
-  font-size: var(--ds-type-label-13-size);
-  font-weight: var(--ds-type-weight-semibold);
-  letter-spacing: 0.08em;
-}
-
 .title {
   color: var(--ds-color-text-primary);
-  font-size: var(--ds-type-display-48-size);
-  line-height: var(--ds-type-display-48-line);
+  font-size: clamp(3rem, 8vw, 6.5rem);
+  font-weight: var(--ds-type-weight-medium);
+  line-height: 1;
   letter-spacing: 0;
 }
 
 .copy {
-  max-width: 36rem;
+  margin: 1.5rem auto 5.25rem;
   color: var(--ds-color-text-secondary);
-  font-size: var(--ds-type-body-18-size);
-  line-height: var(--ds-type-body-18-line);
+  font-size: clamp(1.25rem, 2.4vw, 1.875rem);
+  line-height: 1.3;
+}
+
+.copy strong {
+  color: var(--ds-color-action-primary);
+  font-weight: var(--ds-type-weight-semibold);
 }
 
 .form {
-  display: grid;
-  gap: var(--ds-space-lg);
   width: 100%;
-  margin-top: clamp(2.5rem, 6vw, 4.5rem);
+  padding: clamp(2.75rem, 5vw, 4.5rem) clamp(2.75rem, 6vw, 5.25rem);
+  border: 1px solid
+    color-mix(in srgb, var(--ds-color-action-primary) 44%, transparent);
+  border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-color-canvas) 82%, transparent);
+  text-align: left;
 }
 
-.field {
-  display: grid;
-  gap: var(--ds-space-xs);
+.sentence {
+  color: color-mix(
+    in srgb,
+    var(--ds-color-text-primary) 90%,
+    transparent
+  );
+  font-size: clamp(1.125rem, 1.6vw, 1.25rem);
+  font-weight: var(--ds-type-weight-regular);
+  line-height: 2.65;
+  text-align: left;
 }
 
-.field label {
-  color: var(--ds-color-text-primary);
-  font-size: var(--ds-type-label-14-size);
-  font-weight: var(--ds-type-weight-semibold);
-  line-height: var(--ds-type-label-14-line);
+.inlineField {
+  position: relative;
+  display: inline-block;
+  min-width: min(100%, 18.75rem);
+  margin: 0 0.5rem 0.5rem;
+  line-height: 1;
+  vertical-align: baseline;
 }
 
-.field input,
-.field textarea {
+.longField {
+  min-width: min(100%, 26.25rem);
+}
+
+.inlineField input {
   width: 100%;
+  padding: 0 0.25rem 0.125rem;
   border: 0;
   border-bottom: 2px solid var(--ds-color-border-strong);
   border-radius: 0;
@@ -71,40 +97,59 @@
   background: transparent;
   color: var(--ds-color-text-primary);
   font-family: var(--ds-font-family-primary);
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
-  padding: 0 0 var(--ds-space-2xs);
+  font-size: 0.92em;
+  font-weight: var(--ds-type-weight-regular);
+  line-height: 1;
+  text-align: left;
+  caret-color: var(--ds-color-action-primary);
   transition:
     border-color var(--ds-duration-fast) var(--ds-ease-standard),
-    box-shadow var(--ds-duration-fast) var(--ds-ease-standard);
+    color var(--ds-duration-fast) var(--ds-ease-standard);
 }
 
-.field textarea {
-  min-height: 7rem;
-  resize: vertical;
+.inlineField input::placeholder {
+  color: color-mix(
+    in srgb,
+    var(--ds-color-text-tertiary) 42%,
+    transparent
+  );
 }
 
-.field input:focus-visible,
-.field textarea:focus-visible {
+.inlineField:focus-within input {
   border-bottom-color: var(--ds-color-action-primary);
-  box-shadow: 0 0.25rem 0 -0.0625rem var(--ds-color-focus);
 }
 
-.validField input,
-.validField textarea {
-  border-bottom-color: var(--ds-color-action-secondary-hover);
+.validField input {
+  border-bottom-color: var(--ds-color-action-secondary);
 }
 
-.invalidField input,
-.invalidField textarea {
+.invalidField input {
   border-bottom-color: var(--danger);
 }
 
 .fieldMessage {
-  min-height: 1.25rem;
-  color: var(--ds-color-text-tertiary);
+  position: absolute;
+  left: 0.25rem;
+  bottom: -1.05rem;
+  color: color-mix(
+    in srgb,
+    var(--ds-color-action-secondary) 82%,
+    transparent
+  );
   font-size: var(--ds-type-body-14-size);
-  line-height: var(--ds-type-body-14-line);
+  line-height: 1.2;
+  opacity: 0;
+  transform: translateY(-0.25rem);
+  transition:
+    opacity var(--ds-duration-fast) var(--ds-ease-standard),
+    transform var(--ds-duration-fast) var(--ds-ease-standard);
+  pointer-events: none;
+}
+
+.inlineField:focus-within .fieldMessage,
+.invalidField .fieldMessage {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .invalidField .fieldMessage,
@@ -114,33 +159,79 @@
 
 .actions {
   display: flex;
-  justify-content: flex-start;
-  margin-top: var(--ds-space-md);
+  justify-content: center;
+  margin-top: 3.25rem;
 }
 
 .actions button {
   width: auto;
-  min-width: 0;
-  padding-inline: var(--ds-space-xl);
+  min-width: 11rem;
+  min-height: 3.5rem;
+  padding-inline: 1.5rem;
+  border-width: 1.5px;
+  font-size: 1.125rem;
 }
 
 .statusMessage {
+  margin-top: var(--ds-space-md);
   font-size: var(--ds-type-body-14-size);
   line-height: var(--ds-type-body-14-line);
+  text-align: center;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (min-width: 64rem) {
   .main {
-    padding-inline: max(var(--ds-grid-gutter), 8.25rem);
+    padding-inline: 8.25rem;
   }
 }
 
 @media (max-width: 48rem) {
   .main {
-    padding-block: clamp(3.5rem, 14vw, 5rem);
+    padding: 3.25rem var(--ds-grid-gutter);
+  }
+
+  .copy {
+    margin-bottom: 3rem;
   }
 
   .form {
-    margin-top: var(--ds-space-2xl);
+    padding: 2.75rem 1.5rem;
+  }
+
+  .sentence {
+    font-size: clamp(1.125rem, 5.6vw, 1.5rem);
+    line-height: 2.25;
+  }
+
+  .inlineField,
+  .longField {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin: 0.375rem 0 1.375rem;
+  }
+
+  .fieldMessage {
+    bottom: -1.25rem;
+  }
+
+  .actions {
+    margin-top: 2.75rem;
+  }
+
+  .actions button {
+    width: 100%;
   }
 }

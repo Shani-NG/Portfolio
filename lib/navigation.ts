@@ -1,4 +1,4 @@
-import { projectCards } from "@/lib/portfolio-content";
+import { experienceProjectCards } from "@/lib/portfolio-content";
 
 type ProjectNavigationItem = {
   label: string;
@@ -6,7 +6,7 @@ type ProjectNavigationItem = {
 };
 
 export const projects: ProjectNavigationItem[] = [
-  ...projectCards.map((project) => ({
+  ...experienceProjectCards.map((project) => ({
     label: project.title,
     href: project.href,
   })),

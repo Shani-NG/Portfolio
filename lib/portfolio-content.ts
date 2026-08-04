@@ -87,6 +87,20 @@ export const projectCards = [
   },
 ] as const;
 
+export const roleFitProjectCard = {
+  category: "AI PRODUCT CASE STUDY",
+  title: "Role Fit Agent",
+  href: "/experience/role-fit-agent",
+  summary: "A conversation-based portfolio agent for evidence-based role-fit analysis.",
+  visual: "placeholder",
+  accent: "rose",
+} as const;
+
+export const experienceProjectCards = [
+  ...projectCards,
+  roleFitProjectCard,
+] as const;
+
 export const bigRedButtonCaseStudy = {
   slug: "the-big-red-button",
   category: "MONITOR MODULE",
