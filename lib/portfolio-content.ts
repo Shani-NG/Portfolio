@@ -485,24 +485,36 @@ export const kmsCaseStudy = {
   category: "Knowledge Management System",
   title: "Nobody Reads the Manual",
   statement: "Structuring expert knowledge before generative AI",
-  heroImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuDxcL-OuYY_mcApk_3VuXEbNsL4XXURb8wdHWD_YdENMzQQ_SHEn7C9m2B40A0e4VRRNk3PY4JltfOXsG7AG183_SOHMaFSup-bfxApu4zpwicq5-STQoVY3PBaDVsCUuZTRC0pr5-bIX8HvgzJWZ-JXS3rRJDLg5rjQjltEDfw_1QANFsxPcs2us3xUitgqZujQuKAuZPNFczQL2uCmyqWUNZpyxsIgpdcZqtFxlBBeVM3a4NJ7NBc3Q",
+  heroImage: "/assets/case-studies/nobody-reads-the-manual/hero-kms.png",
   heroImageAlt: "Howtool main interface.",
   visuals: {
     foundation: [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDHjXdRrYr2ezviuzpV-BcHBYbLGFUf4_78Rzsk9smZ7FlpjALRaRdgs06UE6gThgTeX5ocH1S0tOBlKrrRykPOMTGRRs9WGeDWbPlx76VNWaOY7A97XxZP_bvf_uX_MkjCXsxpYDWXDiQ1T3rtWSOlatBtQGqkdyG4k9XCQ-OUzTcDG9E0jmSrV0kMvogRslr6amkapWrwIWMnOugPbv-EHRSy6ieeoTH15jNVpT-R3wxtC2yUBxOX9A",
+      "/assets/case-studies/nobody-reads-the-manual/foundation-phase.png",
       "Dashboard redesign.",
     ],
     editorToMobile: [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBKz26WIztYh3FgCWKy9vlXigHZayyhVWkXhh_g2XS0m1FYc0uAjD5QIt8vXFbpo_KptTXFlqx2AJsMT4Stfk9fr6hAyn-gQ0xD3C0WM1RqFjt86K7UIMrbsresTnbiIFOYa5LfXjH-bFbsixMehwIlQERk_RJI2KV9uGu9olZMnXogMsLp8PVhW5bYmoPdDfyUBGcqaOlrC1Iz71-qkAFL0xT4bnQY0vHbVUJ4g6cWU5p9QsOIxaP9ng",
+      "/assets/case-studies/nobody-reads-the-manual/editor-to-mobile.png",
       "Editor to mobile translation.",
     ],
     process: [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuAoCVRrJTk3-A_qOYVjwLJHK-mQJVNzYzjsoHbb7qNP6_GY9PA8QWw7RUuRNre-D4twTxfdKXBJjqsuitJ-ZVkkPPwCjtex9_MaP8PRlTi_LCD3FKvbvdI14LMpbRa04axHsMBWYggi9p9sBjb_Re-p9NKdkJGdm6l1R8AU_dAgaC4Kd-sOd8dXF9_QOB5DoKVUaEbKYDKyODSHk__R_E2eAqRov8mQQvqRsyKroNOVx1mLQebYw9y60g",
+      "/assets/case-studies/nobody-reads-the-manual/process-model-center.png",
       "Process flow diagram.",
     ],
+    processLeft: [
+      "/assets/case-studies/nobody-reads-the-manual/process-model-left.png",
+      "Guide editor with structured content controls.",
+    ],
+    processRight: [
+      "/assets/case-studies/nobody-reads-the-manual/process-model-right.png",
+      "Guide flowchart translating expert logic into field steps.",
+    ],
     validation: [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCGxdw2VPIGsJ2NclocdTAH3TbQf1IVzlN7cNHMPVw5gNEjGOtOIHBr8iKU5BqWenVE8xomK745aBB7zbn0kMyPpDG-lhskCJs97L3pn9BNwHlSC5CfrZJ0Zr-EXW593qgck3kK15tcWbUdT1uqmTVi02HrKrnAcqwkwky9XWv-dF3t4obsMasSAEB7QBRkTSUtsdXzQsWA8egn3S_s2ACPWkq4NklNy_jSNUSmlVCiju2HEWRiBL4-rA",
+      "/assets/case-studies/nobody-reads-the-manual/process-model.png",
       "Validation panel.",
+    ],
+    contextual: [
+      "/assets/case-studies/nobody-reads-the-manual/contextual-guidance.png",
+      "Contextual guidance embedded inside the creation workflow.",
     ],
   },
   snapshot: [

@@ -96,8 +96,8 @@ const monitoringSections = [
     title: "From field noise to product judgment",
     body: "The shift was not from qualitative to quantitative. It was from fragmented evidence to a product learning loop.",
     layout: "overview",
-    visualIcon: "trending_up",
-    visualLabel: "From fragmented evidence to a learning loop",
+    visualSrc: "/assets/case-studies/monitoring-product-intelligence/field-noise.png",
+    visualAlt: "Diagram showing fragmented field inputs becoming structured product intelligence and prioritized product decisions.",
     visualHeight: "short",
   },
   {
@@ -107,6 +107,9 @@ const monitoringSections = [
     icon: "description",
     title: "I did not want another feedback loop. I wanted a learning system.",
     body: "The monitoring initiative started from a product concern: the organization was making decisions from field impressions, commander summaries, and evaluation spreadsheets, while the system itself had a much richer truth about behavior. The goal was to create a way to reach users without always meeting them, compare claims with real usage, and give product and engineering teams a shared evidence base.",
+    visualSrc: "/assets/case-studies/monitoring-product-intelligence/personal-context.png",
+    visualAlt: "Product intelligence dashboard connecting users, telemetry, field context, and system signals.",
+    visualHeight: "medium",
     cards: [
       ["Confidential by design", "All screens, data, operational details, service names, and user identifiers are abstracted. This case study focuses on learning, methods, and product impact.", "lock"],
       ["Product strategy lens", "This was not only UX analytics. It was a mechanism for prioritization, release evaluation, adoption learning, and organizational change.", "strategy"],
@@ -120,8 +123,8 @@ const monitoringSections = [
     title: "Scenario mapping turned \"usage\" into measurable intent",
     body: "I submitted the initial mapping scenarios and helped the team build a full scenario kit across major capabilities. Each scenario defined what success looked like for a specific user, workflow, and release moment. This gave product and engineering a shared way to evaluate whether a capability was actually working in the field.",
     layout: "text-left",
-    visualIcon: "device_hub",
-    visualLabel: "Scenario-mapping visual with workflow nodes per capability",
+    visualSrc: "/assets/case-studies/monitoring-product-intelligence/deep-dive-01.png",
+    visualAlt: "Scenario mapping illustration connecting workflows, capabilities, and measurable outcomes.",
     visualHeight: "medium",
   },
   {
@@ -132,8 +135,8 @@ const monitoringSections = [
     title: "Matomo became a product evaluation layer",
     body: "The implementation was framed around complete workflows, not vanity metrics. I connected Matomo telemetry with UX benchmarking logic: task success, time on task, errors, abandonment, adoption, and lightweight perception metrics. This made monitoring useful for release evaluation, prioritization, training, and redesign.",
     layout: "text-right",
-    visualIcon: "dashboard",
-    visualLabel: "Matomo telemetry dashboard and workflow metrics",
+    visualSrc: "/assets/case-studies/monitoring-product-intelligence/deep-dive-02.png",
+    visualAlt: "Matomo product evaluation illustration with workflow and telemetry metrics.",
     visualHeight: "medium",
   },
   {
@@ -143,6 +146,9 @@ const monitoringSections = [
     icon: "architecture",
     title: "From analytics to evidence-backed UX decisions",
     body: "I used the monitoring initiative as a way to combine behavioral telemetry with UX benchmarking logic: task success, time on task, error patterns, adoption, retention, and lightweight perception measures. The goal was to reduce bias, evaluate releases with confidence, and choose three to four meaningful KPIs per workflow instead of drowning in generic dashboards.",
+    visualSrc: "/assets/case-studies/monitoring-product-intelligence/measurement-architecture.png",
+    visualAlt: "Measurement architecture connecting behavioral analytics, UX benchmarks, and field context.",
+    visualHeight: "medium",
     columns: [
       ["Measurement Methods", ["Top-task success", "Time on task", "Single Ease Question or UMUX-Lite", "System Usability Scale", "Confidence intervals only where the sample and method support them"]],
       ["Evidence Stack", ["Behavioral Data", "Task Benchmark", "Perception Pulse", "Field Context"]],
@@ -155,6 +161,9 @@ const monitoringSections = [
     icon: "lightbulb",
     title: "The first week surfaced hidden product value",
     body: "The data immediately exposed patterns that field reports alone could not explain: forms that were used often but incorrectly, new forms that almost nobody opened, and repeated user behaviors that pointed to better defaults. This was the moment the initiative became impossible to ignore.",
+    visualSrc: "/assets/case-studies/monitoring-product-intelligence/deep-dive-03.png",
+    visualAlt: "First-week product findings grouped into incorrect use, invisible value, and repeated patterns.",
+    visualHeight: "medium",
     cards: [
       ["Used, but wrong", "High usage exposed a need, but the pattern showed users were operating the form in an unintended way.", "warning"],
       ["Useful, but invisible", "New forms with high potential were barely discovered, exposing an awareness and discoverability gap.", "visibility_off"],
@@ -175,8 +184,8 @@ const monitoringSections = [
       ["Discoverability-related", "Features present but not surfaced in the right context", "search"],
       ["Truly missing capability", "Confirmed gaps that justified new development", "add_circle"],
     ],
-    visualIcon: "mediation",
-    visualLabel: "Insight loop and prioritization framework visual",
+    visualSrc: "/assets/case-studies/monitoring-product-intelligence/deep-dive-04.png",
+    visualAlt: "Insight loop illustration showing how evidence changed product prioritization.",
     visualHeight: "tall",
   },
 ] as const;
@@ -186,20 +195,17 @@ function MonitoringIcon({ name }: { name: string }) {
 }
 
 function MonitoringVisual({
-  icon,
-  label,
+  src,
+  alt,
   height = "medium",
 }: {
-  icon: string;
-  label: string;
+  src: string;
+  alt: string;
   height?: "short" | "medium" | "tall";
 }) {
   return (
-    <div className={[styles.monitoringVisual, styles[`monitoringVisual${height[0].toUpperCase()}${height.slice(1)}`]].join(" ")} aria-label={label} role="img">
-      <span className={styles.monitoringVisualGrid} aria-hidden="true" />
-      <span className={styles.monitoringVisualPulse} aria-hidden="true" />
-      <MonitoringIcon name={icon} />
-      <strong>{label}</strong>
+    <div className={[styles.monitoringVisual, styles[`monitoringVisual${height[0].toUpperCase()}${height.slice(1)}`]].join(" ")}>
+      <Image src={src} alt={alt} fill sizes="(max-width: 48rem) 100vw, 52vw" />
     </div>
   );
 }
@@ -233,7 +239,7 @@ function MonitoringCaseStudy() {
       <section className={styles.monitoringHero} data-ds-theme="dark" id="monitoring-and-product-intelligence">
         <div className={styles.monitoringHeroBg} aria-hidden="true">
           <Image
-            src="/assets/project-monitoring-product-intelligence.png"
+            src="/assets/case-studies/monitoring-product-intelligence/hero-monitoring.png"
             alt=""
             fill
             priority
@@ -273,6 +279,7 @@ function MonitoringCaseStudy() {
               <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
                 <div className={styles.monitoringWrap}>
                   <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+                  <MonitoringVisual src={section.visualSrc} alt={section.visualAlt} height={section.visualHeight} />
                   <div className={styles.monitoringColumnGrid}>
                     {section.columns.map(([title, items]) => (
                       <article className={styles.monitoringInfoCard} key={title}>
@@ -308,7 +315,7 @@ function MonitoringCaseStudy() {
                       ))}
                     </div>
                   </div>
-                  <MonitoringVisual icon={section.visualIcon} label={section.visualLabel} height={section.visualHeight} />
+                  <MonitoringVisual src={section.visualSrc} alt={section.visualAlt} height={section.visualHeight} />
                 </div>
               </section>
             </ScrollReveal>
@@ -321,6 +328,7 @@ function MonitoringCaseStudy() {
               <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
                 <div className={styles.monitoringWrap}>
                   <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+                  <MonitoringVisual src={section.visualSrc} alt={section.visualAlt} height={section.visualHeight} />
                   <div className={section.cards.length === 2 ? styles.monitoringCardGridTwo : styles.monitoringCardGridThree}>
                     {section.cards.map(([title, body, icon]) => (
                       <article className={styles.monitoringInfoCard} key={title}>
@@ -341,7 +349,7 @@ function MonitoringCaseStudy() {
             <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
               <div className={[styles.monitoringWrap, styles.monitoringSplit, section.layout === "text-right" ? styles.monitoringSplitReverse : ""].join(" ")}>
                 <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
-                <MonitoringVisual icon={section.visualIcon} label={section.visualLabel} height={section.visualHeight} />
+                <MonitoringVisual src={section.visualSrc} alt={section.visualAlt} height={section.visualHeight} />
               </div>
             </section>
           </ScrollReveal>
@@ -811,46 +819,31 @@ function C4iHtmlCaseStudy() {
 
             <div className={styles.c4iAlignGrid}>
               <article className={[styles.c4iAlignCard, styles.c4iAlignFeature].join(" ")}>
-                <span className={styles.c4iIconTag}><C4iIcon name="groups" /></span>
-                <h3 className={styles.c4iCardTitleLarge}>Operational users</h3>
-                <p>Command and field teams have long-standing habits, deep contextual knowledge, and reduced cognitive load under stress.</p>
-                <div className={styles.c4iOperatorViz} aria-label="Operator context alignment animation" role="img">
-                  <span className={styles.c4iOperatorCore}><C4iIcon name="support_agent" /></span>
-                  <span className={styles.c4iOrbitA}>Pressure</span>
-                  <span className={styles.c4iOrbitB}>Context</span>
-                  <span className={styles.c4iOrbitC}>Decision</span>
+                <img className={styles.c4iAlignCardImage} src="/assets/case-studies/c4i-beyond-clarity/leadership-operational-users.png" alt="" />
+                <div className={styles.c4iAlignCardContent}>
+                  <h3 className={styles.c4iCardTitleLarge}>Operational users</h3>
+                  <p>Command and field teams needed fast comprehension, clear prioritization, and interfaces that reduce cognitive load under pressure.</p>
                 </div>
               </article>
               <article className={styles.c4iAlignCard}>
-                <span className={styles.c4iIconTag}><C4iIcon name="build" /></span>
-                <h3 className={styles.c4iCardTitleLarge}>Engineering constraints</h3>
-                <p>The solution had to respect data flows, roles, permissions, release capacity, and technical dependencies.</p>
-                <div className={styles.c4iArchitectureViz} aria-label="Architecture constraints connecting data, roles, release capacity, and dependencies" role="img">
-                  <span className={styles.c4iArchitectureLine} />
-                  <span className={styles.c4iArchitectureNode}>Data</span>
-                  <span className={styles.c4iArchitectureNode}>Roles</span>
-                  <span className={styles.c4iArchitectureNode}>Release</span>
-                  <span className={styles.c4iArchitectureNode}>Dependencies</span>
+                <img className={styles.c4iAlignCardImage} src="/assets/case-studies/c4i-beyond-clarity/leadership-governance-challenge.png" alt="" />
+                <div className={styles.c4iAlignCardContent}>
+                  <h3 className={styles.c4iCardTitleLarge}>Governance challenge</h3>
+                  <p>Move UX from request handling into a repeatable product capability for decisions, delivery, and learning.</p>
                 </div>
               </article>
               <article className={styles.c4iAlignCard}>
-                <span className={styles.c4iIconTag}><C4iIcon name="account_tree" /></span>
-                <h3 className={styles.c4iCardTitleLarge}>Governance challenge</h3>
-                <p>Move UX from request handling into a repeatable product capability for decisions, delivery, and learning.</p>
-                <div className={styles.c4iGovernanceViz} aria-label="Governance flow from requests to decisions, delivery, and learning" role="img">
-                  <span className={styles.c4iGovernanceDoc}>Requests</span>
-                  <span className={styles.c4iGovernanceArrow}><C4iIcon name="arrow_forward" /></span>
-                  <span className={styles.c4iGovernanceDoc}>Decisions</span>
-                  <span className={styles.c4iGovernanceArrow}><C4iIcon name="arrow_forward" /></span>
-                  <span className={styles.c4iGovernanceDoc}>Learning</span>
+                <img className={styles.c4iAlignCardImage} src="/assets/case-studies/c4i-beyond-clarity/leadership-engineering-constraints.png" alt="" />
+                <div className={styles.c4iAlignCardContent}>
+                  <h3 className={styles.c4iCardTitleLarge}>Engineering constraints</h3>
+                  <p>The solution had to respect data flows, roles, permissions, release capacity, and technical dependencies.</p>
                 </div>
               </article>
               <article className={styles.c4iAlignCard}>
-                <span className={styles.c4iIconTag}><C4iIcon name="layers" /></span>
-                <h3 className={styles.c4iCardTitleLarge}>Product consistency</h3>
-                <p>Multiple interfaces needed to behave like one product: consistent language, reusable patterns, and shared ownership.</p>
-                <div className={styles.c4iConsistencyViz} aria-label="Shared product patterns connecting multiple interfaces" role="img">
-                  <span /><span /><span />
+                <img className={styles.c4iAlignCardImage} src="/assets/case-studies/c4i-beyond-clarity/leadership-product-consistency.png" alt="" />
+                <div className={styles.c4iAlignCardContent}>
+                  <h3 className={styles.c4iCardTitleLarge}>Product consistency</h3>
+                  <p>Multiple interfaces needed to behave like one product: consistent language, reusable patterns, and shared ownership.</p>
                 </div>
               </article>
             </div>
@@ -938,38 +931,6 @@ function C4iHtmlCaseStudy() {
               alt="Dark feature composition showing personalized interfaces, access control, and contextual tools."
             />
 
-            <div className={styles.c4iDefaultsProcess} aria-label="Profile-based defaults process">
-              <div className={styles.c4iBentoLead}>
-                <span>Profile-Based Defaults</span>
-                <h3>A ready workspace by profile, role, and mission context.</h3>
-              </div>
-              <div className={styles.c4iBentoTile}>
-                <strong><C4iIcon name="badge" /> Profile-based capability</strong>
-                <p>Category and location, designation, and contextual level.</p>
-              </div>
-              <div className={styles.c4iBentoTile}>
-                <strong><C4iIcon name="visibility" /> Operational context</strong>
-                <p>Displayed data, recommended workflow, and prioritized alerts.</p>
-              </div>
-              <div className={[styles.c4iBentoTile, styles.c4iBentoAccent].join(" ")}>
-                <strong><C4iIcon name="construction" /> Augmented toolset</strong>
-                <p>New tasks, saved filters, and map layers remained adjustable.</p>
-              </div>
-            </div>
-
-            <div className={styles.c4iLineCards}>
-              {[
-                ["Personalized Context", "The workspace started ready", "Profile settings defined roles, map layers, tools, and operational views before the user began working."],
-                ["Role Alignment", "Tools followed the role", "Each user saw workflows for their exact operational role, aligned to the full breadth of their tasks."],
-                ["User Control", "Defaults stayed editable", "Local presets supported meeting needs, while still allowing operators to adjust the less-standard settings."],
-              ].map(([tag, title, body]) => (
-                <article className={styles.c4iLineCard} key={title}>
-                  <span>{tag}</span>
-                  <h3>{title}</h3>
-                  <p>{body}</p>
-                </article>
-              ))}
-            </div>
           </div>
         </section>
       </ScrollReveal>
@@ -1237,7 +1198,11 @@ function KmsSectionView({ section, index }: { section: KmsSection; index: number
               </div>
             ) : null}
           </div>
-          <KmsVisualImage visual={kmsCaseStudy.visuals.process} className={styles.kmsProcessVisual} />
+          <div className={styles.kmsProcessGallery}>
+            <KmsVisualImage visual={kmsCaseStudy.visuals.processLeft} className={styles.kmsProcessVisual} />
+            <KmsVisualImage visual={kmsCaseStudy.visuals.process} className={styles.kmsProcessVisual} />
+            <KmsVisualImage visual={kmsCaseStudy.visuals.processRight} className={styles.kmsProcessVisual} />
+          </div>
         </section>
       </ScrollReveal>
     );
@@ -1278,6 +1243,8 @@ function KmsSectionView({ section, index }: { section: KmsSection; index: number
             <p className={styles.kmsBody}>{guidanceSection.body}</p>
           </div>
 
+          <KmsVisualImage visual={kmsCaseStudy.visuals.contextual} className={styles.kmsGuidanceVisual} />
+
           <div className={styles.kmsGuidanceCards}>
             <article className={styles.kmsInfoCard}>
               <h3>{guidanceSection.cardsTitle}</h3>
@@ -1317,11 +1284,13 @@ function EpdSectionHeader({
   label,
   title,
   body,
+  highlightPhrases = [],
 }: {
   icon: string;
   label: string;
   title: string;
   body?: string | readonly string[];
+  highlightPhrases?: readonly string[];
 }) {
   const bodyItems = Array.isArray(body) ? body : body ? [body] : [];
 
@@ -1329,12 +1298,27 @@ function EpdSectionHeader({
     <div className={styles.epdSectionHeader}>
       <Eyebrow as="div" className={styles.epdEyebrow} icon={<EpdIcon name={icon} />}>{label}</Eyebrow>
       <h2>{title}</h2>
-      {bodyItems.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+      {bodyItems.map((paragraph) => (
+        <p key={paragraph}><HighlightedText text={paragraph} phrases={highlightPhrases} /></p>
+      ))}
     </div>
   );
 }
 
-const epdReferenceBase = "/assets/case-studies/ux-from-the-heart/references";
+function HighlightedText({ text, phrases }: { text: string; phrases: readonly string[] }) {
+  if (phrases.length === 0) return text;
+  const escaped = phrases.map((phrase) => phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const matcher = new RegExp(`(${escaped.join("|")})`, "g");
+  const highlighted = new Set(phrases);
+
+  return text.split(matcher).map((part, index) => (
+    highlighted.has(part)
+      ? <strong className={styles.epdTextHighlight} key={`${part}-${index}`}>{part}</strong>
+      : part
+  ));
+}
+
+const epdReferenceBase = "/assets/case-studies/ux-from-the-heart";
 
 function EpdMediaFrame({
   src,
@@ -1382,10 +1366,10 @@ function EpdModelVisual() {
 function EpdHeartVisual() {
   return (
     <EpdMediaFrame
-      src={`${epdReferenceBase}/electrophysiologist.png`}
-      alt="Electrophysiologist working beside the patient during the procedure"
+      src={`${epdReferenceBase}/epd-colored.png`}
+      alt="Clinical cardiac mapping views preserving established anatomy and ablation color conventions."
       className={styles.epdPrincipleVisual}
-      imageClassName={styles.epdMediaCover}
+      imageClassName={styles.epdMediaContain}
       sizes="(max-width: 48rem) 100vw, 44vw"
     />
   );
@@ -1431,10 +1415,10 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
               {section.roles.map(([, title, body], roleIndex) => (
                 <article key={title}>
                   <EpdMediaFrame
-                    src={roleIndex === 0 ? `${epdReferenceBase}/electrophysiologist-v2.png` : `${epdReferenceBase}/ep-technician.png`}
+                    src={roleIndex === 0 ? `${epdReferenceBase}/electrophysiologist.png` : `${epdReferenceBase}/ep-technician.png`}
                     alt={title}
                     className={styles.epdRoleMedia}
-                    imageClassName={styles.epdMediaCover}
+                    imageClassName={styles.epdMediaContain}
                     sizes="(max-width: 48rem) 100vw, 26vw"
                   />
                   <div>
@@ -1499,7 +1483,13 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
       <ScrollReveal mode="creative">
         <section className={[styles.epdSection, styles.epdWashGreen].join(" ")} id={section.id}>
           <div className={styles.epdWrap}>
-            <EpdSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+            <EpdSectionHeader
+              icon={section.icon}
+              label={section.label}
+              title={section.title}
+              body={section.body}
+              highlightPhrases={["not linear", "procedure type", "active catheter", "connected equipment", "physician preference", "patient condition"]}
+            />
             <EpdModelVisual />
             <div className={styles.epdDriverGrid}>
               {section.drivers.map(([, title, body], driverIndex) => (
@@ -1590,7 +1580,14 @@ function EpdCaseStudy() {
                 title={epdCaseStudy.overview.title}
               />
               <div className={styles.epdOverviewBody}>
-                {epdCaseStudy.overview.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                {epdCaseStudy.overview.body.map((paragraph, paragraphIndex) => (
+                  <p key={paragraph}>
+                    <HighlightedText
+                      text={paragraph}
+                      phrases={paragraphIndex === 1 ? ["real challenge", "redefine the MVP", "clinical adoption"] : []}
+                    />
+                  </p>
+                ))}
               </div>
             </div>
             <dl className={styles.epdSnapshot}>
@@ -1658,7 +1655,7 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
 
   if (slug === kmsCaseStudy.slug) {
     return (
-      <main className={[styles.page, styles.kmsPage].join(" ")} data-ds-theme="light">
+      <main className={[styles.page, styles.kmsPage].join(" ")}>
         <section className={styles.kmsHero} data-ds-theme="dark" id="kms-hero">
           <div className={styles.kmsHeroCopy}>
             <p className={styles.kmsEyebrow}>{kmsCaseStudy.category}</p>
