@@ -22,8 +22,8 @@ import {
   inferRoleFamily,
   isValidRoleClarificationAnswer,
   looksLikeReportIntent,
-  looksLikeRoleInput,
   resolveRoleTextForValidation,
+  shouldValidateRoleCollectionMessage,
   validateRoleText,
 } from "@/lib/role-fit/server/role-understanding";
 
@@ -36,6 +36,7 @@ const requestSchema = z
     message: z.string().min(1),
     language: z.enum(["he", "en", "mixed"]).default("en"),
     repeatedInput: z.boolean().optional().default(false),
+    roleCollectionActive: z.boolean().optional().default(false),
     clarificationAttempts: z.number().int().nonnegative().max(10).optional().default(0),
     completedReportCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional().default(0),
     conversationContext: z.string().optional(),
@@ -93,7 +94,10 @@ export async function POST(request: Request) {
 
   const traceId = crypto.randomUUID();
   const hasReportIntent = looksLikeReportIntent(parsedRequest.data.message);
-  const hasRoleInput = looksLikeRoleInput(parsedRequest.data.message);
+  const hasRoleInput = shouldValidateRoleCollectionMessage({
+    message: parsedRequest.data.message,
+    roleCollectionActive: parsedRequest.data.roleCollectionActive,
+  });
   const roleContext = parsedRequest.data.roleContext;
   const pendingRoleField = roleContext?.pendingField;
   const isFieldClarification = Boolean(roleContext && pendingRoleField && !hasRoleInput);

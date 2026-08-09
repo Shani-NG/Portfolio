@@ -293,6 +293,14 @@ export function looksLikeReportIntent(message: string) {
   return /\b(report|fit|match|role fit|analy[sz]e|analysis)\b/i.test(message) || /דוח|דו"ח|דו״ח|התאמה|מתאימ|נתח|משרה|תפקיד/.test(message);
 }
 
+export function shouldValidateRoleCollectionMessage(input: {
+  message: string;
+  roleCollectionActive: boolean;
+}) {
+  return looksLikeRoleInput(input.message)
+    || (input.roleCollectionActive && isPlausibleRoleTitle(input.message));
+}
+
 export function looksLikeRoleInput(message: string) {
   const lower = normalizeRoleText(message).toLowerCase();
   const labeledFieldCount = ["company:", "organization:", "title:", "role:", "description:", "responsibilities:", "requirements:", "qualifications:", "skills:"].filter((label) => lower.includes(label)).length;

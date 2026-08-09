@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyRoleCorrection, createRoleDraftFromText, detectRoleCorrection, looksLikeRoleInput, mergeRoleClarification, resolveRoleTextForValidation, validateRoleText } from "./role-understanding.ts";
+import { applyRoleCorrection, createRoleDraftFromText, detectRoleCorrection, looksLikeRoleInput, mergeRoleClarification, resolveRoleTextForValidation, shouldValidateRoleCollectionMessage, validateRoleText } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -122,6 +122,12 @@ describe("Role Fit pasted job understanding", () => {
 
     assert.equal(result.roleDraft.title?.originalValue, "");
     assert.deepEqual(result.missingFields, ["title"]);
+  });
+
+  it("accepts a title-only reply while role collection is active", () => {
+    assert.equal(shouldValidateRoleCollectionMessage({ message: "UX", roleCollectionActive: true }), true);
+    assert.equal(shouldValidateRoleCollectionMessage({ message: "UX", roleCollectionActive: false }), false);
+    assert.equal(shouldValidateRoleCollectionMessage({ message: "Tell me about Shani", roleCollectionActive: true }), false);
   });
 
   it("merges a requested title as a labeled deterministic clarification", () => {

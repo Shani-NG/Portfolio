@@ -156,6 +156,7 @@ export default function RoleFitPage() {
           message: messageForAgent,
           language: activeLanguage,
           repeatedInput,
+          roleCollectionActive: liveSession.state === "awaiting-role-completion" && !liveSession.reportPayload,
           clarificationAttempts: liveSession.clarificationAttempts,
           completedReportCount: liveSession.completedReportCount,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)),

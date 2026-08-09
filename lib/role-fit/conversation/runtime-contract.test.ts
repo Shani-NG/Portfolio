@@ -22,4 +22,15 @@ describe("Role Fit runtime conversation contract", () => {
     assert.ok(guardedRequest > confirmationGuard);
     assert.ok(guardExit > guardedRequest);
   });
+
+  it("keeps collecting role details after Generate Report is requested", async () => {
+    const [page, route] = await Promise.all([
+      readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8"),
+      readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8"),
+    ]);
+
+    assert.match(page, /roleCollectionActive: liveSession\.state === "awaiting-role-completion"/);
+    assert.match(route, /shouldValidateRoleCollectionMessage\(\{/);
+    assert.match(route, /roleCollectionActive: parsedRequest\.data\.roleCollectionActive/);
+  });
 });
