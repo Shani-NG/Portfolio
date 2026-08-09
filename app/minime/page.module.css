@@ -1621,3 +1621,81 @@
   .requirementChevron,
   .requirementPanelWrap { transition: none; }
 }
+
+/* Report workspace behavior. Narrow layouts expose one pane at a time. */
+.paneToggleFab {
+  display: none;
+}
+
+@media (max-width: 70rem) {
+  .liveSplitPage {
+    height: auto;
+    min-height: calc(100vh - var(--site-header-height));
+    overflow: visible;
+    position: static;
+  }
+
+  .liveSplitWorkspace {
+    display: block;
+    height: auto;
+    min-height: calc(100vh - var(--site-header-height));
+    padding: var(--ds-space-xl) var(--ds-grid-gutter) calc(var(--ds-space-3xl) + 4rem);
+  }
+
+  .liveSplitWorkspace .chatPane,
+  .liveSplitWorkspace .canvasPane {
+    height: auto;
+    max-width: none;
+    overflow: visible;
+    padding: 0;
+    width: 100%;
+  }
+
+  .liveSplitWorkspace .chatPane:focus,
+  .liveSplitWorkspace .canvasPane:focus {
+    outline: none;
+  }
+
+  .liveSplitWorkspace .chatHistory {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .narrowPaneInactive {
+    display: none !important;
+  }
+
+  .narrowPaneActive.splitChatPane {
+    display: flex;
+  }
+
+  .narrowPaneActive.canvasPane {
+    display: flex;
+  }
+
+  .paneToggleFab {
+    align-items: center;
+    background: var(--rf-rose-500);
+    border: 0;
+    border-radius: var(--radius-pill);
+    bottom: max(var(--ds-space-lg), env(safe-area-inset-bottom));
+    box-shadow: var(--rf-shadow);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    font: inherit;
+    font-size: var(--ds-type-label-13-size);
+    font-weight: var(--ds-type-weight-semibold);
+    gap: var(--ds-space-xs);
+    min-height: 2.75rem;
+    padding: 0 var(--ds-space-md);
+    position: fixed;
+    right: max(var(--ds-space-lg), env(safe-area-inset-right));
+    z-index: 40;
+  }
+
+  .paneToggleFab:focus-visible {
+    outline: 3px solid var(--ds-color-focus);
+    outline-offset: 3px;
+  }
+}

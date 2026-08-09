@@ -1,21 +1,13 @@
 "use client";
 
 import { Chip } from "@/components/ui/chip";
-import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
+import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
 import { resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
 import { useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
-
-type MatchType =
-  | "direct"
-  | "semantic"
-  | "transferable"
-  | "partial"
-  | "insufficient"
-  | "insufficient-evidence"
-  | "real-gap";
 
 type LiveReportState = {
   provider?: string;
@@ -49,26 +41,6 @@ function reportFailureMessage(result: ReportFailureResult): string {
   return result.safeMessage ?? "I could not complete a reliable evidence-based report. Your role details are preserved, so you can try again.";
 }
 
-const matchLabels: Record<MatchType, string> = {
-  direct: "Direct evidence",
-  semantic: "Strong semantic match",
-  transferable: "Transferable match",
-  partial: "Partial evidence",
-  insufficient: "Insufficient evidence",
-    "insufficient-evidence": "Insufficient evidence",
-  "real-gap": "Real gap",
-};
-
-const matchTones: Record<MatchType, "success" | "secondary" | "warning"> = {
-  direct: "success",
-  semantic: "success",
-  transferable: "secondary",
-  partial: "warning",
-  insufficient: "warning",
-  "insufficient-evidence": "warning",
-"real-gap": "warning",
-};
-
 function normalizeRepeatedInput(value: string) {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
@@ -84,9 +56,14 @@ export default function RoleFitPage() {
   const [isSending, setIsSending] = useState(false);
   const [isReportRequestInFlight, setIsReportRequestInFlight] = useState(false);
   const [liveReportState, setLiveReportState] = useState<LiveReportState | null>(null);
+  const [activePane, setActivePane] = useState<"chat" | "report">("chat");
+  const [isNarrowLayout, setIsNarrowLayout] = useState(false);
   const reportRequestInFlightRef = useRef(false);
+  const chatPaneRef = useRef<HTMLDivElement>(null);
+  const reportPaneRef = useRef<HTMLElement>(null);
   const reportLimitReached = liveSession.completedReportCount >= 2;
   const hasLiveReport = Boolean(liveSession.reportPayload);
+  const activeReport = liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined;
   const liveSplitCanvas = liveSession.state === "generating-report" || liveSession.state === "recoverable-error" || liveSession.state === "report-ready";
   const splitCanvas = liveSplitCanvas;
   const hasConversation = liveSession.messages.length > 0 || liveSession.state !== "initial";
@@ -231,6 +208,7 @@ export default function RoleFitPage() {
     setLiveReportState(null);
     reportRequestInFlightRef.current = true;
     setIsReportRequestInFlight(true);
+    setActivePane("report");
     syncLiveSession({ state: "generating-report" });
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), reportRequestTimeoutMs);
@@ -295,6 +273,7 @@ export default function RoleFitPage() {
         pendingRoleField: null,
         pendingReportConfirmation: false,
       });
+      setActivePane("report");
     } catch (error) {
       const timedOut = error instanceof Error && error.name === "AbortError";
       const message = timedOut
@@ -320,7 +299,25 @@ export default function RoleFitPage() {
   }, []);
 
   useEffect(() => {
-    if (!liveSplitCanvas) return;
+    const restoredSession = restoreRoleFitLiveSession();
+    setLiveSession(restoredSession);
+    if (restoredSession.reportPayload) setActivePane("report");
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 70rem)");
+    const syncLayout = () => setIsNarrowLayout(media.matches);
+    syncLayout();
+    media.addEventListener("change", syncLayout);
+    return () => media.removeEventListener("change", syncLayout);
+  }, []);
+
+  useEffect(() => {
+    if (isNarrowLayout && hasLiveReport) setActivePane("report");
+  }, [activeReport?.reportId, hasLiveReport, isNarrowLayout]);
+
+  useEffect(() => {
+    if (!liveSplitCanvas || isNarrowLayout) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -328,7 +325,23 @@ export default function RoleFitPage() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [liveSplitCanvas]);
+  }, [isNarrowLayout, liveSplitCanvas]);
+
+  function switchPane(nextPane: "chat" | "report") {
+    setActivePane(nextPane);
+    window.requestAnimationFrame(() => {
+      (nextPane === "chat" ? chatPaneRef.current : reportPaneRef.current)?.focus();
+    });
+  }
+
+  function startNewAnalysis() {
+    const nextSession = resetRoleFitAnalysis();
+    setLiveSession(nextSession);
+    setLiveReportState(null);
+    setApiStatusMessage("");
+    setRoleInput("");
+    setActivePane("chat");
+  }
 
   const chatMessages = liveSession.messages;
 
@@ -344,10 +357,15 @@ export default function RoleFitPage() {
       >
         Generate Report
       </button> : null}
-      {splitCanvas ? (
-        <button className={styles.mobileBackChip} type="button" onClick={() => syncLiveSession({ state: "general-qa" })}>
-          <span className={styles.msi} aria-hidden="true">arrow_back</span>
-          Back to chat
+      {hasLiveReport && splitCanvas ? (
+        <button
+          aria-label={activePane === "report" ? "Switch to chat" : "Switch to report"}
+          className={styles.paneToggleFab}
+          onClick={() => switchPane(activePane === "report" ? "chat" : "report")}
+          type="button"
+        >
+          <span className={styles.msi} aria-hidden="true">{activePane === "report" ? "chat" : "description"}</span>
+          <span>{activePane === "report" ? "Chat" : "Report"}</span>
         </button>
       ) : null}
 
@@ -387,7 +405,12 @@ export default function RoleFitPage() {
         </section>
       ) : (
         <section className={liveSplitCanvas ? `${styles.agentViewContainer} ${styles.liveSplitWorkspace}` : styles.agentViewContainer} id="role-fit-workspace" aria-label="Role Fit workspace">
-          <div className={`${styles.chatPane} ${splitCanvas ? styles.compactHiddenChat : styles.fullWidth}`}>
+          <div
+            aria-hidden={isNarrowLayout && splitCanvas && activePane !== "chat"}
+            className={`${styles.chatPane} ${splitCanvas ? styles.splitChatPane : styles.fullWidth} ${activePane === "chat" ? styles.narrowPaneActive : styles.narrowPaneInactive}`}
+            ref={chatPaneRef}
+            tabIndex={-1}
+          >
             <div className={styles.chatHistory}>
               {chatMessages.map((message, index) => (
                 <div className={`${styles.chatBubble} ${message.role === "user" ? styles.userBubble : styles.agentBubble}`} key={`${message.role}-${index}`}>
@@ -420,7 +443,13 @@ export default function RoleFitPage() {
           </div>
 
           {splitCanvas ? (
-            <aside className={styles.canvasPane} aria-label="Role Fit report canvas">
+            <aside
+              aria-hidden={isNarrowLayout && activePane !== "report"}
+              className={`${styles.canvasPane} ${activePane === "report" ? styles.narrowPaneActive : styles.narrowPaneInactive}`}
+              aria-label="Role Fit report canvas"
+              ref={reportPaneRef}
+              tabIndex={-1}
+            >
               {liveSession.state === "generating-report" ? (
                 <div className={styles.generatingState} id="role-fit-generating" role="status" aria-live="polite">
                   <div className={styles.generatingBars} aria-hidden="true">
@@ -437,453 +466,12 @@ export default function RoleFitPage() {
                   <p>{apiStatusMessage || "The session is preserved. Please continue in the chat or try again."}</p>
                 </div>
               ) : (
-                <LiveReportCanvas
-                  liveReportState={{
-                    report: liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined,
-                    provider: liveReportState?.provider ?? liveSession.reportProvider,
-                    model: liveReportState?.model ?? liveSession.reportModel,
-                  }}
-                />
+                activeReport ? <RoleFitLiveReport onStartNewAnalysis={startNewAnalysis} report={activeReport} /> : null
               )}
             </aside>
           ) : null}
         </section>
       )}
     </main>
-  );
-}
-
-function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportState | null }) {
-  const report = liveReportState?.report;
-  const [openRequirementIds, setOpenRequirementIds] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!report) {
-      setOpenRequirementIds(new Set());
-      return;
-    }
-
-    const defaultRequirementId =
-      report.requirementMapping.items.find((item) =>
-        item.clusterIds.includes(report.evidencePanel.defaultClusterId ?? ""),
-      )?.itemId ?? report.requirementMapping.items[0]?.itemId;
-
-    setOpenRequirementIds(defaultRequirementId ? new Set([defaultRequirementId]) : new Set());
-  }, [report?.reportId]);
-
-  if (!report) {
-    return (
-      <div className={`${styles.reportShell} ${styles.liveReportCanvas}`} id="role-fit-live-report">
-        <section className={`${styles.bentoCard} ${styles.roleSnapshot}`}>
-          <span className={styles.reportEyebrow}>Role Fit Report</span>
-          <h2>Report unavailable</h2>
-          <p className={styles.fitSummary}>
-            The report response is ready, but no display payload was returned.
-          </p>
-        </section>
-      </div>
-    );
-  }
-
-  const fitLevel =
-    report.overallFitVisual.mode === "fit"
-      ? report.overallFitVisual.level
-      : "partial";
-
-  const reportToneClass =
-    fitLevel === "strong"
-      ? styles.fitStrong
-      : fitLevel === "good"
-        ? styles.fitGood
-        : styles.fitPartial;
-
-  const confidenceLabel = report.evidenceConfidence.level.replaceAll("-", " ");
-
-  const skills = report.skillsMatch.items;
-  const requirements = report.requirementMapping.items;
-  const evidenceClusters = report.evidencePanel.clusters;
-
-  const strengths = report.topStrengths.items;
-  const gaps = report.keyGaps.items;
-
-  const skillsCoverageLabel = (() => {
-    const coverage = report.skillsMatch.visualCoverage;
-
-    if (coverage.mode === "qualitative") {
-      return coverage.label;
-    }
-
-    if (coverage.mode === "traceable-count") {
-      return `${coverage.matchedCount}/${coverage.totalCount}`;
-    }
-
-    return "Evidence-based";
-  })();
-
-  function findClusterForItem(clusterIds: string[]) {
-    return (
-      evidenceClusters.find((cluster) => clusterIds.includes(cluster.clusterId)) ??
-      null
-    );
-  }
-
-  const fitValue = report.overallFitVisual.mode === "fit" ? report.overallFitVisual.fitVisualValue : 0;
-  const progressOffset = 327 - (327 * Math.min(100, Math.max(0, fitValue))) / 100;
-  const fitIllustration = fitLevel === "strong" ? "account_tree" : fitLevel === "good" ? "schema" : "alt_route";
-  const additionalSkillCount = Math.max(0, skills.length - 5);
-  const visibleSkills = skills.slice(0, 5);
-  const remainingSkills = skills.slice(5).map((skill) => skill.displayLabel || skill.originalText).join(" · ");
-  const locationValue = [report.roleSnapshot.location, report.roleSnapshot.workModel].filter(Boolean).join(" · ") || "Not specified";
-  const experienceValue = report.roleSnapshot.yearsOfExperience
-    ? `${report.roleSnapshot.yearsOfExperience}+ years`
-    : report.roleSnapshot.seniority || "Not specified";
-
-  return (
-    <div
-      className={`${styles.reportShell} ${styles.liveReportCanvas} ${reportToneClass}`}
-      dir={report.language === "he" ? "rtl" : "ltr"}
-      id="role-fit-live-report"
-    >
-      <header className={styles.reportHeader}>
-        <div className={styles.reportIdentity}>
-          <div className={styles.reportBrand}>
-            <div className={styles.avatar}>S</div>
-            <div>
-              <h1>Shani Nakash-Gomel - Smart Role Fit</h1>
-              <p>A concise role-fit report grounded in verified portfolio evidence.</p>
-            </div>
-          </div>
-        </div>
-        <div className={styles.fitLevelChips} aria-label={`Fit level: ${report.overallFitVisual.label}`}>
-          {(["strong", "good", "partial"] as const).map((level) => (
-            <span
-              aria-current={fitLevel === level ? "true" : undefined}
-              className={`${styles.fitLevelChip} ${fitLevel === level ? styles.fitLevelSelected : ""}`}
-              key={level}
-              title={level}
-            >
-              {level}
-            </span>
-          ))}
-        </div>
-      </header>
-
-      <div className={styles.reportGrid}>
-        <section
-          className={`${styles.bentoCard} ${styles.roleSnapshot}`}
-          id="live-analyzed-job-profile"
-          aria-label="Live Role Fit report"
-        >
-          <div className={styles.snapshotTop}>
-            <div className={styles.snapshotCopy}>
-              <span className={styles.reportEyebrow}>Analyzed Job Profile</span>
-              <h2>{report.roleSnapshot.title}</h2>
-              <p>
-                <span className={styles.msi} aria-hidden="true">
-                  business
-                </span>{" "}
-                {report.roleSnapshot.company}
-              </p>
-            </div>
-
-          </div>
-
-          <p className={styles.fitSummary}>
-            {report.overallFitVisual.rationale}
-          </p>
-
-          <div className={styles.statsGrid}>
-            <Stat
-              icon="business"
-              label="Company"
-              value={report.roleSnapshot.company}
-            />
-            <Stat
-              icon="workspace_premium"
-              label="Required experience"
-              value={experienceValue}
-            />
-            <Stat
-              icon="location_on"
-              label="Location & work model"
-              value={locationValue}
-            />
-            <Stat
-              icon="verified"
-              label="Evidence confidence"
-              value={confidenceLabel}
-            />
-          </div>
-        </section>
-
-        <section
-          className={`${styles.bentoCard} ${styles.skillsCard}`}
-          id="live-skills-match"
-        >
-          <div className={styles.progressWrap} aria-label={`${report.overallFitVisual.label}: ${skillsCoverageLabel}`}>
-            <svg viewBox="0 0 120 120" aria-hidden="true">
-              <circle cx="60" cy="60" r="52" className={styles.progressTrack} />
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                className={styles.progressCircle}
-                strokeDasharray="327"
-                strokeDashoffset={progressOffset}
-              />
-            </svg>
-            <div className={styles.fitIllustration} aria-hidden="true">
-              <span className={styles.msi}>{fitIllustration}</span>
-              <i />
-              <i />
-            </div>
-          </div>
-          <h3>Core Matching Skills</h3>
-          <p className={styles.skillsSubtitle}>The strongest capabilities supporting this fit.</p>
-
-          <div className={styles.skillsList}>
-            {visibleSkills.map((skill) => (
-              <Chip className={styles.skillChip} kind="info" key={skill.itemId}>
-                {skill.displayLabel || skill.originalText}
-              </Chip>
-            ))}
-            {additionalSkillCount ? <span className={styles.moreSkillsChip} title={remainingSkills}>+{additionalSkillCount} more</span> : null}
-          </div>
-        </section>
-
-        <section
-          className={`${styles.bentoCard} ${styles.evidenceSection}`}
-          id="live-requirements-evidence"
-        >
-          <div className={styles.sectionHeader}>
-            <div>
-              <span className={styles.reportEyebrow}>
-                Requirements & Evidence Mapping
-              </span>
-              <h3>Evidence Behind the Match</h3>
-            </div>
-
-            <Chip
-              className={styles.guidanceChip}
-              icon="touch_app"
-              kind="info"
-            >
-              Tap a requirement to view its portfolio evidence
-            </Chip>
-          </div>
-
-          <div className={styles.requirementsList}>
-              {requirements.map((requirement) => {
-                const cluster = findClusterForItem(requirement.clusterIds);
-                const isOpen = openRequirementIds.has(requirement.itemId);
-
-                return (
-                  <article
-                    className={`${styles.requirementDisclosure} ${isOpen ? styles.activeRequirement : ""}`}
-                    key={requirement.itemId}
-                  >
-                    <button
-                      className={styles.requirementItem}
-                      type="button"
-                      aria-expanded={isOpen}
-                      aria-controls={`evidence-${requirement.itemId}`}
-                      onClick={() => {
-                        setOpenRequirementIds((current) => {
-                          const next = new Set(current);
-                          if (next.has(requirement.itemId)) next.delete(requirement.itemId);
-                          else next.add(requirement.itemId);
-                          return next;
-                        });
-                      }}
-                    >
-                      <span className={styles.requirementIcon} aria-hidden="true">
-                        <span className={styles.msi}>
-                        {requirement.impact === "gap"
-                          ? "warning"
-                          : requirement.matchType === "direct"
-                            ? "verified"
-                            : "link"}
-                        </span>
-                      </span>
-
-                      <span className={styles.requirementCopy}>
-                        <strong title={requirement.displayLabel || requirement.originalText}>
-                          {requirement.displayLabel || requirement.originalText}
-                        </strong>
-
-                        <small title={requirement.shortRationale}>{requirement.shortRationale}</small>
-
-                        <Chip
-                          className={styles.matchChip}
-                          kind="info"
-                          tone={matchTones[requirement.matchType]}
-                        >
-                          {matchLabels[requirement.matchType]} ·{" "}
-                          {requirement.evidenceConfidence.replaceAll("-", " ")}
-                        </Chip>
-                      </span>
-
-                      <span className={`${styles.msi} ${styles.requirementChevron}`} aria-hidden="true">
-                        expand_more
-                      </span>
-                    </button>
-
-                    <div className={styles.requirementPanelWrap} id={`evidence-${requirement.itemId}`} aria-hidden={!isOpen}>
-                      <div className={styles.requirementPanelInner}>
-                        {cluster ? <LiveEvidencePanel cluster={cluster} /> : (
-                          <div className={styles.noEvidenceState}>
-                            <span className={styles.msi} aria-hidden="true">search_off</span>
-                            <strong>No verified portfolio evidence found</strong>
-                            <p>This requirement is not supported by the approved portfolio evidence.</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-        </section>
-
-        <ListCard
-          id="live-top-strengths"
-          icon="check_circle"
-          title="Top Strengths"
-          items={strengths}
-          tone="strength"
-        />
-
-        <ListCard
-          id="live-key-gaps"
-          icon="warning"
-          title="Key Gaps"
-          items={gaps}
-          tone="gap"
-          emptyTitle="No material gaps detected"
-          emptyBody="Based on the submitted role and available evidence."
-        />
-
-        <section className={styles.ctaSection} id="live-role-fit-contact">
-          <p>{report.disclaimer.text}</p>
-
-          {report.contactCta.enabled && report.contactCta.href ? (
-          <a href={report.contactCta.href} className={styles.ctaButton}>
-            <span className={styles.msi} aria-hidden="true">
-              mail
-            </span>
-            <span>{report.contactCta.label}</span>
-          </a>
-          ) : null}
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function LiveEvidencePanel({
-  cluster,
-}: {
-  cluster: ReportUIPayload["evidencePanel"]["clusters"][number];
-}) {
-  const hasLink = cluster.destination.mode !== "no-link";
-
-  return (
-    <div className={styles.projectContent}>
-      <div>
-        <div className={styles.verifiedLabel}>
-          <span className={styles.msi} aria-hidden="true">
-            folder_open
-          </span>
-          Verified Portfolio Evidence
-        </div>
-
-        <h4>{cluster.project?.title || cluster.title}</h4>
-        <p>{cluster.summary}</p>
-
-      </div>
-
-      {hasLink ? (
-        <a
-          href={cluster.destination.mode === "no-link" ? "#" : cluster.destination.href}
-          className={styles.projectLink}
-        >
-          <span>
-            View Case Study
-          </span>
-
-          <span className={styles.msi} aria-hidden="true">
-            arrow_forward
-          </span>
-        </a>
-      ) : (
-        <p className={`${styles.projectLink} ${styles.sourceLabel}`}>
-          Source: {cluster.title}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Stat({ icon, label, value }: { icon: string; label: string; value: string }) {
-  return (
-    <div className={styles.statCard}>
-      <div><span className={styles.msi} aria-hidden="true">{icon}</span></div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-type ReportListItem = string | Pick<ReportUIPayload["requirementMapping"]["items"][number], "displayLabel" | "originalText" | "shortRationale">;
-
-function ListCard({
-  id,
-  icon,
-  title,
-  items,
-  tone,
-  emptyTitle,
-  emptyBody,
-}: {
-  id: string;
-  icon: string;
-  title: string;
-  items: ReportListItem[];
-  tone: "strength" | "gap";
-  emptyTitle?: string;
-  emptyBody?: string;
-}) {
-  const hasItems = items.length > 0;
-
-  return (
-    <section className={`${styles.bentoCard} ${styles.listCard}`} id={id}>
-      <h3 className={tone === "strength" ? styles.strengthTitle : styles.gapTitle}>
-        <span className={styles.msi} aria-hidden="true">{icon}</span>
-        {title}
-      </h3>
-      {hasItems ? (
-        <ul>
-        {items.map((item) => {
-          const label = typeof item === "string" ? item : item.displayLabel || item.originalText;
-          const rationale = typeof item === "string" ? "" : item.shortRationale;
-
-          return (
-          <li key={`${label}-${rationale}`}>
-            <span className={styles.msi} aria-hidden="true">{tone === "strength" ? "check_circle" : "error"}</span>
-            <span>
-              <strong>{label}</strong>
-              {rationale ? <small>{rationale}</small> : null}
-            </span>
-          </li>
-          );
-        })}
-      </ul>
-      ) : (
-        <div className={styles.emptyGapState}>
-          <strong>{emptyTitle ?? "No items to show"}</strong>
-          {emptyBody ? <p>{emptyBody}</p> : null}
-        </div>
-      )}
-    </section>
   );
 }
