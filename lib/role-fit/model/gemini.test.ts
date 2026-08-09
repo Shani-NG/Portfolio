@@ -27,7 +27,7 @@ function geminiResponse(text: string, finishReason: string) {
 describe("Gemini chat completion guard", () => {
   it("keeps only complete sentences and never returns a trailing fragment", () => {
     assert.equal(completeChatAnswer("First complete sentence. Second complete sentence. unfinished"), "First complete sentence. Second complete sentence.");
-    assert.equal(completeChatAnswer("שמחה שהצלחנו להתחבר. אני"), null);
+    assert.equal(completeChatAnswer("שמחה שהצלחנו להתחבר. אני"), "שמחה שהצלחנו להתחבר.");
   });
 
   it("retries MAX_TOKENS once with a larger plain-text budget", async () => {
@@ -66,7 +66,7 @@ describe("Gemini chat completion guard", () => {
     let requestCount = 0;
     globalThis.fetch = async () => {
       requestCount += 1;
-      return geminiResponse("I can help with that. What would you like to explore next?", "STOP");
+      return geminiResponse("What would you like to explore next?", "STOP");
     };
 
     const result = await createGeminiRoleFitProvider().generateChat({
@@ -78,11 +78,11 @@ describe("Gemini chat completion guard", () => {
 
     assert.equal(result.ok, true);
     if (!result.ok) return;
-    assert.equal(result.answer, "I can help with that. What would you like to explore next?");
+    assert.equal(result.answer, "What would you like to explore next?");
     assert.equal(requestCount, 1);
   });
 
-  it("returns a complete fallback when the retry is still truncated", async () => {
+  it("returns the complete sentence when a retry ends with a trailing fragment", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3-flash-preview";
     globalThis.fetch = async () => geminiResponse("שמחה שהצלחנו להתחבר. אני", "MAX_TOKENS");
@@ -96,7 +96,7 @@ describe("Gemini chat completion guard", () => {
 
     assert.equal(result.ok, true);
     if (!result.ok) return;
-    assert.equal(result.answer, "לא הצלחתי להשלים תשובה אמינה ברגע זה. אפשר לנסות שוב, והקשר השיחה יישמר.");
+    assert.equal(result.answer, "שמחה שהצלחנו להתחבר.");
   });
 
   it("retries a MAX_TOKENS report once and rejects a second truncated JSON response", async () => {

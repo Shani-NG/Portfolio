@@ -2,6 +2,7 @@ import { createRoleValidationResult } from "./eligibility.ts";
 
 type RoleSectionKind = "description" | "responsibilities" | "requirements" | "preferred";
 export type RoleClarificationField = "company" | "title" | "responsibilities" | "requirements";
+export type RoleCorrection = { field: RoleClarificationField; value: string };
 
 const roleSectionHeadings: Array<{ kind: RoleSectionKind; labels: string[] }> = [
   { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity", "Overview"] },
@@ -157,6 +158,44 @@ export function isValidRoleClarificationAnswer(field: RoleClarificationField, va
 
 export function mergeRoleClarification(roleText: string, field: RoleClarificationField, value: string): string {
   return [roleText.trim(), `${clarificationLabels[field]}: ${value.trim()}`].filter(Boolean).join("\n");
+}
+
+export function detectRoleCorrection(message: string): RoleCorrection | null {
+  const english = message.match(/\b(?:actually|correction|change|update|instead)\b[^\n]{0,50}?\b(title|role|company|responsibilities|requirements)\b\s*(?:is|to|:)?\s+(.+)/i);
+  if (english) {
+    const field = english[1].toLowerCase() === "role"
+      ? "title"
+      : (english[1].toLowerCase() as RoleClarificationField);
+    const value = english[2].trim().replace(/[.!?]+$/, "");
+    return value ? { field, value } : null;
+  }
+
+  const hebrew = message.match(/(?:בעצם|תיקון|שינוי)[^\n]{0,50}?(שם המשרה|התפקיד|החברה|האחריות|הדרישות)\s*(?:הוא|היא|ל|:)?\s+(.+)/);
+  if (!hebrew) return null;
+
+  const fieldByLabel: Record<string, RoleClarificationField> = {
+    "שם המשרה": "title",
+    "התפקיד": "title",
+    "החברה": "company",
+    "האחריות": "responsibilities",
+    "הדרישות": "requirements",
+  };
+  const value = hebrew[2].trim().replace(/[.!?]+$/, "");
+  return value ? { field: fieldByLabel[hebrew[1]], value } : null;
+}
+
+export function applyRoleCorrection(roleText: string, correction: RoleCorrection): string {
+  const labels: Record<RoleClarificationField, RegExp> = {
+    company: /^(?:Company|Organization):.*$/im,
+    title: /^(?:Title|Role):.*$/im,
+    responsibilities: /^(?:Responsibilities|Responsibility|Key Responsibilities):.*$/im,
+    requirements: /^(?:Requirements|Qualifications|Skills):.*$/im,
+  };
+  const replacement = `${clarificationLabels[correction.field]}: ${correction.value}`;
+
+  return labels[correction.field].test(roleText)
+    ? roleText.replace(labels[correction.field], replacement)
+    : [roleText.trim(), replacement].filter(Boolean).join("\n");
 }
 
 export function resolveRoleTextForValidation(input: {

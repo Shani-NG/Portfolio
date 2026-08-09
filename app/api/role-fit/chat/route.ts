@@ -3,9 +3,29 @@ import { join } from "node:path";
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
+import {
+  clarificationLimitAnswer,
+  existingReportAnswer,
+  looksLikeNewReportRequest,
+  looksLikeRoleSubmissionSetup,
+  maxRoleClarificationAttempts,
+  missingDetailsAnswer,
+  readyForReportAnswer,
+  reportLimitAnswer,
+  roleSubmissionSetupAnswer,
+} from "@/lib/role-fit/conversation/behavior";
 import { logRoleFitEvent, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
-import { inferRoleFamily, isValidRoleClarificationAnswer, looksLikeReportIntent, looksLikeRoleInput, resolveRoleTextForValidation, validateRoleText } from "@/lib/role-fit/server/role-understanding";
+import {
+  applyRoleCorrection,
+  detectRoleCorrection,
+  inferRoleFamily,
+  isValidRoleClarificationAnswer,
+  looksLikeReportIntent,
+  looksLikeRoleInput,
+  resolveRoleTextForValidation,
+  validateRoleText,
+} from "@/lib/role-fit/server/role-understanding";
 
 const pendingFieldSchema = z.enum(["company", "title", "responsibilities", "requirements"]);
 
@@ -16,6 +36,8 @@ const requestSchema = z
     message: z.string().min(1),
     language: z.enum(["he", "en", "mixed"]).default("en"),
     repeatedInput: z.boolean().optional().default(false),
+    clarificationAttempts: z.number().int().nonnegative().max(10).optional().default(0),
+    completedReportCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional().default(0),
     conversationContext: z.string().optional(),
     reportContext: z.string().optional(),
     roleContext: z
@@ -41,57 +63,6 @@ async function loadApprovedConversationContext() {
   );
 
   return contents.join("\n\n---\n\n");
-}
-
-function isHebrew(language: "he" | "en" | "mixed") {
-  return language === "he" || language === "mixed";
-}
-
-function missingFieldQuestion(missingField: string | undefined, language: "he" | "en" | "mixed") {
-  if (isHebrew(language)) {
-    if (missingField === "title") return "מה שם המשרה?";
-    if (missingField === "responsibilities") return "אפשר להוסיף את תחומי האחריות המרכזיים?";
-    if (missingField === "requirements") return "אפשר להוסיף את הדרישות או הכישורים המרכזיים?";
-    return "איזה פרט מרכזי חסר במשרה?";
-  }
-
-  if (missingField === "title") return "What is the role title?";
-  if (missingField === "responsibilities") return "Please add the main responsibilities section.";
-  if (missingField === "requirements") return "Please add the main requirements or qualifications.";
-  return "What key role detail is still missing?";
-}
-
-function readyForReportAnswer(input: { title: string; companyName?: string; language: "he" | "en" | "mixed"; repeatedInput: boolean }) {
-  if (isHebrew(input.language)) {
-    const roleLabel = input.title ? ` עבור "${input.title}"` : "";
-    const companyLabel = input.companyName ? ` ב-${input.companyName}` : "";
-    return input.repeatedInput
-      ? `יש לי כבר מספיק מידע${roleLabel}${companyLabel}. שנמשיך לדוח?`
-      : `יש לי את כל מה שאני צריכה כדי לייצר דוח${roleLabel}${companyLabel}. שנמשיך?`;
-  }
-
-  const roleLabel = input.title ? ` for "${input.title}"` : "";
-  const companyLabel = input.companyName ? ` at ${input.companyName}` : "";
-  return input.repeatedInput
-    ? `I already have enough role detail${roleLabel}${companyLabel}. Shall I generate the report?`
-    : `I have everything I need to generate a report${roleLabel}${companyLabel}. Shall we continue?`;
-}
-
-function missingDetailsAnswer(input: { missingField: string | undefined; language: "he" | "en" | "mixed"; repeatedInput: boolean }) {
-  const question = missingFieldQuestion(input.missingField, input.language);
-  if (isHebrew(input.language)) {
-    return input.repeatedInput
-      ? `זה נראה אותו טקסט. ${question}`
-      : `אני יכולה לנתח את המשרה, אבל חסר פרט אחד. ${question}`;
-  }
-
-  return input.repeatedInput
-    ? `This appears unchanged. ${question}`
-    : `I can analyze this role, but one key detail is still missing. ${question}`;
-}
-
-function looksLikeRoleSubmissionSetup(message: string) {
-  return /\b(upload|paste|provide|add|send)\b.*\b(job|role|description|jd|details)\b/i.test(message) || /להעלות|להדביק|להזין|לשלוח|משרה|תיאור תפקיד/.test(message);
 }
 
 export async function POST(request: Request) {
@@ -126,29 +97,60 @@ export async function POST(request: Request) {
   const roleContext = parsedRequest.data.roleContext;
   const pendingRoleField = roleContext?.pendingField;
   const isFieldClarification = Boolean(roleContext && pendingRoleField && !hasRoleInput);
+  const roleCorrection = roleContext && !pendingRoleField
+    ? detectRoleCorrection(parsedRequest.data.message)
+    : null;
+  const isRoleCorrection = Boolean(roleCorrection);
   const { conversationId, sessionId } = parsedRequest.data;
 
+  if (
+    parsedRequest.data.completedReportCount >= 2
+    && hasReportIntent
+    && (!parsedRequest.data.reportContext || looksLikeNewReportRequest(parsedRequest.data.message))
+  ) {
+    return NextResponse.json({
+      state: parsedRequest.data.reportContext ? "report-ready" : "general-qa",
+      answer: reportLimitAnswer(parsedRequest.data.language),
+      safeMessageKey: "report.limit_reached",
+    });
+  }
+
+  if (parsedRequest.data.reportContext && parsedRequest.data.repeatedInput && hasRoleInput) {
+    return NextResponse.json({
+      state: "report-ready",
+      answer: existingReportAnswer(parsedRequest.data.language),
+      roleText: roleContext?.roleText,
+      safeMessageKey: "report.existing_role",
+    });
+  }
+
   if (roleContext && pendingRoleField && isFieldClarification && !isValidRoleClarificationAnswer(pendingRoleField, parsedRequest.data.message)) {
+    const clarificationExhausted = parsedRequest.data.clarificationAttempts + 1 >= maxRoleClarificationAttempts;
     return NextResponse.json({
       state: "awaiting-role-completion",
-      answer: missingDetailsAnswer({
-        missingField: pendingRoleField,
-        language: parsedRequest.data.language,
-        repeatedInput: false,
-      }),
+      answer: clarificationExhausted
+        ? clarificationLimitAnswer(parsedRequest.data.language)
+        : missingDetailsAnswer({
+            missingField: pendingRoleField,
+            language: parsedRequest.data.language,
+            repeatedInput: false,
+          }),
       roleText: roleContext.roleText,
-      pendingField: pendingRoleField,
+      pendingField: clarificationExhausted ? null : pendingRoleField,
+      clarificationExhausted,
       safeMessageKey: "role.invalid_clarification",
     });
   }
 
-  const roleTextForValidation = resolveRoleTextForValidation({
-    message: parsedRequest.data.message,
-    savedRoleText: roleContext?.roleText,
-    pendingField: pendingRoleField,
-    hasRoleInput,
-    hasReportIntent,
-  });
+  const roleTextForValidation = roleCorrection && roleContext
+    ? applyRoleCorrection(roleContext.roleText, roleCorrection)
+    : resolveRoleTextForValidation({
+        message: parsedRequest.data.message,
+        savedRoleText: roleContext?.roleText,
+        pendingField: pendingRoleField,
+        hasRoleInput,
+        hasReportIntent,
+      });
 
   if (roleTextForValidation.length > policy.maxInputChars) {
     return NextResponse.json(
@@ -164,14 +166,12 @@ export async function POST(request: Request) {
   if (!parsedRequest.data.reportContext && !roleContext && !hasRoleInput && looksLikeRoleSubmissionSetup(parsedRequest.data.message)) {
     return NextResponse.json({
       state: "awaiting-role-completion",
-      answer: isHebrew(parsedRequest.data.language)
-        ? "מעולה. אפשר להעלות קובץ או להדביק כאן את טקסט המשרה, ואני אקח את זה משם."
-        : "Great. You can upload a file or paste the role text here, and I will take it from there.",
+      answer: roleSubmissionSetupAnswer(parsedRequest.data.language),
       safeMessageKey: "role.awaiting_input",
     });
   }
 
-  if (!parsedRequest.data.reportContext && (hasReportIntent || hasRoleInput || isFieldClarification)) {
+  if (hasRoleInput || isFieldClarification || isRoleCorrection || (!parsedRequest.data.reportContext && hasReportIntent)) {
     const validation = validateRoleText({
       conversationId,
       traceId,
@@ -182,7 +182,6 @@ export async function POST(request: Request) {
     if (validation.parseStatus === "valid-complete") {
       const title = validation.roleDraft.title?.originalValue ?? "";
       const companyName = validation.roleDraft.company?.originalValue;
-      const autoApproveReport = isFieldClarification;
       after(async () => {
         await Promise.all([
           logRoleFitEvent({
@@ -215,20 +214,16 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         state: "awaiting-report-confirmation",
-        answer: autoApproveReport
-          ? isHebrew(parsedRequest.data.language)
-            ? "תודה, כל הפרטים הנדרשים הושלמו. אני מפיקה את הדוח עכשיו."
-            : "Thanks, all required details are complete. I am generating the report now."
-          : readyForReportAnswer({
-              title,
-              companyName,
-              language: parsedRequest.data.language,
-              repeatedInput: parsedRequest.data.repeatedInput,
-            }),
+        answer: readyForReportAnswer({
+          title,
+          companyName,
+          language: parsedRequest.data.language,
+          repeatedInput: parsedRequest.data.repeatedInput,
+        }),
         validation,
         roleText: roleTextForValidation,
         pendingField: null,
-        autoApproveReport,
+        clarificationExhausted: false,
         safeMessageKey: "role.ready_for_confirmation",
       });
     }
@@ -265,16 +260,21 @@ export async function POST(request: Request) {
       ]);
     });
 
+    const clarificationExhausted = parsedRequest.data.clarificationAttempts + 1 >= maxRoleClarificationAttempts;
+
     return NextResponse.json({
       state: "awaiting-role-completion",
-      answer: missingDetailsAnswer({
-        missingField,
-        language: parsedRequest.data.language,
-        repeatedInput: parsedRequest.data.repeatedInput,
-      }),
+      answer: clarificationExhausted
+        ? clarificationLimitAnswer(parsedRequest.data.language)
+        : missingDetailsAnswer({
+            missingField,
+            language: parsedRequest.data.language,
+            repeatedInput: parsedRequest.data.repeatedInput,
+          }),
       validation,
       roleText: roleTextForValidation,
-      pendingField: missingField,
+      pendingField: clarificationExhausted ? null : missingField,
+      clarificationExhausted,
       safeMessageKey: "role.missing_required_fields",
     });
   }

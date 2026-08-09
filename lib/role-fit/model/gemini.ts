@@ -159,8 +159,8 @@ export function completeChatAnswer(answer: string): string | null {
   const normalized = answer.replace(/\s+/g, " ").trim();
   const completeSentences = normalized.match(/[^.!?…]+[.!?…]+/gu)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
 
-  if (completeSentences.length < 2) return null;
-  return completeSentences.slice(0, 5).join(" ");
+  if (completeSentences.length < 1) return null;
+  return completeSentences.slice(0, 3).join(" ");
 }
 
 function safeChatFallback(language: RoleFitChatInput["language"]): string {
@@ -225,7 +225,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         const retry = await generateGeminiContent({
           apiKey,
           models: getCandidateModels(model),
-          prompt: `${prompt}\n\n---\n\nReturn a fresh, concise answer of 2-5 short complete sentences. End every sentence with punctuation and do not stop mid-sentence.`,
+          prompt: `${prompt}\n\n---\n\nReturn a fresh, concise answer of 1-3 short complete sentences. One complete sentence is valid. End every sentence with punctuation and do not stop mid-sentence.`,
           maxOutputTokens: Math.max(input.maxOutputTokens * 2, 1800),
           temperature: 0.2,
           thinkingLevel: "low",
