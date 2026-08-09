@@ -1,6 +1,6 @@
 import type { ReportUIPayload } from "../contracts/index.ts";
 
-export type RoleFitModelProviderName = "mock" | "gemini";
+export type RoleFitModelProviderName = "gemini";
 
 export type QualitativeReportAnalysis = {
   fitLevel: "strong" | "good" | "partial" | "insufficient" | "out-of-scope";
