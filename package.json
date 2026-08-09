@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test lib/access.test.ts",
+    "test": "node --test lib/access.test.ts lib/role-fit/model/index.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

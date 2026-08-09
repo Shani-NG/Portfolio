@@ -49,31 +49,6 @@
   white-space: nowrap;
 }
 
-.stateBar {
-  align-items: center;
-  background: color-mix(in srgb, var(--rf-surface) 88%, transparent);
-  border: 1px solid var(--rf-border);
-  border-radius: 999px;
-  display: flex;
-  gap: 10px;
-  left: 24px;
-  padding: 8px 12px;
-  position: fixed;
-  top: calc(var(--site-header-height) + 12px);
-  width: fit-content;
-  z-index: 20;
-}
-
-.stateBar select {
-  background: var(--rf-bg);
-  border: 1px solid var(--rf-border);
-  border-radius: 999px;
-  color: var(--rf-text-primary);
-  font: inherit;
-  min-height: 34px;
-  padding: 0 34px 0 12px;
-}
-
 .stickyReportChip {
   align-items: center;
   background: var(--rf-rose-500);
@@ -208,7 +183,6 @@
 .iconToolBtn,
 .submitBtn,
 .chipItem,
-.fitButton,
 .requirementItem {
   font: inherit;
 }
@@ -499,23 +473,6 @@
   color: var(--rf-text-secondary);
   font-size: 12px;
   margin: 4px 0 0 44px;
-}
-
-.fitModeControl {
-  background: var(--rf-surface);
-  border: 1px solid var(--rf-border);
-  border-radius: 18px;
-  display: flex;
-  font-size: 12px;
-  gap: 4px;
-  padding: 4px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.fitButton {
-  flex: 1 1 auto;
-  min-height: 1.875rem;
 }
 
 .reportGrid {
@@ -1116,15 +1073,6 @@
     justify-content: center;
   }
 
-  .fitModeControl {
-    flex-direction: column;
-  }
-
-  .fitModeControl {
-    align-items: stretch;
-    border-radius: 16px;
-  }
-
   .roleSnapshot,
   .skillsCard,
   .listCard,
@@ -1161,18 +1109,6 @@
 
   .mobileBackChip {
     bottom: 16px;
-  }
-
-  .stateBar {
-    left: 12px;
-    right: 12px;
-    top: calc(var(--site-header-height) + 8px);
-    width: auto;
-  }
-
-  .stateBar select {
-    min-width: 0;
-    width: 100%;
   }
 
   .heroSection {

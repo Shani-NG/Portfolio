@@ -4,12 +4,9 @@ import { Chip } from "@/components/ui/chip";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
 
-type RoleFitScreenState = "home" | "conversation" | "missing-details" | "generating" | "error" | "report";
-type RoleFitDisplayMode = "live" | RoleFitScreenState;
-type FitMode = "strong" | "good" | "partial";
 type MatchType =
   | "direct"
   | "semantic"
@@ -24,16 +21,6 @@ type LiveReportState = {
   model?: string;
   report?: ReportUIPayload;
 };
-
-const screenOptions: { value: RoleFitDisplayMode; label: string }[] = [
-  { value: "live", label: "Live agent" },
-  { value: "home", label: "Simulation - initial entry" },
-  { value: "conversation", label: "Simulation - conversation started" },
-  { value: "missing-details", label: "Simulation - missing job details" },
-  { value: "generating", label: "Simulation - generating report" },
-  { value: "error", label: "Simulation - report generation failed" },
-  { value: "report", label: "Simulation - fit report" },
-];
 
 const reportRequestTimeoutMs = 65_000;
 
@@ -60,251 +47,6 @@ function reportFailureMessage(result: ReportFailureResult): string {
 
   return result.safeMessage ?? "I could not complete a reliable evidence-based report. Your role details are preserved, so you can try again.";
 }
-
-const evidenceProjects = [
-  {
-    title: "C4I - Beyond Clarity",
-    desc: "Optimizing data density and visual hierarchy in multi-system command & control platforms. A comprehensive design that translated sheer complexity into a single source of truth.",
-    insight: "Redesigned the tactical UI hierarchy, reducing target identification time by 40%.",
-    link: "/experience/c4i-beyond-clarity#before-ux-organizational-alignment",
-    icon: "verified",
-  },
-  {
-    title: "AI Starts Before the Model",
-    desc: "Comprehensive workflow mapping integrating artificial intelligence, focusing on human intent and preparedness prior to model deployment.",
-    insight: "Structured a progressive disclosure workflow that mitigated critical decision errors caused by AI hallucinations.",
-    link: "/experience/nobody-reads-the-manual#foundation-phase",
-    icon: "auto_awesome",
-  },
-  {
-    title: "The Big RED BUTTON",
-    desc: "Led end-to-end research and design to minimize critical enterprise system downtime via a rapid disaster-recovery module.",
-    insight: "Slashed troubleshooting steps from 12 separate interventions to 3 intuitive actions.",
-    link: "/experience/the-big-red-button#translating-infrastructure-into-operational-meaning",
-    icon: "terminal",
-  },
-  {
-    title: "Monitoring & Product Intelligence",
-    desc: "Built advanced tracking dashboards translating anecdotal user feedback into structured product intelligence metrics for accurate feature prioritization.",
-    insight: "Established unified product telemetry views, accelerating cross-functional alignment by 30%.",
-    link: "/experience/monitoring-product-intelligence",
-    icon: "groups",
-  },
-  {
-    title: "UX from the Heart",
-    desc: "A highly critical medical system used in operating theatres, blending rigorous clinical safety compliance with rapid usability.",
-    insight: "Engineered a hands-on tactile workflow that avoids cognitive load or distraction for surgeons under high operational pressure.",
-    link: "/experience/ux-from-the-heart",
-    icon: "health_and_safety",
-  },
-];
-
-const fitModes = {
-  strong: {
-    badgeText: "Strong Fit",
-    score: "82",
-    confidence: "High",
-    summary: "Most core responsibilities are supported by direct or strong semantic evidence from complex systems work.",
-    skillsRatio: "9 / 10",
-    skillsOffset: 30,
-    skills: ["UX Strategy", "AI Integration", "Systems Design", "User Research", "Fast Prototyping", "Team Alignment", "Data Analysis", "Agile Design Ops", "Clinical UX Standards"],
-    matchedRatio: "8 / 10",
-    coreCoverage: "80%",
-    expRequired: "8+ years",
-    requirements: [
-      {
-        label: "Lead UX strategy for complex enterprise systems",
-        detail: "Direct evidence from C4I product alignment, research, information architecture, and system-wide UX governance.",
-        matchType: "direct",
-        confidence: "High",
-        projectIndex: 0,
-      },
-      {
-        label: "Integrate AI-enabled workflows into product operations",
-        detail: "Strong semantic evidence from pre-model workflow mapping, human oversight, and progressive disclosure decisions.",
-        matchType: "semantic",
-        confidence: "Medium",
-        projectIndex: 1,
-      },
-      {
-        label: "Translate technical architecture into usable operational tools",
-        detail: "Direct evidence from system-health, diagnostics, and service-level recovery flows.",
-        matchType: "direct",
-        confidence: "High",
-        projectIndex: 2,
-      },
-      {
-        label: "Align product, engineering, research, and leadership",
-        detail: "Direct evidence from design-system alignment, telemetry-based decisions, and cross-functional product rituals.",
-        matchType: "direct",
-        confidence: "High",
-        projectIndex: 3,
-      },
-      {
-        label: "Work in regulated or safety-sensitive product contexts",
-        detail: "Transferable evidence from mission-critical and medical-system environments, with some domain-specific details still unverified.",
-        matchType: "transferable",
-        confidence: "Medium",
-        projectIndex: 4,
-      },
-    ],
-    strengths: [
-      "AI product leadership in complex enterprise & defense domains",
-      "End-to-end product strategy, execution, & agentic UX",
-      "Cross-functional alignment & executive influence",
-      "Experience with regulated & mission-critical environments",
-      "User-centered design thinking backed by product metrics",
-    ],
-    gaps: [
-      "Limited direct experience in specific clinical healthcare domains",
-      "No exposure to strict hospital EHR integration workflows",
-      "Vendor management at massive global scale",
-    ],
-    ctaText: "Strong Fit - Let's build something great together! (Contact)",
-  },
-  good: {
-    badgeText: "Good Fit",
-    score: "64",
-    confidence: "Medium",
-    summary: "There is meaningful overlap, but several responsibilities rely on transferable evidence rather than direct proof.",
-    skillsRatio: "7 / 10",
-    skillsOffset: 90,
-    skills: ["UX Strategy", "Systems Design", "User Research", "Fast Prototyping", "Team Alignment", "Data Analysis", "Agile Design Ops"],
-    matchedRatio: "7 / 10",
-    coreCoverage: "65%",
-    expRequired: "8+ years",
-    requirements: [
-      {
-        label: "Shape product direction from ambiguous requirements",
-        detail: "Strong semantic evidence across C4I and knowledge-management work, especially around turning complexity into structure.",
-        matchType: "semantic",
-        confidence: "High",
-        projectIndex: 0,
-      },
-      {
-        label: "Facilitate research and stakeholder alignment",
-        detail: "Direct evidence exists, but the target role may require a different operating cadence or company scale.",
-        matchType: "direct",
-        confidence: "Medium",
-        projectIndex: 3,
-      },
-      {
-        label: "Prototype and validate workflow concepts quickly",
-        detail: "Transferable evidence from operational and KMS flows; implementation depth should be clarified in conversation.",
-        matchType: "transferable",
-        confidence: "Medium",
-        projectIndex: 1,
-      },
-      {
-        label: "Own AI product execution end to end",
-        detail: "Partial evidence: strong workflow thinking, but the current public portfolio does not fully prove model-side ownership.",
-        matchType: "partial",
-        confidence: "Low",
-        projectIndex: 1,
-      },
-      {
-        label: "Operate inside a highly specific domain stack",
-        detail: "Insufficient evidence for the exact stack; related systems experience should not be presented as a direct match.",
-        matchType: "insufficient",
-        confidence: "Low",
-        projectIndex: 2,
-      },
-    ],
-    strengths: [
-      "Proven systems strategy across mission-critical products",
-      "Strong cross-functional alignment with engineering & research",
-      "Solid foundation in user research and rapid prototyping",
-      "Track record of shipping in regulated environments",
-    ],
-    gaps: [
-      "Less hands-on depth with non-AI tooling in the target stack",
-      "Split between execution and high-level strategy needs clarifying",
-      "Direct agentic AI workflow experience still developing",
-    ],
-    ctaText: "Good Fit - Let's schedule an introductory call! (Contact)",
-  },
-  partial: {
-    badgeText: "Partial Match",
-    score: "38",
-    confidence: "Low",
-    summary: "Relevant capabilities exist, but the available evidence does not cover enough of the role's core requirements.",
-    skillsRatio: "5 / 10",
-    skillsOffset: 150,
-    skills: ["UX Strategy", "Systems Design", "User Research", "Team Alignment", "Fast Prototyping"],
-    matchedRatio: "4 / 10",
-    coreCoverage: "45%",
-    expRequired: "8+ years",
-    requirements: [
-      {
-        label: "Lead strategic UX discovery",
-        detail: "Transferable evidence exists across complex systems, but it may not match the exact domain or seniority expectations.",
-        matchType: "transferable",
-        confidence: "Medium",
-        projectIndex: 0,
-      },
-      {
-        label: "Build production-grade AI product systems",
-        detail: "Partial evidence only: workflow architecture is visible, but hands-on AI system delivery is not fully proven.",
-        matchType: "partial",
-        confidence: "Low",
-        projectIndex: 1,
-      },
-      {
-        label: "Own frontend implementation",
-        detail: "Insufficient evidence. The portfolio supports UX strategy and product translation, not a software-engineering claim.",
-        matchType: "insufficient",
-        confidence: "Low",
-        projectIndex: 2,
-      },
-      {
-        label: "Navigate safety-sensitive product constraints",
-        detail: "Transferable evidence from medical and mission-critical work, but role-specific compliance requirements need validation.",
-        matchType: "transferable",
-        confidence: "Medium",
-        projectIndex: 4,
-      },
-      {
-        label: "Run cross-functional workshops and alignment",
-        detail: "Direct evidence appears across portfolio work and remains one of the stronger supported areas.",
-        matchType: "direct",
-        confidence: "High",
-        projectIndex: 3,
-      },
-    ],
-    strengths: [
-      "Solid strategic UX foundation transferable across domains",
-      "Strong team alignment and stakeholder facilitation skills",
-      "Fast prototyping capability for early-stage validation",
-    ],
-    gaps: [
-      "Frontend development fluency required vs. close R&D sync unclear",
-      "Limited exposure to this product's specific technical domain",
-      "First-quarter success metrics not yet clearly defined",
-    ],
-    ctaText: "Partial Match - Let's talk and explore the potential! (Contact)",
-  },
-} satisfies Record<FitMode, {
-  badgeText: string;
-  score: string;
-  confidence: "High" | "Medium" | "Low";
-  summary: string;
-  skillsRatio: string;
-  skillsOffset: number;
-  skills: string[];
-  matchedRatio: string;
-  coreCoverage: string;
-  expRequired: string;
-  requirements: {
-    label: string;
-    detail: string;
-    matchType: MatchType;
-    confidence: "High" | "Medium" | "Low";
-    projectIndex: number;
-  }[];
-  strengths: string[];
-  gaps: string[];
-  ctaText: string;
-}>;
 
 const matchLabels: Record<MatchType, string> = {
   direct: "Direct evidence",
@@ -341,10 +83,6 @@ function detectSessionLanguage(message: string, session: RoleFitLiveSession) {
 }
 
 export default function RoleFitPage() {
-  const [displayMode, setDisplayMode] = useState<RoleFitDisplayMode>("live");
-  const [screenState, setScreenState] = useState<RoleFitScreenState>("home");
-  const [fitMode, setFitMode] = useState<FitMode>("strong");
-  const [activeProject, setActiveProject] = useState<number | null>(null);
   const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => getRoleFitLiveSession());
   const [roleInput, setRoleInput] = useState("");
   const [apiStatusMessage, setApiStatusMessage] = useState("");
@@ -352,24 +90,17 @@ export default function RoleFitPage() {
   const [isReportRequestInFlight, setIsReportRequestInFlight] = useState(false);
   const [liveReportState, setLiveReportState] = useState<LiveReportState | null>(null);
   const reportRequestInFlightRef = useRef(false);
-  const fit = fitModes[fitMode];
-  const selectedProject = activeProject === null ? null : evidenceProjects[activeProject];
   const reportLimitReached = liveSession.completedReportCount >= 2;
-  const isLiveMode = displayMode === "live";
   const hasLiveReport = Boolean(liveSession.reportPayload);
   const liveSplitCanvas = liveSession.state === "generating-report" || liveSession.state === "recoverable-error" || liveSession.state === "report-ready";
-
-  const simulationSplitCanvas = screenState === "generating" || screenState === "error" || screenState === "report";
-  const splitCanvas = isLiveMode ? liveSplitCanvas : simulationSplitCanvas;
-  const hasConversation = isLiveMode ? liveSession.messages.length > 0 || liveSession.state !== "initial" : screenState !== "home";
+  const splitCanvas = liveSplitCanvas;
+  const hasConversation = liveSession.messages.length > 0 || liveSession.state !== "initial";
   const reportActionLabel = reportLimitReached
     ? "Sorry, that is it for now. You are welcome to contact me."
-    : isLiveMode && hasLiveReport
+    : hasLiveReport
       ? "Show report"
-    : isLiveMode && liveSession.pendingReportConfirmation
+    : liveSession.pendingReportConfirmation
       ? "Generate confirmed report"
-      : !isLiveMode && screenState === "report"
-      ? "Create a new report"
       : "Generate report";
 
   function syncLiveSession(update: Partial<RoleFitLiveSession>) {
@@ -387,7 +118,7 @@ export default function RoleFitPage() {
   async function submitLiveMessage(textOverride?: string) {
     const submittedText = (textOverride ?? roleInput).trim();
     if (!submittedText || isSending) return;
-    if (isLiveMode && liveSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
+    if (liveSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
       appendLiveMessage({ role: "user", content: submittedText });
       setRoleInput("");
       await requestReport();
@@ -468,11 +199,6 @@ export default function RoleFitPage() {
   }
 
   async function requestReport(sessionOverride?: RoleFitLiveSession) {
-    if (!isLiveMode) {
-      setScreenState("report");
-      return;
-    }
-
     const reportSession = sessionOverride ?? liveSession;
 
     if (reportRequestInFlightRef.current) return;
@@ -501,7 +227,6 @@ export default function RoleFitPage() {
       return;
     }
 
-    setActiveProject(null);
     setApiStatusMessage("");
     setLiveReportState(null);
     reportRequestInFlightRef.current = true;
@@ -595,7 +320,7 @@ export default function RoleFitPage() {
   }, []);
 
   useEffect(() => {
-    if (!isLiveMode || !liveSplitCanvas) return;
+    if (!liveSplitCanvas) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -603,61 +328,24 @@ export default function RoleFitPage() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isLiveMode, liveSplitCanvas]);
+  }, [liveSplitCanvas]);
 
-  const chatMessages = useMemo(() => {
-    if (isLiveMode) return liveSession.messages;
-    if (screenState === "home") return [];
-
-    const messages = [
-      { role: "user", content: "I pasted a Senior UX Strategist role and want to understand the fit." },
-      { role: "agent", content: "Received. I am analyzing Shani's documented UX strategy & AI workflow cases against your query." },
-    ];
-
-    if (screenState === "missing-details") {
-      messages.push({ role: "agent", content: apiStatusMessage || "Please upload a file or paste job details so we can generate a high-quality report." });
-    }
-
-    if (screenState === "error") {
-      messages.push({ role: "agent", content: apiStatusMessage || "I could not generate a reliable report from the provided input. Please add role requirements, responsibilities, or expected outcomes." });
-    }
-
-    return messages;
-  }, [apiStatusMessage, isLiveMode, liveSession.messages, screenState]);
+  const chatMessages = liveSession.messages;
 
   return (
-    <main className={isLiveMode && liveSplitCanvas ? `${styles.roleFitPage} ${styles.liveSplitPage}` : styles.roleFitPage}>
-      <section className={styles.stateBar} aria-label="Role Fit preview state">
-        <select
-          id="role-fit-state"
-          aria-label="Role Fit preview state"
-          value={displayMode}
-          onChange={(event) => {
-            const nextMode = event.target.value as RoleFitDisplayMode;
-            setDisplayMode(nextMode);
-            if (nextMode !== "live") setScreenState(nextMode);
-          }}
-        >
-          {screenOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </section>
-
-      {!(isLiveMode && hasLiveReport) ? <button
-        className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, isLiveMode && styles.liveReportAction].filter(Boolean).join(" ")}
+    <main className={liveSplitCanvas ? `${styles.roleFitPage} ${styles.liveSplitPage}` : styles.roleFitPage}>
+      {!hasLiveReport ? <button
+        className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, styles.liveReportAction].filter(Boolean).join(" ")}
         aria-label={reportActionLabel}
         type="button"
-        disabled={isLiveMode ? reportLimitReached || isReportRequestInFlight : false}
+        disabled={reportLimitReached || isReportRequestInFlight}
         title={reportActionLabel}
         onClick={() => void requestReport()}
       >
-        {isLiveMode ? "Generate Report" : <span className={styles.msi} aria-hidden="true">{screenState === "report" ? "add" : "arrow_forward"}</span>}
+        Generate Report
       </button> : null}
       {splitCanvas ? (
-        <button className={styles.mobileBackChip} type="button" onClick={() => isLiveMode ? syncLiveSession({ state: "general-qa" }) : setScreenState("conversation")}>
+        <button className={styles.mobileBackChip} type="button" onClick={() => syncLiveSession({ state: "general-qa" })}>
           <span className={styles.msi} aria-hidden="true">arrow_back</span>
           Back to chat
         </button>
@@ -679,26 +367,26 @@ export default function RoleFitPage() {
               <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                 <span className={styles.msi} aria-hidden="true">add</span>
               </button>
-              <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isLiveMode && (isSending || !roleInput.trim())} onClick={() => isLiveMode ? void submitLiveMessage() : setScreenState("conversation")}>
+              <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
                 <span className={styles.msi} aria-hidden="true">arrow_forward</span>
               </button>
             </div>
           </div>
 
           <div className={styles.chipsRow}>
-            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="upload_file" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to upload a job description for validation.") : setScreenState("conversation")} title="Upload a job description" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending} icon="upload_file" kind="action" onClick={() => void submitLiveMessage("I want to upload a job description for validation.")} title="Upload a job description" tone="primary">
               <span className={styles.fullChipLabel}>Upload a job description</span><span className={styles.shortChipLabel} aria-hidden="true">Upload</span>
             </Chip>
-            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="content_paste" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("I want to paste job details for validation.") : setScreenState("conversation")} title="Paste job details" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending} icon="content_paste" kind="action" onClick={() => void submitLiveMessage("I want to paste job details for validation.")} title="Paste job details" tone="primary">
               <span className={styles.fullChipLabel}>Paste job details</span><span className={styles.shortChipLabel} aria-hidden="true">Paste</span>
             </Chip>
-            <Chip className={styles.chipItem} disabled={isLiveMode && isSending} icon="travel_explore" kind="action" onClick={() => isLiveMode ? void submitLiveMessage("Explore my experience") : setScreenState("conversation")} title="Explore my experience" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending} icon="travel_explore" kind="action" onClick={() => void submitLiveMessage("Explore my experience")} title="Explore my experience" tone="primary">
               <span className={styles.fullChipLabel}>Explore my experience</span><span className={styles.shortChipLabel} aria-hidden="true">Explore</span>
             </Chip>
           </div>
         </section>
       ) : (
-        <section className={isLiveMode && liveSplitCanvas ? `${styles.agentViewContainer} ${styles.liveSplitWorkspace}` : styles.agentViewContainer} id="role-fit-workspace" aria-label="Role Fit workspace">
+        <section className={liveSplitCanvas ? `${styles.agentViewContainer} ${styles.liveSplitWorkspace}` : styles.agentViewContainer} id="role-fit-workspace" aria-label="Role Fit workspace">
           <div className={`${styles.chatPane} ${splitCanvas ? styles.compactHiddenChat : styles.fullWidth}`}>
             <div className={styles.chatHistory}>
               {chatMessages.map((message, index) => (
@@ -706,7 +394,7 @@ export default function RoleFitPage() {
                   {message.content}
                 </div>
               ))}
-              {isLiveMode && isSending ? (
+              {isSending ? (
                 <div className={styles.thinkingIndicator} role="status" aria-label="Agent is thinking">
                   <span aria-hidden="true" />
                 </div>
@@ -724,7 +412,7 @@ export default function RoleFitPage() {
                 <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
                   <span className={styles.msi} aria-hidden="true">add</span>
                 </button>
-                <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isLiveMode && (isSending || !roleInput.trim())} onClick={() => isLiveMode ? void submitLiveMessage() : requestReport()}>
+                <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
                   <span className={styles.msi} aria-hidden="true">arrow_forward</span>
                 </button>
               </div>
@@ -733,8 +421,8 @@ export default function RoleFitPage() {
 
           {splitCanvas ? (
             <aside className={styles.canvasPane} aria-label="Role Fit report canvas">
-              {(isLiveMode ? liveSession.state === "generating-report" : screenState === "generating") ? (
-                <div className={styles.generatingState} id="role-fit-generating" role={isLiveMode ? "status" : undefined} aria-live={isLiveMode ? "polite" : undefined}>
+              {liveSession.state === "generating-report" ? (
+                <div className={styles.generatingState} id="role-fit-generating" role="status" aria-live="polite">
                   <div className={styles.generatingBars} aria-hidden="true">
                     <div className={styles.genBar} />
                     <div className={styles.genBar} />
@@ -742,13 +430,13 @@ export default function RoleFitPage() {
                   </div>
                   <p>Analyzing job requirements & matching Evidence Cards...</p>
                 </div>
-              ) : (isLiveMode ? liveSession.state === "recoverable-error" : screenState === "error") ? (
-                <div className={styles.errorState} id="role-fit-error" role={isLiveMode ? "alert" : undefined}>
+              ) : liveSession.state === "recoverable-error" ? (
+                <div className={styles.errorState} id="role-fit-error" role="alert">
                   <span className={styles.msi} aria-hidden="true">error</span>
-                  <h2>{isLiveMode ? "The live agent needs attention" : "Report could not be generated"}</h2>
-                  <p>{apiStatusMessage || (isLiveMode ? "The session is preserved. Please continue in the chat or try again." : "The job description does not include enough role requirements or responsibility context for an evidence-based fit report.")}</p>
+                  <h2>The live agent needs attention</h2>
+                  <p>{apiStatusMessage || "The session is preserved. Please continue in the chat or try again."}</p>
                 </div>
-              ) : isLiveMode ? (
+              ) : (
                 <LiveReportCanvas
                   liveReportState={{
                     report: liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined,
@@ -756,8 +444,6 @@ export default function RoleFitPage() {
                     model: liveReportState?.model ?? liveSession.reportModel,
                   }}
                 />
-              ) : (
-                <RoleFitReport fitMode={fitMode} setFitMode={setFitMode} fit={fit} selectedProject={selectedProject} activeProject={activeProject} setActiveProject={setActiveProject} />
               )}
             </aside>
           ) : null}
@@ -1134,171 +820,6 @@ function LiveEvidencePanel({
           Source: {cluster.title}
         </p>
       )}
-    </div>
-  );
-}
-
-function RoleFitReport({
-  fitMode,
-  setFitMode,
-  fit,
-  selectedProject,
-  activeProject,
-  setActiveProject,
-}: {
-  fitMode: FitMode;
-  setFitMode: (mode: FitMode) => void;
-  fit: (typeof fitModes)[FitMode];
-  selectedProject: (typeof evidenceProjects)[number] | null;
-  activeProject: number | null;
-  setActiveProject: (index: number) => void;
-}) {
-  const reportToneClass = fitMode === "strong" ? styles.fitStrong : fitMode === "good" ? styles.fitGood : styles.fitPartial;
-
-  return (
-    <div className={`${styles.reportShell} ${reportToneClass}`} id="role-fit-report">
-      <header className={styles.reportHeader}>
-        <div>
-          <div className={styles.reportBrand}>
-            <div className={styles.avatar}>S</div>
-            <h1>Shani Nakash-Gomel - Smart Role Fit</h1>
-          </div>
-          <p>Smart Role Fit engine linking real job requirements directly to verified portfolio case studies</p>
-        </div>
-
-        <div className={styles.fitModeControl} aria-label="Fit mode">
-          {(["strong", "good", "partial"] as const).map((mode) => (
-            <Chip className={styles.fitButton} key={mode} kind="action" onClick={() => setFitMode(mode)} selected={fitMode === mode} tone={mode === "strong" ? "success" : mode === "good" ? "secondary" : "warning"}>
-              {fitModes[mode].badgeText}
-            </Chip>
-          ))}
-        </div>
-      </header>
-
-      <div className={styles.reportGrid}>
-        <section className={`${styles.bentoCard} ${styles.roleSnapshot}`} id="analyzed-job-profile">
-          <div className={styles.snapshotTop}>
-            <div>
-              <span className={styles.reportEyebrow}>Analyzed Job Profile</span>
-              <h2>Senior UX Strategist</h2>
-              <p><span className={styles.msi} aria-hidden="true">business</span> Google Cloud Group</p>
-            </div>
-            <Chip className={styles.fitBadge} kind="info">{fit.badgeText}</Chip>
-          </div>
-          <p className={styles.fitSummary}>{fit.summary}</p>
-          <div className={styles.statsGrid}>
-            <Stat icon="speed" label="Estimated Fit Score" value={fit.score} />
-            <Stat icon="verified" label="Evidence Coverage" value={fit.matchedRatio} />
-            <Stat icon="psychology" label="Core Skills Coverage" value={fit.coreCoverage} />
-            <Stat icon="fact_check" label="Evidence Confidence" value={fit.confidence} />
-          </div>
-        </section>
-
-        <section className={`${styles.bentoCard} ${styles.skillsCard}`} id="skills-match">
-          <div className={styles.progressWrap}>
-            <svg viewBox="0 0 112 112" aria-hidden="true">
-              <circle cx="56" cy="56" r="48" stroke="var(--rf-border)" strokeWidth="8" fill="transparent" />
-              <circle className={styles.progressCircle} cx="56" cy="56" r="48" stroke="var(--rf-fit-color)" strokeWidth="8" fill="transparent" strokeDasharray="301.59" strokeDashoffset={fit.skillsOffset} />
-            </svg>
-            <div>
-              <strong>{fit.skillsRatio}</strong>
-              <span>Skills Match</span>
-            </div>
-          </div>
-          <h3>Core Matching Skills</h3>
-          <div className={styles.skillsList}>
-            {fit.skills.map((skill) => <Chip className={styles.skillChip} kind="info" key={skill}>{skill}</Chip>)}
-          </div>
-        </section>
-
-        <section className={`${styles.bentoCard} ${styles.evidenceSection}`} id="requirements-evidence">
-          <div className={styles.sectionHeader}>
-            <div>
-              <span className={styles.reportEyebrow}>Requirements & Evidence Mapping</span>
-              <h3>Top 5 Requirements & Responsibilities vs Portfolio Projects</h3>
-            </div>
-            <Chip className={styles.guidanceChip} icon="touch_app" kind="info">Tap a requirement to see the matching proof</Chip>
-          </div>
-
-          <div className={styles.evidenceGrid}>
-            <div className={styles.requirementsList}>
-              {fit.requirements.map((requirement) => {
-                const project = evidenceProjects[requirement.projectIndex];
-                const isActive = activeProject === requirement.projectIndex;
-                return (
-                  <div className={styles.requirementDisclosure} key={requirement.label}>
-                    <button className={isActive ? `${styles.requirementItem} ${styles.activeRequirement}` : styles.requirementItem} type="button" aria-expanded={isActive} onClick={() => setActiveProject(requirement.projectIndex)}>
-                      <span className={styles.msi} aria-hidden="true">{project.icon}</span>
-                      <span>
-                        <strong>{requirement.label}</strong>
-                        <small>{requirement.detail}</small>
-                        <Chip className={styles.matchChip} kind="info" tone={matchTones[requirement.matchType]}>
-                          {matchLabels[requirement.matchType]} - {requirement.confidence} confidence
-                        </Chip>
-                      </span>
-                      <span className={styles.msi} aria-hidden="true">{isActive ? "expand_more" : "chevron_right"}</span>
-                    </button>
-                    {isActive ? (
-                      <div className={styles.inlineProjectPanel}>
-                        <ProjectEvidencePanel project={project} />
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className={styles.projectPanel}>
-              {selectedProject ? (
-                <ProjectEvidencePanel project={selectedProject} />
-              ) : (
-                <div className={styles.emptyProjectState}>
-                  <div className={styles.skeletonHint}>
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <div><span className={styles.msi} aria-hidden="true">touch_app</span></div>
-                  </div>
-                  <p>Pick a requirement to see it in action</p>
-                  <small>Its matching case study will show up right here.</small>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <ListCard id="top-strengths" icon="check_circle" title="Top Strengths" items={fit.strengths} tone="strength" />
-        <ListCard id="key-gaps" icon="warning" title="Key Gaps" items={fit.gaps} tone="gap" />
-
-        <section className={styles.ctaSection} id="role-fit-contact">
-          <p>This report is generated based on semantic analysis of job requirements and verified candidate evidence.</p>
-          <a href="/contact" className={styles.ctaButton}>
-            <span className={styles.msi} aria-hidden="true">chat_bubble</span>
-            <span>{fit.ctaText}</span>
-          </a>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function ProjectEvidencePanel({ project }: { project: (typeof evidenceProjects)[number] }) {
-  return (
-    <div className={styles.projectContent}>
-      <div>
-        <div className={styles.verifiedLabel}><span className={styles.msi} aria-hidden="true">folder_open</span> Verified Portfolio Evidence</div>
-        <h4>{project.title}</h4>
-        <p>{project.desc}</p>
-        <div className={styles.insightBox}>
-          <strong>Strategic Decision Made:</strong>
-          <span>{project.insight}</span>
-        </div>
-      </div>
-      <a href={project.link} className={styles.projectLink}>
-        <span>Go to Full Portfolio Project</span>
-        <span className={styles.msi} aria-hidden="true">arrow_forward</span>
-      </a>
     </div>
   );
 }

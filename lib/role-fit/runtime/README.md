@@ -25,7 +25,6 @@ These values are configured in Vercel and may be changed without altering the pr
 
 Model selection is also environment-driven:
 
-- `ROLE_FIT_MODEL_PROVIDER`
 - `GOOGLE_AI_STUDIO_MODEL`
 - `GOOGLE_AI_STUDIO_CHAT_MODEL`
 - `GOOGLE_AI_STUDIO_ANALYSIS_MODEL`
