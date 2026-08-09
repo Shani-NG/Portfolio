@@ -493,7 +493,7 @@ export const kmsCaseStudy = {
       "Dashboard redesign.",
     ],
     editorToMobile: [
-      "/assets/case-studies/nobody-reads-the-manual/editor-to-mobile.png",
+      "/assets/case-studies/nobody-reads-the-manual/editor-to-mobile-dark.png",
       "Editor to mobile translation.",
     ],
     process: [

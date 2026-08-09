@@ -6383,6 +6383,309 @@
   }
 }
 
+/* Case study graphics polish: approved section-level adjustments. */
+.c4iHtmlPage .c4iFusionCard {
+  gap: clamp(1.5rem, 4vw, 2.25rem);
+  margin-bottom: var(--ds-space-lg);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.c4iHtmlPage .c4iMergeViz,
+.c4iHtmlPage .c4iMergeFrame {
+  overflow: visible;
+  background: #0b0b0d;
+}
+
+.c4iHtmlPage .c4iIconCard > span {
+  width: 4.125rem;
+  height: 4.125rem;
+  border-radius: 50%;
+}
+
+.c4iHtmlPage .c4iIconCard > span .c4iIcon {
+  font-size: 1.65rem;
+}
+
+.c4iHtmlPage .c4iThreatCard {
+  display: grid;
+  justify-items: end;
+  margin-bottom: var(--ds-space-xl);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.c4iHtmlPage .c4iThreatCard .c4iFlowSteps {
+  width: min(100%, 38rem);
+}
+
+.c4iHtmlPage .c4iProofRows {
+  margin-top: var(--ds-space-2xl);
+}
+
+.c4iHtmlPage .c4iProofRow {
+  align-items: center;
+}
+
+.c4iHtmlPage .c4iProofVisual {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.c4iHtmlPage .c4iProofVisual img {
+  object-position: center;
+}
+
+.c4iHtmlPage .c4iProofRow:nth-child(2) .c4iProofVisual {
+  width: 100%;
+}
+
+.monitoringOverviewStack {
+  grid-template-columns: 1fr;
+}
+
+.monitoringOverviewStack .monitoringSectionHead {
+  max-width: 48rem;
+}
+
+.monitoringOverviewStack .monitoringVisual {
+  width: min(100%, 64rem);
+  margin-inline: auto;
+}
+
+.monitoringPersonalGrid,
+.monitoringDeepDiveThree,
+.monitoringMeasurementGrid {
+  display: grid;
+  grid-template-columns: minmax(18rem, 1fr) minmax(0, 1fr);
+  gap: clamp(2.5rem, 6vw, 4.5rem);
+  align-items: center;
+}
+
+.monitoringCardsCopy,
+.monitoringMeasurementCopy {
+  min-width: 0;
+}
+
+.monitoringCardsCopy .monitoringCardGridTwo,
+.monitoringCardsCopy .monitoringCardGridThree {
+  grid-template-columns: 1fr;
+  margin-top: var(--ds-space-xl);
+}
+
+.monitoringDeepDiveThree .monitoringCardsCopy {
+  order: 1;
+}
+
+.monitoringDeepDiveThree > .monitoringVisual {
+  order: 2;
+  width: 100%;
+}
+
+.monitoringMeasurementCopy > .monitoringVisual {
+  width: 100%;
+  margin-top: var(--ds-space-xl);
+}
+
+.monitoringClosing > .monitoringWrap,
+.monitoringClosing .monitoringSectionHead {
+  justify-items: center;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.kmsHero h1 {
+  font-size: var(--ds-type-display-48-size);
+  line-height: var(--ds-type-display-48-line);
+}
+
+.kmsSnapshotLead h2,
+.kmsSection h2,
+.kmsClosing h2 {
+  font-size: var(--ds-type-heading-28-size);
+  line-height: var(--ds-type-heading-28-line);
+}
+
+.kmsProblemCard {
+  position: relative;
+  min-height: 12rem;
+  overflow: hidden;
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.kmsProblemCard > span {
+  position: absolute;
+  top: -0.12em;
+  right: 0.04em;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  color: var(--kms-accent);
+  font-family: var(--font-display);
+  font-size: var(--ds-type-display-64-size);
+  line-height: 1;
+  opacity: 0.08;
+}
+
+.kmsProblemCard > div {
+  position: relative;
+  z-index: 1;
+}
+
+.kmsDashboardVisual,
+.kmsPhoneVisual,
+.kmsValidationVisual,
+.kmsGuidanceVisual {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.kmsDashboardVisual img,
+.kmsGuidanceVisual img {
+  transition: transform var(--ds-duration-fast) var(--ds-ease-standard), filter var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.kmsGuidanceInner {
+  grid-template-columns: minmax(18rem, 1fr) minmax(0, 1fr);
+  align-items: center;
+}
+
+.kmsGuidanceVisual {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 100%;
+}
+
+.kmsGuidanceHeader,
+.kmsGuidanceCards {
+  grid-column: 2;
+  width: 100%;
+  max-width: none;
+  justify-items: start;
+  text-align: left;
+}
+
+.kmsGuidanceCards {
+  grid-template-columns: 1fr;
+}
+
+.kmsClosing > div {
+  text-align: center;
+}
+
+.kmsClosing p {
+  margin-inline: auto;
+}
+
+.epdSnapshotCard,
+.epdSnapshotCard:nth-child(1),
+.epdSnapshotCard:nth-child(2),
+.epdSnapshotCard:nth-child(3),
+.epdSnapshotCard:nth-child(4),
+.epdSnapshotCard:nth-child(5) {
+  display: flex;
+  white-space: nowrap;
+}
+
+.epdSnapshot dt {
+  grid-column: auto;
+}
+
+.epdSnapshot {
+  width: min(100%, 52rem);
+  margin-inline: auto;
+}
+
+.epdRoleMedia,
+.epdTimelineVisual,
+.epdPrincipleVisual {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.epdRoleMedia {
+  width: 100%;
+}
+
+.epdCompareWrap,
+.epdDriverGrid {
+  width: 100%;
+  max-width: none;
+}
+
+.epdTimeline article > div {
+  display: grid;
+  gap: var(--ds-space-sm);
+  align-content: center;
+}
+
+.epdTimeline article > div > span {
+  margin-bottom: var(--ds-space-xs);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kmsDashboardVisual:hover img,
+  .kmsGuidanceVisual:hover img {
+    filter: drop-shadow(0 0 1rem color-mix(in srgb, var(--kms-accent) 18%, transparent));
+    transform: scale(1.025);
+  }
+}
+
+@media (max-width: 68rem) {
+  .monitoringPersonalGrid,
+  .monitoringDeepDiveThree,
+  .monitoringMeasurementGrid,
+  .kmsGuidanceInner {
+    grid-template-columns: 1fr;
+  }
+
+  .monitoringDeepDiveThree .monitoringCardsCopy,
+  .monitoringDeepDiveThree > .monitoringVisual,
+  .kmsGuidanceVisual,
+  .kmsGuidanceHeader,
+  .kmsGuidanceCards {
+    grid-column: auto;
+    grid-row: auto;
+    order: unset;
+  }
+}
+
+@media (max-width: 48rem) {
+  .c4iHtmlPage .c4iFusionCard {
+    grid-template-columns: 1fr;
+  }
+
+  .c4iHtmlPage .c4iThreatCard .c4iFlowSteps {
+    width: 100%;
+  }
+
+  .epdSnapshotCard,
+  .epdSnapshotCard:nth-child(1),
+  .epdSnapshotCard:nth-child(2),
+  .epdSnapshotCard:nth-child(3),
+  .epdSnapshotCard:nth-child(4),
+  .epdSnapshotCard:nth-child(5) {
+    overflow: visible;
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kmsDashboardVisual img,
+  .kmsGuidanceVisual img {
+    transition: none;
+  }
+}
+
 /* Task 01: case-study graphics and image fidelity polish. */
 .c4iHtmlPage .c4iAlignCard {
   position: relative;
@@ -6803,5 +7106,63 @@
   .c4iHtmlPage .c4iAlignCard,
   .kmsVisualImage {
     transition: none;
+  }
+}
+
+/* Final cascade alignment for the approved graphics-polish pass. */
+.c4iHtmlPage .c4iProofRow {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.monitoringOverviewStack > .monitoringVisual {
+  width: min(100%, 64rem);
+}
+
+.monitoringPersonalGrid {
+  grid-template-columns: minmax(18rem, 1.1fr) minmax(0, 0.9fr);
+}
+
+.kmsDashboardVisual,
+.kmsPhoneVisual,
+.kmsValidationVisual,
+.kmsGuidanceVisual {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.kmsProblemCard > span {
+  background: transparent;
+}
+
+.epdSnapshotCard,
+.epdSnapshotCard:nth-child(1),
+.epdSnapshotCard:nth-child(2),
+.epdSnapshotCard:nth-child(3),
+.epdSnapshotCard:nth-child(4),
+.epdSnapshotCard:nth-child(5) {
+  display: flex;
+  white-space: nowrap;
+}
+
+.epdSnapshot dt {
+  grid-column: auto;
+}
+
+@media (max-width: 68rem) {
+  .c4iHtmlPage .c4iProofRow,
+  .monitoringPersonalGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 48rem) {
+  .epdSnapshotCard,
+  .epdSnapshotCard:nth-child(1),
+  .epdSnapshotCard:nth-child(2),
+  .epdSnapshotCard:nth-child(3),
+  .epdSnapshotCard:nth-child(4),
+  .epdSnapshotCard:nth-child(5) {
+    white-space: normal;
   }
 }

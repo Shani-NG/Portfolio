@@ -108,6 +108,22 @@
   margin: 0;
 }
 
+.reportVisual {
+  position: relative;
+  width: min(100%, 38rem);
+  aspect-ratio: 798 / 1128;
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: clamp(1rem, 2vw, 1.5rem);
+  background: var(--ds-color-surface-raised);
+  box-shadow: var(--ds-shadow-lg);
+}
+
+.reportVisual :global(img) {
+  object-fit: contain;
+}
+
 .visualPlaceholder {
   display: grid;
   min-height: clamp(24rem, 42vw, 38rem);

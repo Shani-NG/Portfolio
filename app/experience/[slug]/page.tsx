@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ImageCompare } from "@/components/experience/image-compare";
+import { KmsProcessGallery } from "@/components/experience/kms-process-gallery";
 import { ContextFab } from "@/components/site/context-fab";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { MaterialIcon } from "@/components/ui/material-icon";
@@ -149,6 +150,8 @@ const monitoringSections = [
     visualSrc: "/assets/case-studies/monitoring-product-intelligence/measurement-architecture.png",
     visualAlt: "Measurement architecture connecting behavioral analytics, UX benchmarks, and field context.",
     visualHeight: "medium",
+    secondaryVisualSrc: "/assets/case-studies/monitoring-product-intelligence/measurement-architecture-02.png",
+    secondaryVisualAlt: "Evidence stack connecting behavioral data, task benchmarks, perception measures, and field context.",
     columns: [
       ["Measurement Methods", ["Top-task success", "Time on task", "Single Ease Question or UMUX-Lite", "System Usability Scale", "Confidence intervals only where the sample and method support them"]],
       ["Evidence Stack", ["Behavioral Data", "Task Benchmark", "Perception Pulse", "Field Context"]],
@@ -277,19 +280,12 @@ function MonitoringCaseStudy() {
           return (
             <ScrollReveal mode="overlap" key={section.id}>
               <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
-                <div className={styles.monitoringWrap}>
-                  <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
-                  <MonitoringVisual src={section.visualSrc} alt={section.visualAlt} height={section.visualHeight} />
-                  <div className={styles.monitoringColumnGrid}>
-                    {section.columns.map(([title, items]) => (
-                      <article className={styles.monitoringInfoCard} key={title}>
-                        <h3>{title}</h3>
-                        <ul className={styles.monitoringList}>
-                          {items.map((item) => <li key={item}>{item}</li>)}
-                        </ul>
-                      </article>
-                    ))}
+                <div className={[styles.monitoringWrap, styles.monitoringMeasurementGrid].join(" ")}>
+                  <div className={styles.monitoringMeasurementCopy}>
+                    <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+                    <MonitoringVisual src={section.secondaryVisualSrc} alt={section.secondaryVisualAlt} height="short" />
                   </div>
+                  <MonitoringVisual src={section.visualSrc} alt={section.visualAlt} height={section.visualHeight} />
                 </div>
               </section>
             </ScrollReveal>
@@ -323,20 +319,24 @@ function MonitoringCaseStudy() {
         }
 
         if ("cards" in section) {
+          const isPersonalContext = section.id === "a-learning-system";
+          const isDeepDiveThree = section.id === "first-week-product-value";
           return (
             <ScrollReveal mode={index % 2 === 0 ? "creative" : "overlap"} key={section.id}>
               <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
-                <div className={styles.monitoringWrap}>
-                  <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+                <div className={[styles.monitoringWrap, isPersonalContext ? styles.monitoringPersonalGrid : isDeepDiveThree ? styles.monitoringDeepDiveThree : ""].join(" ")}>
                   <MonitoringVisual src={section.visualSrc} alt={section.visualAlt} height={section.visualHeight} />
-                  <div className={section.cards.length === 2 ? styles.monitoringCardGridTwo : styles.monitoringCardGridThree}>
-                    {section.cards.map(([title, body, icon]) => (
-                      <article className={styles.monitoringInfoCard} key={title}>
-                        <span className={styles.monitoringCardIcon}><MonitoringIcon name={icon} /></span>
-                        <h3>{title}</h3>
-                        <p>{body}</p>
-                      </article>
-                    ))}
+                  <div className={styles.monitoringCardsCopy}>
+                    <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+                    <div className={section.cards.length === 2 ? styles.monitoringCardGridTwo : styles.monitoringCardGridThree}>
+                      {section.cards.map(([title, body, icon]) => (
+                        <article className={styles.monitoringInfoCard} key={title}>
+                          <span className={styles.monitoringCardIcon}><MonitoringIcon name={icon} /></span>
+                          <h3>{title}</h3>
+                          <p>{body}</p>
+                        </article>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </section>
@@ -347,7 +347,7 @@ function MonitoringCaseStudy() {
         return (
           <ScrollReveal mode={index % 2 === 0 ? "creative" : "overlap"} key={section.id}>
             <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
-              <div className={[styles.monitoringWrap, styles.monitoringSplit, section.layout === "text-right" ? styles.monitoringSplitReverse : ""].join(" ")}>
+              <div className={[styles.monitoringWrap, styles.monitoringSplit, section.layout === "text-right" ? styles.monitoringSplitReverse : "", section.layout === "overview" ? styles.monitoringOverviewStack : ""].join(" ")}>
                 <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
                 <MonitoringVisual src={section.visualSrc} alt={section.visualAlt} height={section.visualHeight} />
               </div>
@@ -944,27 +944,11 @@ function C4iHtmlCaseStudy() {
               <p>In this kind of critical system, the most important moment is how people respond to threats. The decision was to build a support layer for defensive workflows: fast threat classification and system recommendations for operators, and a command dashboard for leaders managing the full picture.</p>
             </div>
 
-            <div className={styles.c4iThreatCard}>
-              <div>
-                <span>Threat Workflow</span>
-                <h3>Two views supporting one defensive process.</h3>
-                <div className={styles.c4iFlowSteps}>
-                  {["Detect", "Classify", "Confirm", "Respond"].map((step) => (
-                    <div className={styles.c4iFlowStep} key={step}><span />{step}</div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <span>Command Overview</span>
-                <h3>Manage the picture from above.</h3>
-                <div className={styles.c4iCommandPanel}>
-                  <small>Live Status</small>
-                  <div>
-                    <strong>6<small>Active threats</small></strong>
-                    <strong>3<small>Confirmed</small></strong>
-                    <strong>20s<small>Response time</small></strong>
-                  </div>
-                </div>
+            <div className={styles.c4iThreatCard} aria-label="Threat workflow iterations">
+              <div className={styles.c4iFlowSteps}>
+                {["Detect", "Classify", "Confirm", "Respond"].map((step) => (
+                  <div className={styles.c4iFlowStep} key={step}><span />{step}</div>
+                ))}
               </div>
             </div>
 
@@ -1004,24 +988,6 @@ function C4iHtmlCaseStudy() {
               <p>A major part of the work was translating technical structures I mapped: backend values, data structures, and system logic that defined what the operator needed to use and what the system should handle in the background.</p>
             </div>
 
-            <div className={styles.c4iEngFlow}>
-              <div className={styles.c4iEngPanel}>
-                <span>Manual source</span>
-                <i />
-                <i />
-                <i />
-                <p>Operational data from paperwork and external flows.</p>
-              </div>
-              <div className={styles.c4iEngMid}><C4iIcon name="swap_horiz" /><span>Field mapping</span></div>
-              <div className={[styles.c4iEngPanel, styles.c4iEngDark].join(" ")}>
-                <span>Structured operational form</span>
-                <i />
-                <i />
-                <i />
-                <p>Pre-filled, synchronized, and ready for user review.</p>
-              </div>
-            </div>
-
             <div className={styles.c4iNumCards}>
               {[
                 ["01", "Mapping", "Operational data mapping", "Each field was defined not only by the data it represented, but by which operational answer it needed to support."],
@@ -1035,19 +1001,8 @@ function C4iHtmlCaseStudy() {
                 </article>
               ))}
             </div>
-          </div>
-        </section>
-      </ScrollReveal>
 
-      <ScrollReveal mode="overlap">
-        <section className={[styles.c4iHtmlSection, styles.c4iWashSoft].join(" ")} id="screens-as-proof">
-          <div className={styles.c4iHtmlWrap}>
-            <div className={[styles.c4iSectionHead, styles.c4iSectionCenter].join(" ")}>
-              <Eyebrow as="div" className={styles.c4iHtmlEyebrow} icon={<C4iIcon name="verified" />}>Product Accountability</Eyebrow>
-              <h2>Screens as proof.</h2>
-              <p>Every visual element is a product decision: pressure handled, responsibility protected, ownership expressed, accountability preserved.</p>
-            </div>
-            <div className={styles.c4iProofRows}>
+            <div className={styles.c4iProofRows} id="screens-as-proof">
               {[
                 ["/assets/case-studies/c4i-beyond-clarity/screens-as-proof-01.png", "Awareness triggers action", "The interface made it possible to move from entry to awareness to coordinated action without losing context."],
                 ["/assets/case-studies/c4i-beyond-clarity/screens-as-proof-02.png", "Authority is visible", "Permissions, dependencies, and actions stayed aligned with the operational hierarchy behind them."],
@@ -1198,11 +1153,11 @@ function KmsSectionView({ section, index }: { section: KmsSection; index: number
               </div>
             ) : null}
           </div>
-          <div className={styles.kmsProcessGallery}>
-            <KmsVisualImage visual={kmsCaseStudy.visuals.processLeft} className={styles.kmsProcessVisual} />
-            <KmsVisualImage visual={kmsCaseStudy.visuals.process} className={styles.kmsProcessVisual} />
-            <KmsVisualImage visual={kmsCaseStudy.visuals.processRight} className={styles.kmsProcessVisual} />
-          </div>
+          <KmsProcessGallery items={[
+            { src: kmsCaseStudy.visuals.processLeft[0], alt: kmsCaseStudy.visuals.processLeft[1] },
+            { src: kmsCaseStudy.visuals.process[0], alt: kmsCaseStudy.visuals.process[1] },
+            { src: kmsCaseStudy.visuals.processRight[0], alt: kmsCaseStudy.visuals.processRight[1] },
+          ]} />
         </section>
       </ScrollReveal>
     );
@@ -1263,10 +1218,6 @@ function KmsSectionView({ section, index }: { section: KmsSection; index: number
                   );
                 })}
               </div>
-            </article>
-            <article className={styles.kmsInfoCard}>
-              <h3>{guidanceSection.secondaryTitle}</h3>
-              <p>{guidanceSection.secondaryBody}</p>
             </article>
           </div>
         </div>
@@ -1366,8 +1317,8 @@ function EpdModelVisual() {
 function EpdHeartVisual() {
   return (
     <EpdMediaFrame
-      src={`${epdReferenceBase}/epd-colored.png`}
-      alt="Clinical cardiac mapping views preserving established anatomy and ablation color conventions."
+      src={`${epdReferenceBase}/epd-fcs-and-physician-interaction.png`}
+      alt="Physician interacting with the cardiac mapping system during a clinical procedure."
       className={styles.epdPrincipleVisual}
       imageClassName={styles.epdMediaContain}
       sizes="(max-width: 48rem) 100vw, 44vw"

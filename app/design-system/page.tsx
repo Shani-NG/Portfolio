@@ -86,7 +86,7 @@ const typeScale = [
 export default function DesignSystemPage() {
   return (
     <main className={styles.page}>
-      <section className={styles.hero}>
+      <section className={styles.hero} id="design-system-overview">
         <p className={styles.eyebrow}>Design system preview</p>
         <h1>Elegant, soft and technical foundations.</h1>
         <p>
@@ -96,7 +96,7 @@ export default function DesignSystemPage() {
         </p>
       </section>
 
-      <section className={styles.section} aria-labelledby="foundations-title">
+      <section className={styles.section} aria-labelledby="foundations-title" id="foundations">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>01 Foundations</p>
           <h2 id="foundations-title">Semantic color roles</h2>
@@ -144,7 +144,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="grid-title">
+      <section className={styles.section} aria-labelledby="grid-title" id="responsive-grid">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>02 Layout grid</p>
           <h2 id="grid-title">One responsive geometry</h2>
@@ -168,7 +168,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="type-title">
+      <section className={styles.section} aria-labelledby="type-title" id="typography">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>03 Typography</p>
           <h2 id="type-title">Outfit as the system voice</h2>
@@ -190,7 +190,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="buttons-title">
+      <section className={styles.section} aria-labelledby="buttons-title" id="buttons">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>04 Buttons</p>
           <h2 id="buttons-title">One component, explicit variants</h2>
@@ -213,7 +213,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="eyebrow-title">
+      <section className={styles.section} aria-labelledby="eyebrow-title" id="eyebrows">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>05 Eyebrow</p>
           <h2 id="eyebrow-title">Small label, consistent signal</h2>
@@ -238,7 +238,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="cards-title">
+      <section className={styles.section} aria-labelledby="cards-title" id="cards">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>06 Reusable cards</p>
           <h2 id="cards-title">Flexible composition, not a fixed box</h2>
@@ -270,7 +270,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="chips-title">
+      <section className={styles.section} aria-labelledby="chips-title" id="chips">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>07 Chips</p>
           <h2 id="chips-title">Compact labels with clear behavior</h2>
@@ -307,7 +307,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="depth-title">
+      <section className={styles.section} aria-labelledby="depth-title" id="depth">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>08 Depth</p>
           <h2 id="depth-title">Quiet elevation hierarchy</h2>
@@ -321,7 +321,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="motion-title">
+      <section className={styles.section} aria-labelledby="motion-title" id="motion">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>09 Motion</p>
           <h2 id="motion-title">Four patterns, one motion language</h2>
@@ -337,7 +337,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="scroll-title">
+      <section className={styles.section} aria-labelledby="scroll-title" id="scroll-reveal">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>10 Scroll behavior</p>
           <h2 id="scroll-title">Three section modes</h2>
@@ -374,7 +374,7 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.darkPreview} data-ds-theme="dark" aria-labelledby="dark-title">
+      <section className={styles.darkPreview} data-ds-theme="dark" aria-labelledby="dark-title" id="dark-mode">
         <div className={styles.sectionIntro}>
           <p className={styles.eyebrow}>11 Dark mode check</p>
           <h2 id="dark-title">Same roles, different theme</h2>
