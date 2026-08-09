@@ -15,6 +15,11 @@
   }
   canvas {
     display: block;
+    width: min(100%, 700px);
+    height: auto;
+    max-height: 100%;
+    aspect-ratio: 1;
+    background: #0b0b0d;
   }
 </style>
 </head>
@@ -54,6 +59,7 @@ function hexToRgb(hex) {
 const rgbColors = colors.map(hexToRgb);
 
 let startTime = null;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function draw(now) {
   if (startTime === null) startTime = now;
@@ -134,7 +140,7 @@ function draw(now) {
     ctx.shadowBlur = 0;
   }
 
-  requestAnimationFrame(draw);
+  if (!reduceMotion) requestAnimationFrame(draw);
 }
 
 requestAnimationFrame(draw);

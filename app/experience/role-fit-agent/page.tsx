@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import styles from "./page.module.css";
@@ -222,10 +223,14 @@ export default function RoleFitAgentCaseStudyPage() {
           </div>
 
           <figure className={styles.heroVisual}>
-            <div className={styles.visualPlaceholder}>
-              <MaterialIcon name="description" />
-              <strong>Role Fit Report</strong>
-              <span>Approved report image placeholder</span>
+            <div className={styles.reportVisual}>
+              <Image
+                alt="Evidence-based Role Fit report interface"
+                fill
+                priority
+                sizes="(max-width: 64rem) 100vw, 48vw"
+                src="/assets/case-studies/role-fit-agent/report.png"
+              />
             </div>
             <figcaption>
               Evidence-based role-fit report interface.

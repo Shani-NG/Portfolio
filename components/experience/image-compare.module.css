@@ -17,11 +17,19 @@
 }
 
 .surface img {
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .after {
   clip-path: inset(0 calc(100% - var(--compare-position)) 0 0);
+}
+
+.beforeLabels {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  clip-path: inset(0 0 0 var(--compare-position));
+  pointer-events: none;
 }
 
 .scrim {
@@ -43,13 +51,13 @@
 }
 
 .labelGroupBefore {
-  left: 1rem;
-}
-
-.labelGroupAfter {
   right: 1rem;
   justify-items: end;
   text-align: right;
+}
+
+.labelGroupAfter {
+  left: 1rem;
 }
 
 .label {
@@ -183,11 +191,11 @@
   }
 
   .labelGroupBefore {
-    left: 0.75rem;
+    right: 0.75rem;
   }
 
   .labelGroupAfter {
-    right: 0.75rem;
+    left: 0.75rem;
   }
 
   .label {

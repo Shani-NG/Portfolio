@@ -34,6 +34,8 @@ export function ImageCompare({
       <div className={styles.root} style={style}>
         <div className={styles.surface}>
           <Image src={beforeSrc} alt={beforeAlt} fill sizes="(max-width: 48rem) 100vw, 72vw" />
+        </div>
+        <div className={styles.beforeLabels} aria-hidden="true">
           <div className={[styles.labelGroup, styles.labelGroupBefore].join(" ")}>
             <span className={[styles.label, styles.labelBefore].join(" ")}>{beforeLabel}</span>
             {beforeDescription ? <p className={styles.note}>{beforeDescription}</p> : null}
