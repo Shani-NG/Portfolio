@@ -1,8 +1,11 @@
 import { reportUIPayloadSchema, type ReportUIPayload, type RoleValidationResult } from "../contracts/index.ts";
+import { resolveApprovedEvidenceDestination } from "../knowledge/evidence-destinations.ts";
 import type { ApprovedEvidenceBundle } from "../knowledge/load-approved-evidence.ts";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
 
 type RoleDraft = RoleValidationResult["roleDraft"];
+type AnalysisItem = QualitativeReportAnalysis["items"][number];
+type ReportItem = ReportUIPayload["requirementMapping"]["items"][number];
 
 export type RoleAnalysisItem = {
   originalText: string;
@@ -39,6 +42,9 @@ const fitPresentation = {
   partial: { value: 45, illustrationKey: "fit-partial", colorToken: "fit.partial", label: "Partial fit" },
 } as const;
 
+const positiveMatchTypes = new Set<AnalysisItem["matchType"]>(["direct", "semantic", "transferable"]);
+const gapMatchTypes = new Set<AnalysisItem["matchType"]>(["partial", "insufficient-evidence", "real-gap"]);
+
 function splitSentences(value: string): string[] {
   return value.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) ?? [];
 }
@@ -46,7 +52,7 @@ function splitSentences(value: string): string[] {
 function conciseSentences(value: string, maxSentences: number, maxChars: number) {
   const sentences = splitSentences(value).slice(0, maxSentences);
   const text = (sentences.length ? sentences.join(" ") : value.replace(/\s+/g, " ").trim()).slice(0, maxChars).trim();
-  return text.replace(/[,:;–-]\s*$/, ".");
+  return text.replace(/[,:;-]\s*$/, ".");
 }
 
 function normalizeItemText(value: string, fallback: string, maxChars: number) {
@@ -63,6 +69,95 @@ function isNearDuplicate(a: string, b: string) {
   return overlap / Math.min(left.size, right.size) > 0.72;
 }
 
+function semanticRationale(item: AnalysisItem, language: "he" | "en" | "mixed") {
+  const base = normalizeItemText(item.shortRationale, "", 220);
+  if (item.matchType !== "semantic" && item.matchType !== "transferable") return base;
+
+  const labels = language === "he"
+    ? ["יכולת משותפת", "הבדל בהקשר", "למה ניתן לגישור", "טרם הוכח"]
+    : ["Shared capability", "Context difference", "Why bridgeable", "Not yet proven"];
+  const details = [item.sharedCapability, item.contextDifference, item.bridgeability, item.unproven]
+    .map((value, index) => `${labels[index]}: ${normalizeItemText(value ?? "", "", 120)}`);
+
+  return conciseSentences([base, ...details].filter(Boolean).join(". "), 5, 620);
+}
+
+function semanticDiagnostic(analysis: QualitativeReportAnalysis): string | null {
+  const gapEligibleItems = analysis.items.filter((item) => gapMatchTypes.has(item.matchType) && item.impact === "gap");
+  const limitationItems = analysis.items.filter((item) => gapMatchTypes.has(item.matchType));
+
+  for (const item of analysis.items) {
+    if (positiveMatchTypes.has(item.matchType) && item.impact === "gap") return "semantic:positive-match-marked-gap";
+    if (gapMatchTypes.has(item.matchType) && item.impact === "strength") return "semantic:limitation-marked-strength";
+    if (
+      (item.matchType === "semantic" || item.matchType === "transferable")
+      && (!item.sharedCapability || !item.contextDifference || !item.bridgeability || !item.unproven)
+    ) {
+      return "semantic:incomplete-semantic-rationale";
+    }
+  }
+
+  if (analysis.fitLevel === "partial" && gapEligibleItems.length === 0) {
+    return "semantic:partial-fit-without-gap";
+  }
+
+  if (
+    (analysis.fitLevel === "strong" || analysis.fitLevel === "good")
+    && gapEligibleItems.length === 0
+    && limitationItems.length > 0
+  ) {
+    return "semantic:unrepresented-limitation";
+  }
+
+  if (
+    (analysis.fitLevel === "strong" || analysis.fitLevel === "good")
+    && gapEligibleItems.length === 0
+    && (analysis.evidenceConfidence === "low" || analysis.evidenceConfidence === "insufficient")
+  ) {
+    return "semantic:low-confidence-without-gap";
+  }
+
+  const generatedText = [
+    analysis.fitRationale,
+    analysis.evidenceConfidenceRationale,
+    analysis.skillsCoverageLabel,
+    ...analysis.items.flatMap((item) => [item.displayLabel, item.shortRationale]),
+  ].join(" ");
+  if (/\b(hire|do not hire|don't hire|hiring recommendation|chance of (?:being hired|success))\b|להעסיק|לא להעסיק|המלצת גיוס|סיכויי קבלה/i.test(generatedText)) {
+    return "semantic:hiring-recommendation";
+  }
+  if (/\b(?:fit|compatibility|match)\s+(?:score|percentage)\b|\b(?:score|fit)\s*(?:of|:)\s*\d|\d+\s*%\s*(?:fit|match)/i.test(generatedText)) {
+    return "semantic:numeric-fit-score";
+  }
+
+  return null;
+}
+
+function dedupeReportItems(items: ReportItem[], maxItems: number) {
+  const selected: ReportItem[] = [];
+  for (const item of items) {
+    const label = item.normalizedConcept ?? item.displayLabel ?? item.originalText;
+    if (selected.some((candidate) => isNearDuplicate(label, candidate.normalizedConcept ?? candidate.displayLabel ?? candidate.originalText))) continue;
+    selected.push(item);
+    if (selected.length === maxItems) break;
+  }
+  return selected;
+}
+
+export function deriveTopStrengths(items: ReportItem[]) {
+  return dedupeReportItems(
+    items.filter((item) => positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.clusterIds.length > 0),
+    5,
+  );
+}
+
+export function deriveKeyGaps(items: ReportItem[]) {
+  return dedupeReportItems(
+    items.filter((item) => gapMatchTypes.has(item.matchType) && item.impact === "gap"),
+    3,
+  );
+}
+
 export function composeReportUIPayload(input: {
   analysis: QualitativeReportAnalysis;
   roleDraft: RoleDraft;
@@ -77,7 +172,10 @@ export function composeReportUIPayload(input: {
     return { ok: false, diagnostic: "composition:item-count" };
   }
 
-  const reportItems: ReportUIPayload["requirementMapping"]["items"] = [];
+  const semanticIssue = semanticDiagnostic(input.analysis);
+  if (semanticIssue) return { ok: false, diagnostic: semanticIssue };
+
+  const reportItems: ReportItem[] = [];
 
   for (const [position, analysisItem] of input.analysis.items.entries()) {
     const roleItem = roleItems[analysisItem.roleItemIndex];
@@ -91,21 +189,22 @@ export function composeReportUIPayload(input: {
       return { ok: false, diagnostic: "evidence:unapproved-source-id" };
     }
 
-    const requiresEvidence = ["direct", "semantic", "transferable", "partial"].includes(analysisItem.matchType);
+    const requiresEvidence = positiveMatchTypes.has(analysisItem.matchType) || analysisItem.matchType === "partial";
     if (requiresEvidence && evidenceSourceIds.length === 0) {
       return { ok: false, diagnostic: "evidence:positive-item-without-source" };
     }
 
     const displayLabel = normalizeItemText(analysisItem.displayLabel, roleItem.originalText, 64);
-    const rawRationale = normalizeItemText(analysisItem.shortRationale, "Supported by approved evidence.", 150);
-    const shortRationale = isNearDuplicate(displayLabel, rawRationale)
-      ? normalizeItemText(roleItem.originalText, rawRationale, 150)
+    const rawRationale = semanticRationale(analysisItem, input.language);
+    const shortRationale = (analysisItem.matchType !== "semantic" && analysisItem.matchType !== "transferable" && isNearDuplicate(displayLabel, rawRationale))
+      ? normalizeItemText(roleItem.originalText, rawRationale, 620)
       : rawRationale;
 
     reportItems.push({
       itemId: `role-item-${position + 1}`,
       originalText: roleItem.originalText,
       displayLabel,
+      normalizedConcept: normalizeItemText(analysisItem.sharedCapability ?? displayLabel, displayLabel, 96),
       source: roleItem.source,
       importance: analysisItem.importance,
       matchType: analysisItem.matchType,
@@ -117,38 +216,53 @@ export function composeReportUIPayload(input: {
   }
 
   const referencedSourceIds = [...new Set(input.analysis.items.flatMap((item) => item.evidenceSourceIds))];
-  const clusters: ReportUIPayload["evidencePanel"]["clusters"] = referencedSourceIds.map((sourceId) => {
-    const source = sourceById.get(sourceId)!;
-    const supportedItems = reportItems.filter((item) => item.clusterIds.includes(`evidence-${sourceId}`));
-    const summary = source.claim ?? [...new Set(supportedItems.map((item) => item.shortRationale))].slice(0, 2).join(" ");
+  const sourceToClusterId = new Map<string, string>();
+  const clustersByDestination = new Map<string, ReportUIPayload["evidencePanel"]["clusters"][number]>();
 
-    return {
-      clusterId: `evidence-${sourceId}`,
+  for (const sourceId of referencedSourceIds) {
+    const source = sourceById.get(sourceId)!;
+    const resolved = resolveApprovedEvidenceDestination({
+      sourceId,
+      projectId: source.project?.id,
+      exactAnchorId: source.project?.anchorId,
+      sectionAnchorId: source.project?.sectionAnchorId,
+    });
+    const dedupeKey = resolved.destination.dedupeKey;
+    const existing = clustersByDestination.get(dedupeKey);
+    const supportedItems = reportItems.filter((item) => item.clusterIds.includes(`evidence-${sourceId}`));
+
+    if (existing) {
+      existing.evidenceIds = [...new Set([...existing.evidenceIds, sourceId])];
+      existing.supportedItemIds = [...new Set([...existing.supportedItemIds, ...supportedItems.map((item) => item.itemId)])];
+      sourceToClusterId.set(sourceId, existing.clusterId);
+      continue;
+    }
+
+    const clusterId = `evidence-${sourceId}`;
+    const summary = source.claim ?? [...new Set(supportedItems.map((item) => item.shortRationale))].slice(0, 2).join(" ");
+    clustersByDestination.set(dedupeKey, {
+      clusterId,
       title: source.label,
       summary: conciseSentences(summary || `Approved evidence from ${source.label}.`, 2, 220),
       supportedItemIds: supportedItems.map((item) => item.itemId),
       evidenceIds: [sourceId],
-      ...(source.project ? { project: { slug: source.project.slug, title: source.project.title } } : {}),
-      destination: source.project
-        ? source.project.anchorId
-          ? {
-            mode: "anchor" as const,
-            href: `/experience/${source.project.slug}#${source.project.anchorId}`,
-            anchorId: source.project.anchorId,
-            dedupeKey: sourceId,
-          }
-          : {
-              mode: "project-top" as const,
-              href: `/experience/${source.project.slug}`,
-              dedupeKey: sourceId,
-            }
-        : { mode: "no-link" as const, dedupeKey: sourceId },
-      reliability: "high" as const,
-    };
-  });
+      ...("project" in resolved ? { project: { slug: resolved.project.slug, title: resolved.project.title } } : {}),
+      destination: resolved.destination,
+      reliability: source.evidenceSpecificity ?? "high",
+    });
+    sourceToClusterId.set(sourceId, clusterId);
+  }
 
-  const strengths = reportItems.filter((item) => item.impact === "strength").slice(0, 5);
-  const gaps = reportItems.filter((item) => item.impact === "gap").slice(0, 3);
+  const clusters = [...clustersByDestination.values()];
+  for (const reportItem of reportItems) {
+    reportItem.clusterIds = [...new Set(reportItem.clusterIds.map((clusterId) => {
+      const sourceId = clusterId.slice("evidence-".length);
+      return sourceToClusterId.get(sourceId) ?? clusterId;
+    }))];
+  }
+
+  const strengths = deriveTopStrengths(reportItems);
+  const gaps = deriveKeyGaps(reportItems);
   const language = input.language === "he" ? "he" : "en";
   const fitLevel = input.analysis.fitLevel;
   const overallFitVisual = fitLevel === "insufficient" || fitLevel === "out-of-scope"

@@ -1,5 +1,3 @@
-import type { ReportUIPayload } from "../contracts/index.ts";
-
 export type RoleFitModelProviderName = "gemini";
 
 export type QualitativeReportAnalysis = {
@@ -16,6 +14,10 @@ export type QualitativeReportAnalysis = {
     impact: "strength" | "gap" | "neutral";
     evidenceConfidence: "high" | "medium" | "low" | "insufficient";
     shortRationale: string;
+    sharedCapability?: string;
+    contextDifference?: string;
+    bridgeability?: string;
+    unproven?: string;
     evidenceSourceIds: string[];
   }>;
 };
@@ -42,12 +44,6 @@ export type RoleFitChatInput = {
 };
 
 export type RoleFitModelResult =
-  | {
-      ok: true;
-      provider: RoleFitModelProviderName;
-      model: string;
-      report: ReportUIPayload;
-    }
   | {
       ok: true;
       provider: RoleFitModelProviderName;

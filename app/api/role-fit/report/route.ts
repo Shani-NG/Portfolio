@@ -217,14 +217,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const composition = "report" in modelResult
-    ? { ok: true as const, report: modelResult.report }
-    : composeReportUIPayload({
-        analysis: modelResult.analysis,
-        roleDraft: validation.roleDraft,
-        evidence: approvedEvidence,
-        language: parsedRequest.data.language,
-      });
+  const composition = composeReportUIPayload({
+    analysis: modelResult.analysis,
+    roleDraft: validation.roleDraft,
+    evidence: approvedEvidence,
+    language: parsedRequest.data.language,
+  });
 
   if (!composition.ok) {
     after(() =>
