@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createRoleDraftFromText, looksLikeRoleInput, mergeRoleClarification, resolveRoleTextForValidation, validateRoleText } from "./role-understanding.ts";
+import { applyRoleCorrection, createRoleDraftFromText, detectRoleCorrection, looksLikeRoleInput, mergeRoleClarification, resolveRoleTextForValidation, validateRoleText } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -167,5 +167,17 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(selectedRoleText, savedRoleText);
     assert.equal(result.parseStatus, "valid-complete");
     assert.equal(result.roleDraft.title?.originalValue, "Senior UX / Human Factors Specialist");
+  });
+
+  it("detects and applies an explicit title correction", () => {
+    const correction = detectRoleCorrection("Actually, the title is Principal Product Designer.");
+    assert.deepEqual(correction, { field: "title", value: "Principal Product Designer" });
+
+    const updated = applyRoleCorrection(
+      "Company: Acme\nTitle: Senior Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience",
+      correction!,
+    );
+    const result = validateRoleText({ conversationId: "conv_test", traceId: "trace_test", roleText: updated, detectedLanguage: "en" });
+    assert.equal(result.roleDraft.title?.originalValue, "Principal Product Designer");
   });
 });

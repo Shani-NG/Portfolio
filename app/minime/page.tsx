@@ -2,6 +2,7 @@
 
 import { Chip } from "@/components/ui/chip";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import { resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
 import { useEffect, useRef, useState } from "react";
@@ -76,12 +77,6 @@ function isReportConfirmationText(value: string) {
   return /^(yes|yep|sure|ok|okay|go ahead|generate|continue|confirm|great|nice|sounds good|יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך)$/i.test(value.trim());
 }
 
-function detectSessionLanguage(message: string, session: RoleFitLiveSession) {
-  if (/[\u0590-\u05ff]/.test(message)) return "he";
-  const hadHebrewConversation = session.messages.some((item) => /[\u0590-\u05ff]/.test(item.content));
-  return hadHebrewConversation ? "he" : "en";
-}
-
 export default function RoleFitPage() {
   const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => getRoleFitLiveSession());
   const [roleInput, setRoleInput] = useState("");
@@ -136,6 +131,7 @@ export default function RoleFitPage() {
     const messageForAgent = repeatedInput
       ? liveSession.activeRoleText
       : submittedText;
+    const activeLanguage = resolveConversationLanguage(submittedText, liveSession.activeLanguage);
 
     const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
     setRoleInput("");
@@ -145,6 +141,7 @@ export default function RoleFitPage() {
     syncLiveSession({
       state: liveSession.reportPayload ? "report-ready" : "general-qa",
       draftInput: "",
+      activeLanguage,
     });
 
     try {
@@ -157,8 +154,10 @@ export default function RoleFitPage() {
           conversationId: sessionAfterUser.conversationId,
           sessionId: sessionAfterUser.sessionId,
           message: messageForAgent,
-          language: detectSessionLanguage(submittedText, sessionAfterUser),
+          language: activeLanguage,
           repeatedInput,
+          clarificationAttempts: liveSession.clarificationAttempts,
+          completedReportCount: liveSession.completedReportCount,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)),
           reportContext: liveSession.reportPayload ? JSON.stringify(liveSession.reportPayload).slice(0, 18000) : undefined,
           roleContext: liveSession.activeRoleText
@@ -174,18 +173,18 @@ export default function RoleFitPage() {
       const responseState = (result.state ?? "general-qa") as RoleFitLiveState;
       const nextState = liveSession.reportPayload && responseState === "general-qa" ? "report-ready" : responseState;
       appendLiveMessage({ role: "agent", content: result.answer ?? "I need a little more context before I can answer safely." });
-      const nextSession = syncLiveSession({
+      syncLiveSession({
         state: nextState,
         activeRoleText: result.roleText ?? liveSession.activeRoleText,
         activeRoleTitle: result.validation?.roleDraft?.title?.originalValue ?? liveSession.activeRoleTitle,
         activeRoleCompany: result.validation?.roleDraft?.company?.originalValue ?? liveSession.activeRoleCompany,
         pendingRoleField: result.pendingField !== undefined ? result.pendingField : liveSession.pendingRoleField,
         pendingReportConfirmation: nextState === "awaiting-report-confirmation",
+        clarificationAttempts: nextState === "awaiting-role-completion" && !result.clarificationExhausted
+          ? liveSession.clarificationAttempts + 1
+          : 0,
+        activeLanguage,
       });
-
-      if (result.autoApproveReport) {
-        await requestReport(nextSession);
-      }
 
       if (!response.ok) {
         setApiStatusMessage(result.safeMessageKey ?? "The live conversation service is currently unavailable.");
@@ -247,7 +246,7 @@ export default function RoleFitPage() {
           completedReportCount: reportSession.completedReportCount,
           conversationId: reportSession.conversationId,
           sessionId: reportSession.sessionId,
-          language: detectSessionLanguage(reportSession.activeRoleText, reportSession),
+          language: reportSession.activeLanguage,
         }),
         signal: controller.signal,
       });

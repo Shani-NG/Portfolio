@@ -30,6 +30,8 @@ export type RoleFitLiveSession = {
   activeRoleTitle: string;
   activeRoleCompany: string;
   pendingRoleField: RoleFitPendingField | null;
+  clarificationAttempts: number;
+  activeLanguage: "he" | "en";
   reportPayload: unknown | null;
   reportProvider: string;
   reportModel: string;
@@ -69,6 +71,8 @@ function createSession(): RoleFitLiveSession {
     activeRoleTitle: "",
     activeRoleCompany: "",
     pendingRoleField: null,
+    clarificationAttempts: 0,
+    activeLanguage: "en",
     reportPayload: null,
     reportProvider: "",
     reportModel: "",
