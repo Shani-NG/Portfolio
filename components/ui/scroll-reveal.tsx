@@ -19,6 +19,18 @@ export function ScrollReveal({ children, mode = "overlap", className, delayMs = 
     const element = ref.current;
     if (!element) return;
 
+    const revealHashTarget = () => {
+      const targetId = decodeURIComponent(window.location.hash.slice(1));
+      const target = targetId ? document.getElementById(targetId) : null;
+      if (target && element.contains(target)) {
+        setIsVisible(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (revealHashTarget()) return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -30,7 +42,11 @@ export function ScrollReveal({ children, mode = "overlap", className, delayMs = 
     );
 
     observer.observe(element);
-    return () => observer.disconnect();
+    window.addEventListener("hashchange", revealHashTarget);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("hashchange", revealHashTarget);
+    };
   }, []);
 
   return (

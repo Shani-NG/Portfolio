@@ -29,7 +29,7 @@ const headingPattern = new RegExp(
   "gi",
 );
 
-function roleField(originalValue: string, sourceId: string) {
+function roleField<T extends string | number>(originalValue: T, sourceId: string) {
   return {
     originalValue,
     sourceRef: {
@@ -37,7 +37,7 @@ function roleField(originalValue: string, sourceId: string) {
       kind: "user-text" as const,
     },
     confidence: "medium" as const,
-    confirmed: Boolean(originalValue.trim()),
+    confirmed: Boolean(String(originalValue).trim()),
   };
 }
 
@@ -245,6 +245,36 @@ function inferCompany(roleText: string): string {
   return match?.[1] ?? "";
 }
 
+function inferYearsOfExperience(roleText: string): number | undefined {
+  const normalizedText = normalizeRoleText(roleText);
+  const patterns = [
+    /\b(?:minimum|min\.?|at least|required)?\s*(\d{1,2})\s*\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:relevant\s+)?experience\b/i,
+    /\bexperience\s*(?:of|:)?\s*(?:(?:at least|minimum|min\.?)\s*)?(\d{1,2})\s*\+?\s*(?:years?|yrs?)\b/i,
+    /\b(\d{1,2})\s*\+?\s*(?:years?|yrs?)\s+(?:in|working with)\b/i,
+  ];
+
+  for (const pattern of patterns) {
+    const years = Number(normalizedText.match(pattern)?.[1]);
+    if (Number.isInteger(years) && years > 0 && years <= 50) return years;
+  }
+
+  return undefined;
+}
+
+function inferLocation(roleText: string): string {
+  return extractSection(roleText, ["location", "job location"])
+    .replace(/\s*[\[(].*\b(?:hybrid|remote|on[ -]?site|in[ -]?office)\b.*$/i, "")
+    .trim();
+}
+
+function inferWorkModel(roleText: string): string {
+  const match = normalizeRoleText(roleText).match(/\b(hybrid|remote|on[ -]?site|in[ -]?office)\b/i)?.[1]?.toLowerCase();
+  if (match === "hybrid") return "Hybrid";
+  if (match === "remote") return "Remote";
+  if (match) return "On-site";
+  return "";
+}
+
 export function createRoleDraftFromText(roleText: string) {
   const sourceId = "role_input_current_request";
   const company = inferCompany(roleText);
@@ -268,6 +298,9 @@ export function createRoleDraftFromText(roleText: string) {
     /\b(experience|years|proven|strong|excellent|ability|knowledge|familiar|expertise|background|degree|portfolio|figma|ux|product)\b/i,
   ]);
   const preferredQualifications = blocks.preferred.flatMap(splitBlockItems);
+  const yearsOfExperience = inferYearsOfExperience(roleText);
+  const location = inferLocation(roleText);
+  const workModel = inferWorkModel(roleText);
 
   return {
     company: roleField(company, sourceId),
@@ -276,6 +309,9 @@ export function createRoleDraftFromText(roleText: string) {
     responsibilities: inferredResponsibilities.map((item) => roleField(item, sourceId)),
     requirements: inferredRequirements.map((item) => roleField(item, sourceId)),
     preferredQualifications: preferredQualifications.map((item) => roleField(item, sourceId)),
+    ...(yearsOfExperience !== undefined ? { yearsOfExperience: roleField(yearsOfExperience, sourceId) } : {}),
+    ...(location ? { location: roleField(location, sourceId) } : {}),
+    ...(workModel ? { workModel: roleField(workModel, sourceId) } : {}),
   };
 }
 

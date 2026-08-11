@@ -243,13 +243,88 @@ describe("Task C evidence and report integrity", () => {
     assert.equal(result.report.evidencePanel.clusters[0]?.supportedItemIds.length, 2);
   });
 
+  it("prefers supporting case studies over CV evidence", () => {
+    const evidenceWithCv: ApprovedEvidenceBundle = {
+      promptContext: "Approved case-study and CV evidence",
+      sources: [
+        ...evidence.sources,
+        {
+          id: "cv",
+          label: "CV knowledge",
+          content: "Approved CV evidence.",
+          sourceType: "cv",
+          approvedPublicVisibility: true,
+        },
+      ],
+    };
+    const result = composeReportUIPayload({
+      analysis: analysis({ items: [item(0, "direct", "strength", ["cv", "c4i"])] }),
+      roleDraft: roleDraft(),
+      evidence: evidenceWithCv,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i"]);
+  });
+
+  it("uses CV evidence when no case study supports the requirement", () => {
+    const cvOnlyEvidence: ApprovedEvidenceBundle = {
+      promptContext: "Approved CV evidence",
+      sources: [{
+        id: "cv",
+        label: "CV knowledge",
+        content: "Approved CV evidence.",
+        sourceType: "cv",
+        approvedPublicVisibility: true,
+      }],
+    };
+    const result = composeReportUIPayload({
+      analysis: analysis({ items: [item(0, "direct", "strength", ["cv"])] }),
+      roleDraft: roleDraft(),
+      evidence: cvOnlyEvidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["cv"]);
+  });
+
+  it("places CV evidence last only when it completes five evidence cards", () => {
+    const caseStudySources: ApprovedEvidenceBundle["sources"] = [
+      { id: "c4i", label: "C4I", content: "C4I evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "c4i", slug: "c4i-beyond-clarity", title: "C4I" } },
+      { id: "epd", label: "EPD", content: "EPD evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "epd", slug: "ux-from-the-heart", title: "EPD" } },
+      { id: "howtool", label: "HOWTOOL", content: "HOWTOOL evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "howtool", slug: "nobody-reads-the-manual", title: "HOWTOOL" } },
+      { id: "monitoring", label: "Monitoring", content: "Monitoring evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "monitoring", slug: "monitoring-product-intelligence", title: "Monitoring" } },
+    ];
+    const fiveCardEvidence: ApprovedEvidenceBundle = {
+      promptContext: "Approved evidence",
+      sources: [
+        { id: "cv", label: "CV", content: "CV evidence", sourceType: "cv", approvedPublicVisibility: true },
+        ...caseStudySources,
+      ],
+    };
+    const result = composeReportUIPayload({
+      analysis: analysis({ items: [item(0, "direct", "strength", ["cv", "c4i", "epd", "howtool", "monitoring"])] }),
+      roleDraft: roleDraft(),
+      evidence: fiveCardEvidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i", "epd", "howtool", "monitoring", "cv"]);
+  });
+
   it("C15 never turns raw JD text into an approved evidence source", async () => {
     const jdOnlyClaim = "JD-only secret capability zxqv";
     const bundle = await loadApprovedEvidence(jdOnlyClaim);
     assert.equal(bundle.sources.some((source) => source.content.includes(jdOnlyClaim)), false);
   });
 
-  it("C16 keeps visible fit output qualitative", () => {
+  it("C16 keeps fit output qualitative while exposing traceable coverage counts", () => {
     const result = composeReportUIPayload({ analysis: analysis({ fitLevel: "good" }), roleDraft: roleDraft(), evidence, language: "en" });
     assert.equal(result.ok, true);
     if (!result.ok) return;
@@ -257,7 +332,11 @@ describe("Task C evidence and report integrity", () => {
       ? `${result.report.overallFitVisual.label} ${result.report.overallFitVisual.rationale}`
       : result.report.overallFitVisual.label;
     assert.doesNotMatch(visibleFitCopy, /%|\bscore\b/i);
-    assert.equal(result.report.skillsMatch.visualCoverage.mode, "qualitative");
+    assert.deepEqual(result.report.skillsMatch.visualCoverage, {
+      mode: "traceable-count",
+      matchedCount: 1,
+      totalCount: 1,
+    });
   });
 
   it("C17 blocks hiring recommendation language", () => {

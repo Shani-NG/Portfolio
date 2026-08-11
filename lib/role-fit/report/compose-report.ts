@@ -169,6 +169,18 @@ function dedupeReportItems(items: ReportItem[], maxItems: number) {
   return selected;
 }
 
+function selectDisplayedEvidenceSourceIds(
+  sourceIds: string[],
+  sourceById: Map<string, ApprovedEvidenceBundle["sources"][number]>,
+) {
+  const caseStudyIds = sourceIds.filter((sourceId) => sourceById.get(sourceId)?.sourceType === "case-study");
+  const cvIds = sourceIds.filter((sourceId) => sourceById.get(sourceId)?.sourceType === "cv");
+
+  if (caseStudyIds.length === 0) return cvIds.slice(0, 1);
+  if (caseStudyIds.length === 4 && cvIds.length > 0) return [...caseStudyIds, cvIds[0]];
+  return caseStudyIds.slice(0, 5);
+}
+
 export function deriveTopStrengths(items: ReportItem[]) {
   return dedupeReportItems(
     items.filter((item) => positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.clusterIds.length > 0),
@@ -210,15 +222,16 @@ export function composeReportUIPayload(input: {
     }
     seenIndexes.add(analysisItem.roleItemIndex);
 
-    const evidenceSourceIds = [...new Set(analysisItem.evidenceSourceIds)];
-    if (evidenceSourceIds.some((sourceId) => !sourceById.has(sourceId))) {
+    const approvedEvidenceSourceIds = [...new Set(analysisItem.evidenceSourceIds)];
+    if (approvedEvidenceSourceIds.some((sourceId) => !sourceById.has(sourceId))) {
       return { ok: false, diagnostic: "evidence:unapproved-source-id" };
     }
 
     const requiresEvidence = positiveMatchTypes.has(analysisItem.matchType) || analysisItem.matchType === "partial";
-    if (requiresEvidence && evidenceSourceIds.length === 0) {
+    if (requiresEvidence && approvedEvidenceSourceIds.length === 0) {
       return { ok: false, diagnostic: "evidence:positive-item-without-source" };
     }
+    const evidenceSourceIds = selectDisplayedEvidenceSourceIds(approvedEvidenceSourceIds, sourceById);
 
     const displayLabel = normalizeItemText(analysisItem.displayLabel, roleItem.originalText, 64);
     const rawRationale = semanticRationale(analysisItem, input.language);
@@ -241,7 +254,9 @@ export function composeReportUIPayload(input: {
     });
   }
 
-  const referencedSourceIds = [...new Set(analysis.items.flatMap((item) => item.evidenceSourceIds))];
+  const referencedSourceIds = [...new Set(reportItems.flatMap((item) =>
+    item.clusterIds.map((clusterId) => clusterId.slice("evidence-".length)),
+  ))];
   const sourceToClusterId = new Map<string, string>();
   const clustersByDestination = new Map<string, ReportUIPayload["evidencePanel"]["clusters"][number]>();
 
@@ -289,13 +304,17 @@ export function composeReportUIPayload(input: {
 
   const strengths = deriveTopStrengths(reportItems);
   const gaps = deriveKeyGaps(reportItems);
+  const matchedRequirements = reportItems.filter((item) =>
+    positiveMatchTypes.has(item.matchType) && item.clusterIds.length > 0,
+  ).length;
+  const totalRequirements = reportItems.length;
   const language = input.language === "he" ? "he" : "en";
   const fitLevel = analysis.fitLevel;
   const overallFitVisual = fitLevel === "insufficient" || fitLevel === "out-of-scope"
     ? {
         mode: fitLevel,
         label: fitLevel === "insufficient" ? "Insufficient evidence" : "Outside the supported role scope",
-        rationale: conciseSentences(analysis.fitRationale, 2, 260),
+        rationale: conciseSentences(analysis.fitRationale, 1, 180),
       }
     : {
         mode: "fit" as const,
@@ -304,7 +323,7 @@ export function composeReportUIPayload(input: {
         illustrationKey: fitPresentation[fitLevel].illustrationKey,
         colorToken: fitPresentation[fitLevel].colorToken,
         label: fitPresentation[fitLevel].label,
-        rationale: conciseSentences(analysis.fitRationale, 2, 260),
+        rationale: conciseSentences(analysis.fitRationale, 1, 180),
         ...(analysis.evidenceConfidence === "low" || analysis.evidenceConfidence === "insufficient"
           ? { qualifiers: ["evidence-limited" as const] }
           : {}),
@@ -319,6 +338,11 @@ export function composeReportUIPayload(input: {
     roleSnapshot: {
       company: input.roleDraft.company?.originalValue.trim() ?? "",
       title: input.roleDraft.title?.originalValue.trim() ?? "",
+      ...(input.roleDraft.seniority?.originalValue ? { seniority: input.roleDraft.seniority.originalValue.trim() } : {}),
+      ...(input.roleDraft.yearsOfExperience?.originalValue !== undefined ? { yearsOfExperience: input.roleDraft.yearsOfExperience.originalValue } : {}),
+      ...(input.roleDraft.location?.originalValue ? { location: input.roleDraft.location.originalValue.trim() } : {}),
+      ...(input.roleDraft.workModel?.originalValue ? { workModel: input.roleDraft.workModel.originalValue.trim() } : {}),
+      ...(input.roleDraft.employmentType?.originalValue ? { employmentType: input.roleDraft.employmentType.originalValue.trim() } : {}),
     },
     overallFitVisual,
     evidenceConfidence: {
@@ -327,7 +351,7 @@ export function composeReportUIPayload(input: {
     },
     skillsMatch: {
       items: strengths,
-      visualCoverage: { mode: "qualitative", label: analysis.skillsCoverageLabel },
+      visualCoverage: { mode: "traceable-count", matchedCount: matchedRequirements, totalCount: totalRequirements },
     },
     requirementMapping: {
       items: reportItems,
