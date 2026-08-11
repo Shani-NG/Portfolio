@@ -108,6 +108,7 @@ function inferListBySignals(roleText: string, signals: RegExp[]): string[] {
 
 const roleTitleSignal = /\b(ux|ui|user experience|product|design(?:er)?|research(?:er)?|strateg(?:y|ist)|manager|management|lead|director|head|vice president|vp|chief|engineer|developer|architect|analyst|specialist|consultant|coordinator|innovation|implementation|operations)\b/i;
 const setupInstructionSignal = /\b(upload|paste|provide|send|share|attach|going to|want to|would like to|job description|role details)\b/i;
+const hebrewSetupInstructionSignal = /^(?:אני|היי|שלום|רוצה|אפשר|צריך|צריכה|תודה)\b/;
 
 export function isPlausibleRoleTitle(value: string): boolean {
   const title = value.trim();
@@ -117,7 +118,7 @@ export function isPlausibleRoleTitle(value: string): boolean {
   if (/[.!?]$/.test(title) || setupInstructionSignal.test(title)) return false;
   if (/^(about|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(title)) return false;
 
-  return roleTitleSignal.test(title);
+  return roleTitleSignal.test(title) || (/[\u0590-\u05ff]/.test(title) && !hebrewSetupInstructionSignal.test(title));
 }
 
 function inferTitle(roleText: string): string {

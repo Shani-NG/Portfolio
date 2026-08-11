@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ContactForm } from "./contact-form";
 import styles from "./page.module.css";
 
@@ -13,7 +14,9 @@ export default function ContactPage() {
           Tell me about your <strong>open role</strong>
         </p>
 
-        <ContactForm />
+        <Suspense fallback={null}>
+          <ContactForm />
+        </Suspense>
       </section>
     </main>
   );

@@ -157,6 +157,10 @@
   color: var(--danger);
 }
 
+.successMessage {
+  color: var(--ds-color-action-secondary);
+}
+
 .actions {
   display: flex;
   justify-content: center;

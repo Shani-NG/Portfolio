@@ -106,9 +106,7 @@ function ProfileCard({ report }: { report: ReportUIPayload }) {
   const location = [report.roleSnapshot.location, report.roleSnapshot.workModel].filter(Boolean).join(" | ");
   const coverage = coverageCounts(report);
   const coveragePercent = coverage.totalCount > 0 ? Math.round((coverage.matchedCount / coverage.totalCount) * 100) : 0;
-  const experience = report.roleSnapshot.yearsOfExperience
-    ? `${report.roleSnapshot.yearsOfExperience}+ years`
-    : report.roleSnapshot.seniority ?? "";
+  const experience = "12+ years";
 
   return (
     <section className={`${styles.card} ${styles.profileCard}`} aria-labelledby="job-profile-title">
@@ -121,7 +119,7 @@ function ProfileCard({ report }: { report: ReportUIPayload }) {
           <Stat icon="verified" label="Verified Requirements" tone="success" value={`${coverage.matchedCount} / ${coverage.totalCount}`} />
           <Stat icon="psychology" label="Core Skills Coverage" tone="purple" value={`${coveragePercent}%`} />
           <Stat icon="location_on" label="Location & Work Model" tone="pink" value={optionalValue(location)} />
-          <Stat icon="workspace_premium" label="Required Experience" tone="gold" value={optionalValue(experience)} />
+          <Stat icon="workspace_premium" label="Relevant Experience" tone="gold" value={experience} />
         </div>
       </div>
     </section>

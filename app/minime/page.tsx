@@ -43,6 +43,12 @@ function reportFailureMessage(result: ReportFailureResult): string {
   return result.safeMessage ?? "I couldn't generate the report this time. Your role details are still here. Please try again later.";
 }
 
+function reportSuccessMessage(language: RoleFitLiveSession["activeLanguage"]) {
+  return language === "he"
+    ? "The report is ready in English. You can review it in the report area and keep asking questions here."
+    : "The report is ready. You can review it in the report area and keep asking questions here.";
+}
+
 function normalizeRepeatedInput(value: string) {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
@@ -239,7 +245,7 @@ export default function RoleFitPage() {
           completedReportCount: reportSession.completedReportCount,
           conversationId: reportSession.conversationId,
           sessionId: reportSession.sessionId,
-          language: reportSession.activeLanguage,
+          language: "en",
         }),
         signal: controller.signal,
       });
@@ -254,7 +260,7 @@ export default function RoleFitPage() {
         const missingField = result.validation?.missingFields?.[0] ?? null;
         setApiStatusMessage(message);
         setErrorContext(missingField ? "validation" : "report");
-        setIsAgentUnavailable(!missingField);
+        setIsAgentUnavailable(false);
         appendLiveMessage({ role: "agent", content: message });
         syncLiveSession({
           state: "recoverable-error",
@@ -269,7 +275,7 @@ export default function RoleFitPage() {
         const message = "I couldn't generate the report this time. Your role details are still here. Please try again later.";
         setApiStatusMessage(message);
         setErrorContext("report");
-        setIsAgentUnavailable(true);
+        setIsAgentUnavailable(false);
         appendLiveMessage({ role: "agent", content: message });
         syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
         return;
@@ -283,7 +289,7 @@ export default function RoleFitPage() {
         model: result.model,
         report,
       });
-      appendLiveMessage({ role: "agent", content: "הדוח מוכן. אפשר לראות אותו באזור הדוח ולהמשיך לשאול כאן באותה שיחה." });
+      appendLiveMessage({ role: "agent", content: reportSuccessMessage(reportSession.activeLanguage) });
       syncLiveSession({
         state: "report-ready",
         reportPayload: report,
@@ -301,7 +307,7 @@ export default function RoleFitPage() {
         : "I couldn't generate the report because the service is unavailable. Your role details are still here. Please try again later.";
       setApiStatusMessage(message);
       setErrorContext("report");
-      setIsAgentUnavailable(true);
+      setIsAgentUnavailable(false);
       appendLiveMessage({ role: "agent", content: message });
       syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
     } finally {

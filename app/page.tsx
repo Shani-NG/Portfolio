@@ -65,7 +65,7 @@ export default function HomePage() {
       <section className={`${styles.contactBand} ${styles.closingSection}`} aria-labelledby="contact-title">
         <h2 id="contact-title">THANKS FOR MAKING IT THIS FAR!</h2>
         <p>Let&apos;s collaborate on your next technical challenge and build something meaningful together.</p>
-        <Link className={styles.contactLink} href={navigationItems.contact.href}>
+        <Link className={styles.contactLink} href={`${navigationItems.contact.href}?source=portfolio-cta`}>
           <Button className={styles.contactCtaButton} variant="primary" tone="outlined">
             LET&apos;S CONNECT
             <MaterialIcon name="arrow_forward" />

@@ -336,8 +336,7 @@ export async function POST(request: Request) {
         answer: "The Role Fit Agent is not available right now. Please try again later.",
         safeMessageKey: modelResult.safeMessageKey,
         detail: modelResult.detail,
-      },
-      { status: modelResult.error === "missing-configuration" ? 503 : 502 },
+      }
     );
   }
 
