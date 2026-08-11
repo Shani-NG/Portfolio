@@ -197,14 +197,6 @@
   transform: scale(1.38);
 }
 
-.fitRationale {
-  color: var(--ds-color-text-secondary);
-  font-size: var(--ds-type-body-14-size);
-  line-height: var(--ds-type-body-14-line);
-  margin: var(--ds-space-sm) 0 0;
-  max-width: 54ch;
-}
-
 .fitCard h3 {
   font-family: var(--ds-font-family-display);
   font-size: var(--ds-type-heading-18-size);
@@ -264,13 +256,26 @@
   overflow-wrap: anywhere;
 }
 
-.stats {
+.profileDetails {
   border-top: 1px solid var(--ds-color-border-subtle);
+  margin-top: var(--ds-space-xl);
+  padding-top: var(--ds-space-lg);
+}
+
+.profileSummary {
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-type-body-14-size);
+  line-height: var(--ds-type-body-14-line);
+  margin: 0;
+  max-width: 68ch;
+  text-align: start;
+}
+
+.stats {
   display: grid;
   gap: var(--ds-space-sm);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: var(--ds-space-xl);
-  padding-top: var(--ds-space-lg);
+  margin-top: var(--ds-space-lg);
 }
 
 .stat {
@@ -285,8 +290,16 @@
   padding: var(--ds-space-md);
 }
 
-.statIcon { color: var(--fit-color); font-size: 1.75rem; }
+.statIcon { font-size: 1.75rem; }
 .statCopy { min-width: 0; }
+.statSuccess .statIcon,
+.statSuccess strong { color: var(--ds-color-action-secondary-hover); }
+.statPurple .statIcon,
+.statPurple strong { color: #a98fe8; }
+.statPink .statIcon,
+.statPink strong { color: var(--ds-color-action-primary-hover); }
+.statGold .statIcon,
+.statGold strong { color: #d7aa62; }
 
 .statLabel {
   color: var(--ds-color-text-secondary);
@@ -301,13 +314,12 @@
 }
 
 .stat strong {
-  display: -webkit-box;
-  font-size: var(--ds-type-heading-18-size);
-  line-height: var(--ds-type-heading-18-line);
+  display: block;
+  font-size: var(--ds-type-button-16-size);
+  line-height: var(--ds-type-button-16-line);
   overflow: hidden;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mutedValue { color: var(--ds-color-text-tertiary); font-weight: var(--ds-type-weight-medium); }
@@ -498,6 +510,7 @@
 
 .strengthCard { grid-area: strength; }
 .gapCard { grid-area: gap; }
+.strengthWide { grid-column: 1 / -1; min-width: 0; }
 .strengthCard h2 > span { color: var(--ds-color-action-secondary-hover); font-size: 1.625rem; }
 .gapCard h2 > span { color: #d7aa62; font-size: 1.625rem; }
 

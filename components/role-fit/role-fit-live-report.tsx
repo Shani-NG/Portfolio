@@ -27,20 +27,23 @@ const matchLabels: Record<ReportItem["matchType"], string> = {
 
 const requirementIcons = ["strategy", "auto_awesome", "terminal", "groups", "health_and_safety"] as const;
 
-function coverageLabel(report: ReportUIPayload) {
+function coverageCounts(report: ReportUIPayload) {
   const coverage = report.skillsMatch.visualCoverage;
-  if (coverage.mode === "qualitative") return coverage.label;
-  if (coverage.mode === "traceable-count") return `${coverage.matchedCount} of ${coverage.totalCount}`;
-  return "Evidence-based";
+  if (coverage.mode === "traceable-count") return coverage;
+  const matchedCount = report.requirementMapping.items.filter((item) =>
+    ["direct", "semantic", "transferable"].includes(item.matchType) && item.clusterIds.length > 0,
+  ).length;
+  return { matchedCount, totalCount: report.requirementMapping.items.length };
 }
 
 function optionalValue(value: string) {
   return value || "Not provided";
 }
 
-function Stat({ icon, label, value }: { icon: string; label: string; value: string }) {
+function Stat({ icon, label, tone, value }: { icon: string; label: string; tone: "success" | "purple" | "pink" | "gold"; value: string }) {
+  const toneClass = `stat${tone[0].toUpperCase()}${tone.slice(1)}` as keyof typeof styles;
   return (
-    <div className={styles.stat}>
+    <div className={`${styles.stat} ${styles[toneClass]}`}>
       <MaterialIcon className={styles.statIcon} name={icon} />
       <div className={styles.statCopy}>
         <span className={styles.statLabel} title={label}>{label}</span>
@@ -66,7 +69,6 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
         <MaterialIcon className={styles.limitedIcon} name={fit.mode === "insufficient" ? "search_off" : "outbound"} />
         <span className={styles.eyebrow}>Role Fit Result</span>
         <h2 id="fit-summary-title">{fit.label}</h2>
-        <p>{fit.rationale}</p>
       </section>
     );
   }
@@ -89,7 +91,6 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
           <Image alt="" aria-hidden="true" fill priority sizes="104px" src={fitAssets[fit.illustrationKey]} />
         </div>
       </div>
-      <p className={styles.fitRationale}>{fit.rationale}</p>
       <h3 id="fit-summary-title">Core Matching Skills</h3>
       <p className={styles.skillsSubtitle}>The strongest capabilities supporting this fit.</p>
       <div className={styles.skills}>
@@ -103,6 +104,8 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
 
 function ProfileCard({ report }: { report: ReportUIPayload }) {
   const location = [report.roleSnapshot.location, report.roleSnapshot.workModel].filter(Boolean).join(" | ");
+  const coverage = coverageCounts(report);
+  const coveragePercent = coverage.totalCount > 0 ? Math.round((coverage.matchedCount / coverage.totalCount) * 100) : 0;
   const experience = report.roleSnapshot.yearsOfExperience
     ? `${report.roleSnapshot.yearsOfExperience}+ years`
     : report.roleSnapshot.seniority ?? "";
@@ -112,11 +115,14 @@ function ProfileCard({ report }: { report: ReportUIPayload }) {
       <span className={styles.eyebrow}>Analyzed Job Profile</span>
       <h2 id="job-profile-title">{report.roleSnapshot.title}</h2>
       <p className={styles.company}>{report.roleSnapshot.company}</p>
-      <div className={styles.stats}>
-        <Stat icon="verified" label="Mapped Requirements" value={String(report.requirementMapping.items.length)} />
-        <Stat icon="psychology" label="Core Skills Coverage" value={coverageLabel(report)} />
-        <Stat icon="location_on" label="Location & Work Model" value={optionalValue(location)} />
-        <Stat icon="workspace_premium" label="Required Experience" value={optionalValue(experience)} />
+      <div className={styles.profileDetails}>
+        <p className={styles.profileSummary}>{report.overallFitVisual.rationale}</p>
+        <div className={styles.stats}>
+          <Stat icon="verified" label="Verified Requirements" tone="success" value={`${coverage.matchedCount} / ${coverage.totalCount}`} />
+          <Stat icon="psychology" label="Core Skills Coverage" tone="purple" value={`${coveragePercent}%`} />
+          <Stat icon="location_on" label="Location & Work Model" tone="pink" value={optionalValue(location)} />
+          <Stat icon="workspace_premium" label="Required Experience" tone="gold" value={optionalValue(experience)} />
+        </div>
       </div>
     </section>
   );
@@ -233,9 +239,9 @@ function EvidenceSection({ report }: { report: ReportUIPayload }) {
   );
 }
 
-function ListCard({ title, tone, items }: { title: string; tone: "strength" | "gap"; items: ReportItem[] }) {
+function ListCard({ title, tone, items, wide = false }: { title: string; tone: "strength" | "gap"; items: ReportItem[]; wide?: boolean }) {
   return (
-    <section className={`${styles.card} ${styles.listCard} ${tone === "strength" ? styles.strengthCard : styles.gapCard}`}>
+    <section className={`${styles.card} ${styles.listCard} ${tone === "strength" ? styles.strengthCard : styles.gapCard} ${wide ? styles.strengthWide : ""}`}>
       <h2><MaterialIcon name={tone === "strength" ? "check" : "warning"} />{title}</h2>
       {items.length ? (
         <ul>
@@ -279,8 +285,8 @@ export function RoleFitLiveReport({ report, onStartNewAnalysis }: { report: Repo
         <FitSummary report={report} />
         <ProfileCard report={report} />
         <EvidenceSection report={report} />
-        <ListCard items={report.topStrengths.items} title="Top Strengths" tone="strength" />
-        <ListCard items={report.keyGaps.items} title="Key Gaps" tone="gap" />
+        <ListCard items={report.topStrengths.items} title="Top Strengths" tone="strength" wide={report.keyGaps.items.length === 0} />
+        {report.keyGaps.items.length > 0 ? <ListCard items={report.keyGaps.items} title="Key Gaps" tone="gap" /> : null}
         <p className={styles.disclaimer}>{report.disclaimer.text}</p>
         {report.contactCta.enabled && report.contactCta.href ? (
           <section className={styles.contactCta}>

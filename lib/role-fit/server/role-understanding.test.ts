@@ -45,6 +45,21 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(draft.preferredQualifications.length, 1);
   });
 
+  it("extracts required experience, location, and work model from the role context", () => {
+    const roleText = [
+      "Senior UX Strategist",
+      "Location: Tel Aviv, Israel (Hybrid)",
+      "Responsibilities: Lead operational product strategy",
+      "Requirements: Minimum 8+ years of relevant experience",
+    ].join("\n");
+
+    const draft = createRoleDraftFromText(roleText);
+
+    assert.equal(draft.yearsOfExperience?.originalValue, 8);
+    assert.equal(draft.location?.originalValue, "Tel Aviv, Israel");
+    assert.equal(draft.workModel?.originalValue, "Hybrid");
+  });
+
   it("treats preferred qualifications as optional", () => {
     const roleText = [
       "Title: UX Research Lead",
