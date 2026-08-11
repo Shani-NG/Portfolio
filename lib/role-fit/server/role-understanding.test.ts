@@ -160,6 +160,20 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(shouldValidateRoleCollectionMessage({ message: "Tell me about Shani", roleCollectionActive: true }), false);
   });
 
+  it("keeps a short Hebrew title when details are added afterward", () => {
+    const merged = resolveRoleTextForValidation({
+      message: "Responsibilities: Lead product discovery with stakeholders\nRequirements: Strong UX strategy experience",
+      savedRoleText: "מנהל מוצר",
+      pendingField: "responsibilities",
+      hasRoleInput: true,
+      hasReportIntent: false,
+    });
+    const result = validateRoleText({ conversationId: "conv_test", traceId: "trace_test", roleText: merged, detectedLanguage: "he" });
+
+    assert.equal(result.roleDraft.title?.originalValue, "מנהל מוצר");
+    assert.equal(result.parseStatus, "valid-complete");
+  });
+
   it("merges a requested title as a labeled deterministic clarification", () => {
     const initialRole = [
       "Responsibilities: Lead product discovery and align stakeholders",

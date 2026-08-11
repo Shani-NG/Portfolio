@@ -211,10 +211,9 @@ export async function POST(request: Request) {
         model: modelResult.model,
         error: modelResult.error,
         safeMessageKey: modelResult.safeMessageKey,
-        safeMessage: "I couldn't generate the report this time. This is a service issue, not a problem with the details you entered. Please try again later.",
+        safeMessage: "I couldn't generate the report this time. Your role details are still here. Please try again later.",
         detail: modelResult.detail,
       },
-      { status: modelResult.error === "missing-configuration" ? 503 : 502 },
     );
   }
 
@@ -251,10 +250,9 @@ export async function POST(request: Request) {
         model: modelResult.model,
         error: "invalid-output",
         safeMessageKey: "model.google_ai_studio_invalid_report_payload",
-        safeMessage: "I couldn't generate the report this time. This is a service issue, not a problem with the details you entered. Please try again later.",
+        safeMessage: "I couldn't generate the report this time. Your role details are still here. Please try again later.",
         detail: composition.diagnostic,
       },
-      { status: 502 },
     );
   }
 
