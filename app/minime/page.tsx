@@ -3,10 +3,10 @@
 import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
-import { resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
+import { isReportConfirmationText, resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import styles from "./page.module.css";
 
 type LiveReportState = {
@@ -45,10 +45,6 @@ function normalizeRepeatedInput(value: string) {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-function isReportConfirmationText(value: string) {
-  return /^(yes|yep|sure|ok|okay|go ahead|generate|continue|confirm|great|nice|sounds good|יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך)$/i.test(value.trim());
-}
-
 export default function RoleFitPage() {
   const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => getRoleFitLiveSession());
   const [roleInput, setRoleInput] = useState("");
@@ -61,6 +57,7 @@ export default function RoleFitPage() {
   const reportRequestInFlightRef = useRef(false);
   const chatPaneRef = useRef<HTMLDivElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
+  const roleFileInputRef = useRef<HTMLInputElement>(null);
   const reportLimitReached = liveSession.completedReportCount >= 2;
   const hasLiveReport = Boolean(liveSession.reportPayload);
   const activeReport = liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined;
@@ -187,15 +184,15 @@ export default function RoleFitPage() {
     if (!reportSession.pendingReportConfirmation || !reportSession.activeRoleText.trim()) {
       const missingFieldGuidance = {
         company: "The company name is still missing. Please enter the company name so I can complete the role details.",
-        title: "The role title is still missing. Please enter the job title so I can complete the role details.",
+        title: "What is the role title? If there is no title, say so and I will offer a generic category.",
         responsibilities: "The role responsibilities are still missing. Please paste the main responsibilities or expected outcomes.",
         requirements: "The role requirements are still missing. Please paste the required skills, experience, or qualifications.",
       } as const;
       const guidance = reportSession.pendingRoleField
         ? missingFieldGuidance[reportSession.pendingRoleField]
         : reportSession.activeRoleText.trim()
-          ? "I still need complete role details and your confirmation before generating the report. Please add the role title, responsibilities, and requirements; include the company when available."
-          : "To generate a report, paste the job description or upload its details here. I need the role title, responsibilities, and requirements; include the company when available.";
+          ? "To create the report, I still need:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\nYou can add them in one message."
+          : "Paste the role details or upload a text file to begin.";
       appendLiveMessage({
         role: "agent",
         content: guidance,
@@ -334,6 +331,25 @@ export default function RoleFitPage() {
     });
   }
 
+  function handleRoleFileUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    void file.text()
+      .then((fileText) => {
+        const roleText = fileText.trim();
+        if (!roleText) {
+          appendLiveMessage({ role: "agent", content: "The selected file is empty. Please choose a text file with the role details." });
+          return;
+        }
+        return submitLiveMessage(`Uploaded file: ${file.name}\n\n${roleText}`);
+      })
+      .catch(() => {
+        appendLiveMessage({ role: "agent", content: "I could not read that file. Please choose a TXT, Markdown, or CSV file." });
+      });
+  }
+
   function startNewAnalysis() {
     const nextSession = resetRoleFitAnalysis();
     setLiveSession(nextSession);
@@ -347,6 +363,14 @@ export default function RoleFitPage() {
 
   return (
     <main className={liveSplitCanvas ? `${styles.roleFitPage} ${styles.liveSplitPage}` : styles.roleFitPage}>
+      <input
+        accept=".txt,.md,.csv,text/plain,text/markdown,text/csv"
+        aria-label="Upload job description"
+        hidden
+        onChange={handleRoleFileUpload}
+        ref={roleFileInputRef}
+        type="file"
+      />
       {!hasLiveReport ? <button
         className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, styles.liveReportAction].filter(Boolean).join(" ")}
         aria-label={reportActionLabel}
@@ -372,7 +396,7 @@ export default function RoleFitPage() {
       {!hasConversation ? (
         <section className={styles.heroSection} id="role-fit-agent" aria-labelledby="role-fit-title">
           <h1 id="role-fit-title">Ask My Agent</h1>
-          <p>Ask about my background, test a job description, or explore my case studies.</p>
+          <p>Hi! Ask about my work or check a role.</p>
 
           <div className={styles.chatBoxContainer}>
             <textarea
@@ -382,7 +406,7 @@ export default function RoleFitPage() {
               onChange={(event) => setRoleInput(event.target.value)}
             />
             <div className={styles.chatBoxToolbar}>
-              <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
+              <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description" onClick={() => roleFileInputRef.current?.click()}>
                 <span className={styles.msi} aria-hidden="true">add</span>
               </button>
               <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
@@ -392,7 +416,7 @@ export default function RoleFitPage() {
           </div>
 
           <div className={styles.chipsRow}>
-            <Chip className={styles.chipItem} disabled={isSending} icon="upload_file" kind="action" onClick={() => void submitLiveMessage("I want to upload a job description for validation.")} title="Upload a job description" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending} icon="upload_file" kind="action" onClick={() => roleFileInputRef.current?.click()} title="Upload a job description" tone="primary">
               <span className={styles.fullChipLabel}>Upload a job description</span><span className={styles.shortChipLabel} aria-hidden="true">Upload</span>
             </Chip>
             <Chip className={styles.chipItem} disabled={isSending} icon="content_paste" kind="action" onClick={() => void submitLiveMessage("I want to paste job details for validation.")} title="Paste job details" tone="primary">
@@ -432,7 +456,7 @@ export default function RoleFitPage() {
                 onChange={(event) => setRoleInput(event.target.value)}
               />
               <div className={styles.chatBoxToolbar}>
-                <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
+                <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description" onClick={() => roleFileInputRef.current?.click()}>
                   <span className={styles.msi} aria-hidden="true">add</span>
                 </button>
                 <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || !roleInput.trim()} onClick={() => void submitLiveMessage()}>

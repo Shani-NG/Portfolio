@@ -33,4 +33,12 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(route, /shouldValidateRoleCollectionMessage\(\{/);
     assert.match(route, /roleCollectionActive: parsedRequest\.data\.roleCollectionActive/);
   });
+
+  it("opens a real file input instead of sending an upload chat message", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+
+    assert.match(page, /type="file"/);
+    assert.match(page, /roleFileInputRef\.current\?\.click\(\)/);
+    assert.doesNotMatch(page, /submitLiveMessage\("I want to upload a job description/);
+  });
 });

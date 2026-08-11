@@ -7,7 +7,7 @@ import { approvedProjectDestinations, resolveApprovedEvidenceDestination } from 
 import { loadApprovedEvidence, type ApprovedEvidenceBundle } from "../knowledge/load-approved-evidence.ts";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
 import { validateRoleText } from "../server/role-understanding.ts";
-import { composeReportUIPayload, deriveKeyGaps, deriveTopStrengths } from "./compose-report.ts";
+import { composeReportUIPayload, deriveKeyGaps, deriveTopStrengths, resolveStableFitLevel } from "./compose-report.ts";
 
 const evidence: ApprovedEvidenceBundle = {
   promptContext: "### APPROVED_SOURCE_ID: c4i",
@@ -79,6 +79,21 @@ function analysis(overrides: Partial<QualitativeReportAnalysis> = {}): Qualitati
     ...overrides,
   };
 }
+
+describe("stable qualitative fit", () => {
+  it("returns the same band for the same evidence mapping even when the model band varies", () => {
+    const strongClaim = analysis({ fitLevel: "strong" });
+    const goodClaim = analysis({ fitLevel: "good" });
+
+    assert.equal(resolveStableFitLevel(strongClaim), "strong");
+    assert.equal(resolveStableFitLevel(goodClaim), "strong");
+  });
+
+  it("uses a qualitative limitation to resolve partial fit without a numeric score", () => {
+    const limited = analysis({ fitLevel: "partial", items: [item(0, "partial", "gap")] });
+    assert.equal(resolveStableFitLevel(limited), "partial");
+  });
+});
 
 function reportItem(
   index: number,

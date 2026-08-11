@@ -30,6 +30,13 @@ describe("Gemini chat completion guard", () => {
     assert.equal(completeChatAnswer("שמחה שהצלחנו להתחבר. אני"), "שמחה שהצלחנו להתחבר.");
   });
 
+  it("preserves scannable bullets and removes visible markdown decoration", () => {
+    assert.equal(
+      completeChatAnswer("**Relevant skills**\n* **UX strategy**\n* \"Research\"\n* Innovation"),
+      "Relevant skills\n- UX strategy\n- Research\n- Innovation",
+    );
+  });
+
   it("retries MAX_TOKENS once with a larger plain-text budget", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3-flash-preview";

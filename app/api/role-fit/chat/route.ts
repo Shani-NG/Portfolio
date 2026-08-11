@@ -6,6 +6,7 @@ import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import {
   clarificationLimitAnswer,
   existingReportAnswer,
+  genericRoleTitleAnswer,
   looksLikeNewReportRequest,
   looksLikeRoleSubmissionSetup,
   maxRoleClarificationAttempts,
@@ -20,10 +21,12 @@ import {
   applyRoleCorrection,
   detectRoleCorrection,
   inferRoleFamily,
+  isNoRoleTitleAnswer,
   isValidRoleClarificationAnswer,
   looksLikeReportIntent,
   resolveRoleTextForValidation,
   shouldValidateRoleCollectionMessage,
+  shouldTreatAsRoleClarification,
   validateRoleText,
 } from "@/lib/role-fit/server/role-understanding";
 
@@ -100,7 +103,7 @@ export async function POST(request: Request) {
   });
   const roleContext = parsedRequest.data.roleContext;
   const pendingRoleField = roleContext?.pendingField;
-  const isFieldClarification = Boolean(roleContext && pendingRoleField && !hasRoleInput);
+  const isFieldClarification = Boolean(roleContext && shouldTreatAsRoleClarification(pendingRoleField, parsedRequest.data.message));
   const roleCorrection = roleContext && !pendingRoleField
     ? detectRoleCorrection(parsedRequest.data.message)
     : null;
@@ -129,6 +132,17 @@ export async function POST(request: Request) {
   }
 
   if (roleContext && pendingRoleField && isFieldClarification && !isValidRoleClarificationAnswer(pendingRoleField, parsedRequest.data.message)) {
+    if (pendingRoleField === "title" && isNoRoleTitleAnswer(parsedRequest.data.message)) {
+      return NextResponse.json({
+        state: "awaiting-role-completion",
+        answer: genericRoleTitleAnswer(parsedRequest.data.language),
+        roleText: roleContext.roleText,
+        pendingField: "title",
+        clarificationExhausted: false,
+        safeMessageKey: "role.generic_title_category_requested",
+      });
+    }
+
     const clarificationExhausted = parsedRequest.data.clarificationAttempts + 1 >= maxRoleClarificationAttempts;
     return NextResponse.json({
       state: "awaiting-role-completion",
@@ -152,7 +166,7 @@ export async function POST(request: Request) {
         message: parsedRequest.data.message,
         savedRoleText: roleContext?.roleText,
         pendingField: pendingRoleField,
-        hasRoleInput,
+        hasRoleInput: hasRoleInput && !isFieldClarification,
         hasReportIntent,
       });
 
@@ -272,6 +286,7 @@ export async function POST(request: Request) {
         ? clarificationLimitAnswer(parsedRequest.data.language)
         : missingDetailsAnswer({
             missingField,
+            missingFields: validation.missingFields,
             language: parsedRequest.data.language,
             repeatedInput: parsedRequest.data.repeatedInput,
           }),

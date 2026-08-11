@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyRoleCorrection, createRoleDraftFromText, detectRoleCorrection, looksLikeRoleInput, mergeRoleClarification, resolveRoleTextForValidation, shouldValidateRoleCollectionMessage, validateRoleText } from "./role-understanding.ts";
+import { applyRoleCorrection, createRoleDraftFromText, detectRoleCorrection, isNoRoleTitleAnswer, looksLikeRoleInput, mergeRoleClarification, normalizeRoleTitleClarification, resolveRoleTextForValidation, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -124,6 +124,21 @@ describe("Role Fit pasted job understanding", () => {
     assert.deepEqual(result.missingFields, ["title"]);
   });
 
+  it("does not promote a responsibility sentence when the first line is a section heading", () => {
+    const roleText = [
+      "About the role",
+      "Translate user research and business objectives into clear, elegant, high-converting design",
+      "Responsibilities",
+      "Lead product discovery and align stakeholders",
+      "Requirements",
+      "Strong UX strategy and research experience",
+    ].join("\n");
+
+    const result = validateRoleText({ conversationId: "conv_test", traceId: "trace_test", roleText, detectedLanguage: "en" });
+    assert.equal(result.roleDraft.title?.originalValue, "");
+    assert.deepEqual(result.missingFields, ["title"]);
+  });
+
   it("accepts a title-only reply while role collection is active", () => {
     assert.equal(shouldValidateRoleCollectionMessage({ message: "UX", roleCollectionActive: true }), true);
     assert.equal(shouldValidateRoleCollectionMessage({ message: "UX", roleCollectionActive: false }), false);
@@ -146,6 +161,37 @@ describe("Role Fit pasted job understanding", () => {
 
     assert.equal(result.parseStatus, "valid-complete");
     assert.equal(result.roleDraft.title?.originalValue, "Senior UX Strategist");
+  });
+
+  it("turns an approved generic category into a usable role title", () => {
+    assert.equal(isNoRoleTitleAnswer("There is no title"), true);
+    assert.equal(normalizeRoleTitleClarification("UX"), "UX Position");
+    assert.equal(normalizeRoleTitleClarification("strategy"), "Strategy Position");
+
+    const clarifiedRole = mergeRoleClarification(
+      "Responsibilities: Lead product discovery\nRequirements: Strong UX strategy experience",
+      "title",
+      "AI",
+    );
+    const result = validateRoleText({ conversationId: "conv_test", traceId: "trace_test", roleText: clarifiedRole, detectedLanguage: "en" });
+    assert.equal(result.roleDraft.title?.originalValue, "AI Position");
+  });
+
+  it("keeps a short title category attached to the existing role draft", () => {
+    assert.equal(shouldTreatAsRoleClarification("title", "Innovation"), true);
+    assert.equal(
+      shouldTreatAsRoleClarification("title", "Title: Innovation Lead\nResponsibilities: Lead discovery\nRequirements: Innovation strategy experience"),
+      false,
+    );
+
+    const merged = resolveRoleTextForValidation({
+      message: "Innovation",
+      savedRoleText: "Responsibilities: Lead discovery\nRequirements: Innovation strategy experience",
+      pendingField: "title",
+      hasRoleInput: false,
+      hasReportIntent: false,
+    });
+    assert.match(merged, /Title: Innovation Position/);
   });
 
   it("keeps the approved role draft when a report-status follow-up is not a new role", () => {

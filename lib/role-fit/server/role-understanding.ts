@@ -126,7 +126,7 @@ function inferTitle(roleText: string): string {
 
   const normalizedText = normalizeRoleText(roleText);
   const firstHeadingIndex = normalizedText.search(headingPattern);
-  const titleSource = firstHeadingIndex > 0 ? normalizedText.slice(0, firstHeadingIndex) : normalizedText;
+  const titleSource = firstHeadingIndex >= 0 ? normalizedText.slice(0, firstHeadingIndex) : normalizedText;
   const inferredTitle = titleSource
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -141,6 +141,22 @@ function inferTitle(roleText: string): string {
   return inferredTitle ?? "";
 }
 
+const genericRoleTitles = new Map([
+  ["ux", "UX Position"],
+  ["strategy", "Strategy Position"],
+  ["innovation", "Innovation Position"],
+  ["ai", "AI Position"],
+]);
+
+export function isNoRoleTitleAnswer(value: string): boolean {
+  return /^(?:no|none|no title|there is no title|it has no title|unknown|not specified)$/i.test(value.trim())
+    || /^(?:אין|אין שם|אין כותרת|אין שם משרה|לא צוין|לא ידוע)$/.test(value.trim());
+}
+
+export function normalizeRoleTitleClarification(value: string): string {
+  return genericRoleTitles.get(value.trim().toLowerCase()) ?? value.trim();
+}
+
 const clarificationLabels: Record<RoleClarificationField, string> = {
   company: "Company",
   title: "Title",
@@ -151,13 +167,14 @@ const clarificationLabels: Record<RoleClarificationField, string> = {
 export function isValidRoleClarificationAnswer(field: RoleClarificationField, value: string): boolean {
   const answer = value.trim();
   if (!answer || answer.length > 1000) return false;
-  if (field === "title") return isPlausibleRoleTitle(answer);
+  if (field === "title") return isPlausibleRoleTitle(normalizeRoleTitleClarification(answer));
   if (field === "company") return answer.length <= 120 && !/[.!?]\s/.test(answer);
   return answer.length >= 8;
 }
 
 export function mergeRoleClarification(roleText: string, field: RoleClarificationField, value: string): string {
-  return [roleText.trim(), `${clarificationLabels[field]}: ${value.trim()}`].filter(Boolean).join("\n");
+  const normalizedValue = field === "title" ? normalizeRoleTitleClarification(value) : value.trim();
+  return [roleText.trim(), `${clarificationLabels[field]}: ${normalizedValue}`].filter(Boolean).join("\n");
 }
 
 export function detectRoleCorrection(message: string): RoleCorrection | null {
@@ -299,6 +316,10 @@ export function shouldValidateRoleCollectionMessage(input: {
 }) {
   return looksLikeRoleInput(input.message)
     || (input.roleCollectionActive && isPlausibleRoleTitle(input.message));
+}
+
+export function shouldTreatAsRoleClarification(pendingField: RoleClarificationField | undefined, message: string) {
+  return Boolean(pendingField) && !looksLikeRoleInput(message);
 }
 
 export function looksLikeRoleInput(message: string) {
