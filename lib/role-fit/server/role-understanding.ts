@@ -222,6 +222,10 @@ export function resolveRoleTextForValidation(input: {
   hasRoleInput: boolean;
   hasReportIntent: boolean;
 }): string {
+  if (input.savedRoleText && input.pendingField && input.hasRoleInput) {
+    return [input.savedRoleText.trim(), input.message.trim()].filter(Boolean).join("\n");
+  }
+
   if (input.savedRoleText && input.pendingField && !input.hasRoleInput) {
     return mergeRoleClarification(input.savedRoleText, input.pendingField, input.message);
   }

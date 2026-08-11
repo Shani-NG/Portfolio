@@ -333,7 +333,7 @@ export async function POST(request: Request) {
         provider: modelResult.provider,
         model: modelResult.model,
         error: modelResult.error,
-        answer: "The live conversation service is not available right now. You can still paste role details, and I will keep the conversation state ready for retry.",
+        answer: "The Role Fit Agent is not available right now. Please try again later.",
         safeMessageKey: modelResult.safeMessageKey,
         detail: modelResult.detail,
       },

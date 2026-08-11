@@ -169,9 +169,7 @@ function readPersistedSession(): RoleFitLiveSession | null {
       expiresAt: value.expiresAt,
       state: reportPayload
         ? "report-ready"
-        : value.state === "recoverable-error" || value.state === "generating-report"
-          ? "recoverable-error"
-          : "initial",
+        : "initial",
       activeLanguage: value.activeLanguage as "he" | "en",
       reportPayload,
       reportProvider: typeof value.reportProvider === "string" ? value.reportProvider : "",
@@ -202,6 +200,8 @@ export function getRoleFitLiveSession() {
 }
 
 export function restoreRoleFitLiveSession() {
+  if (activeSession && activeSession.expiresAt > now()) return activeSession;
+
   const persistedSession = readPersistedSession();
   if (persistedSession) activeSession = persistedSession;
   return getRoleFitLiveSession();

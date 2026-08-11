@@ -194,6 +194,20 @@ describe("Role Fit pasted job understanding", () => {
     assert.match(merged, /Title: Innovation Position/);
   });
 
+  it("appends structured role details to an active incomplete role", () => {
+    const merged = resolveRoleTextForValidation({
+      message: "Responsibilities: Lead product discovery with stakeholders\nRequirements: Strong UX strategy experience",
+      savedRoleText: "Title: UX Position",
+      pendingField: "responsibilities",
+      hasRoleInput: true,
+      hasReportIntent: false,
+    });
+    const result = validateRoleText({ conversationId: "conv_test", traceId: "trace_test", roleText: merged, detectedLanguage: "en" });
+
+    assert.equal(result.roleDraft.title?.originalValue, "UX Position");
+    assert.equal(result.parseStatus, "valid-complete");
+  });
+
   it("keeps the approved role draft when a report-status follow-up is not a new role", () => {
     const savedRoleText = [
       "Company: Example Systems",

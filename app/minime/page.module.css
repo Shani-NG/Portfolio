@@ -1622,6 +1622,19 @@
   .requirementPanelWrap { transition: none; }
 }
 
+.chatBoxContainer textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.availabilityNotice {
+  color: var(--rf-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin: var(--ds-space-sm) 0 0;
+  padding-inline: var(--ds-space-xs);
+}
+
 /* Report workspace behavior. Narrow layouts expose one pane at a time. */
 .paneToggleFab {
   display: none;

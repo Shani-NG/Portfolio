@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import type { ReportUIPayload } from "../contracts/index.ts";
-import { resetRoleFitAnalysis, serializeRoleFitSession, updateRoleFitLiveSession } from "./session.ts";
+import { resetRoleFitAnalysis, restoreRoleFitLiveSession, serializeRoleFitSession, updateRoleFitLiveSession } from "./session.ts";
 
 const report: ReportUIPayload = {
   schemaVersion: "1.0",
@@ -63,5 +63,20 @@ describe("Role Fit report session persistence", () => {
     assert.equal(reset.completedReportCount, 2);
     assert.equal(reset.activeRoleText, "");
     assert.deepEqual(reset.messages, []);
+  });
+
+  test("keeps the in-memory conversation during normal page navigation", () => {
+    updateRoleFitLiveSession({
+      state: "awaiting-role-completion",
+      activeRoleText: "Title: UX Position",
+      pendingRoleField: "responsibilities",
+      messages: [{ id: "message_navigation", role: "user", content: "Continue this conversation" }],
+    });
+
+    const restored = restoreRoleFitLiveSession();
+
+    assert.equal(restored.activeRoleText, "Title: UX Position");
+    assert.equal(restored.pendingRoleField, "responsibilities");
+    assert.equal(restored.messages.at(-1)?.content, "Continue this conversation");
   });
 });

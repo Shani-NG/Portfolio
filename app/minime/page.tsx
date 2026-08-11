@@ -15,6 +15,8 @@ type LiveReportState = {
   report?: ReportUIPayload;
 };
 
+type ErrorContext = "conversation" | "report" | "validation" | null;
+
 const reportRequestTimeoutMs = 65_000;
 
 type ReportFailureResult = {
@@ -38,7 +40,7 @@ function reportFailureMessage(result: ReportFailureResult): string {
       : "The report cannot be generated until the role is complete and approved.";
   }
 
-  return result.safeMessage ?? "I could not complete a reliable evidence-based report. Your role details are preserved, so you can try again.";
+  return result.safeMessage ?? "I couldn't generate the report this time. Your role details are still here. Please try again later.";
 }
 
 function normalizeRepeatedInput(value: string) {
@@ -54,13 +56,15 @@ export default function RoleFitPage() {
   const [liveReportState, setLiveReportState] = useState<LiveReportState | null>(null);
   const [activePane, setActivePane] = useState<"chat" | "report">("chat");
   const [isNarrowLayout, setIsNarrowLayout] = useState(false);
+  const [isAgentUnavailable, setIsAgentUnavailable] = useState(false);
+  const [errorContext, setErrorContext] = useState<ErrorContext>(null);
   const reportRequestInFlightRef = useRef(false);
   const chatPaneRef = useRef<HTMLDivElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
   const roleFileInputRef = useRef<HTMLInputElement>(null);
   const reportLimitReached = liveSession.completedReportCount >= 2;
-  const hasLiveReport = Boolean(liveSession.reportPayload);
   const activeReport = liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined;
+  const hasLiveReport = Boolean(activeReport);
   const liveSplitCanvas = liveSession.state === "generating-report" || liveSession.state === "recoverable-error" || liveSession.state === "report-ready";
   const splitCanvas = liveSplitCanvas;
   const hasConversation = liveSession.messages.length > 0 || liveSession.state !== "initial";
@@ -71,6 +75,11 @@ export default function RoleFitPage() {
     : liveSession.pendingReportConfirmation
       ? "Generate confirmed report"
       : "Generate report";
+  const errorHeading = errorContext === "conversation"
+    ? "Role Fit Agent is unavailable"
+    : errorContext === "validation"
+      ? "A few role details are still missing"
+      : "Report not generated";
 
   function syncLiveSession(update: Partial<RoleFitLiveSession>) {
     const nextSession = updateRoleFitLiveSession(update);
@@ -84,17 +93,18 @@ export default function RoleFitPage() {
     return nextSession;
   }
 
-  async function submitLiveMessage(textOverride?: string) {
+  async function submitLiveMessage(textOverride?: string, sessionOverride?: RoleFitLiveSession) {
+    const currentSession = sessionOverride ?? liveSession;
     const submittedText = (textOverride ?? roleInput).trim();
-    if (!submittedText || isSending) return;
-    if (liveSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
+    if (!submittedText || isSending || isAgentUnavailable) return;
+    if (currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
       appendLiveMessage({ role: "user", content: submittedText });
       setRoleInput("");
-      await requestReport();
+      await requestReport(currentSession);
       return;
     }
     const normalizedSubmittedText = normalizeRepeatedInput(submittedText);
-    const normalizedActiveRoleText = normalizeRepeatedInput(liveSession.activeRoleText);
+    const normalizedActiveRoleText = normalizeRepeatedInput(currentSession.activeRoleText);
     const repeatedInput = Boolean(
       normalizedActiveRoleText &&
       (
@@ -103,9 +113,9 @@ export default function RoleFitPage() {
       ),
     );
     const messageForAgent = repeatedInput
-      ? liveSession.activeRoleText
+      ? currentSession.activeRoleText
       : submittedText;
-    const activeLanguage = resolveConversationLanguage(submittedText, liveSession.activeLanguage);
+    const activeLanguage = resolveConversationLanguage(submittedText, currentSession.activeLanguage);
 
     const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
     setRoleInput("");
@@ -113,7 +123,7 @@ export default function RoleFitPage() {
     setApiStatusMessage("");
     setLiveReportState(null);
     syncLiveSession({
-      state: liveSession.reportPayload ? "report-ready" : "general-qa",
+      state: currentSession.reportPayload ? "report-ready" : "general-qa",
       draftInput: "",
       activeLanguage,
     });
@@ -130,15 +140,15 @@ export default function RoleFitPage() {
           message: messageForAgent,
           language: activeLanguage,
           repeatedInput,
-          roleCollectionActive: liveSession.state === "awaiting-role-completion" && !liveSession.reportPayload,
-          clarificationAttempts: liveSession.clarificationAttempts,
-          completedReportCount: liveSession.completedReportCount,
+          roleCollectionActive: currentSession.state === "awaiting-role-completion" && !currentSession.reportPayload,
+          clarificationAttempts: currentSession.clarificationAttempts,
+          completedReportCount: currentSession.completedReportCount,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)),
-          reportContext: liveSession.reportPayload ? JSON.stringify(liveSession.reportPayload).slice(0, 18000) : undefined,
-          roleContext: liveSession.activeRoleText
+          reportContext: currentSession.reportPayload ? JSON.stringify(currentSession.reportPayload).slice(0, 18000) : undefined,
+          roleContext: currentSession.activeRoleText
             ? {
-                roleText: liveSession.activeRoleText,
-                ...(liveSession.pendingRoleField ? { pendingField: liveSession.pendingRoleField } : {}),
+                roleText: currentSession.activeRoleText,
+                ...(currentSession.pendingRoleField ? { pendingField: currentSession.pendingRoleField } : {}),
               }
             : undefined,
         }),
@@ -146,26 +156,32 @@ export default function RoleFitPage() {
 
       const result = await response.json();
       const responseState = (result.state ?? "general-qa") as RoleFitLiveState;
-      const nextState = liveSession.reportPayload && responseState === "general-qa" ? "report-ready" : responseState;
+      const nextState = currentSession.reportPayload && responseState === "general-qa" ? "report-ready" : responseState;
       appendLiveMessage({ role: "agent", content: result.answer ?? "I need a little more context before I can answer safely." });
       syncLiveSession({
         state: nextState,
-        activeRoleText: result.roleText ?? liveSession.activeRoleText,
-        activeRoleTitle: result.validation?.roleDraft?.title?.originalValue ?? liveSession.activeRoleTitle,
-        activeRoleCompany: result.validation?.roleDraft?.company?.originalValue ?? liveSession.activeRoleCompany,
-        pendingRoleField: result.pendingField !== undefined ? result.pendingField : liveSession.pendingRoleField,
+        activeRoleText: result.roleText ?? currentSession.activeRoleText,
+        activeRoleTitle: result.validation?.roleDraft?.title?.originalValue ?? currentSession.activeRoleTitle,
+        activeRoleCompany: result.validation?.roleDraft?.company?.originalValue ?? currentSession.activeRoleCompany,
+        pendingRoleField: result.pendingField !== undefined ? result.pendingField : currentSession.pendingRoleField,
         pendingReportConfirmation: nextState === "awaiting-report-confirmation",
         clarificationAttempts: nextState === "awaiting-role-completion" && !result.clarificationExhausted
-          ? liveSession.clarificationAttempts + 1
+          ? currentSession.clarificationAttempts + 1
           : 0,
         activeLanguage,
       });
 
       if (!response.ok) {
-        setApiStatusMessage(result.safeMessageKey ?? "The live conversation service is currently unavailable.");
+        setApiStatusMessage(result.answer ?? "The Role Fit Agent is not available right now. Please try again later.");
+        setErrorContext("conversation");
+        setIsAgentUnavailable(true);
       }
     } catch {
-      appendLiveMessage({ role: "agent", content: "The live conversation service is currently unavailable. Please try again in a moment." });
+      const message = "The Role Fit Agent is not available right now. Please try again later.";
+      appendLiveMessage({ role: "agent", content: message });
+      setApiStatusMessage(message);
+      setErrorContext("conversation");
+      setIsAgentUnavailable(true);
       syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: false });
     } finally {
       setIsSending(false);
@@ -175,7 +191,7 @@ export default function RoleFitPage() {
   async function requestReport(sessionOverride?: RoleFitLiveSession) {
     const reportSession = sessionOverride ?? liveSession;
 
-    if (reportRequestInFlightRef.current) return;
+    if (reportRequestInFlightRef.current || isAgentUnavailable) return;
     if (reportSession.completedReportCount >= 2) return;
     if (reportSession.reportPayload) {
       syncLiveSession({ state: "report-ready" });
@@ -202,6 +218,7 @@ export default function RoleFitPage() {
     }
 
     setApiStatusMessage("");
+    setErrorContext(null);
     setLiveReportState(null);
     reportRequestInFlightRef.current = true;
     setIsReportRequestInFlight(true);
@@ -229,13 +246,15 @@ export default function RoleFitPage() {
 
       const result = await response.json().catch(() => ({
         state: "malformed-output",
-        safeMessage: "The report service returned an unreadable response. Your role details are preserved, so you can try again.",
+        safeMessage: "I couldn't generate the report this time. Your role details are still here. Please try again later.",
       }));
 
       if (!response.ok || result.state !== "ready") {
         const message = reportFailureMessage(result);
         const missingField = result.validation?.missingFields?.[0] ?? null;
         setApiStatusMessage(message);
+        setErrorContext(missingField ? "validation" : "report");
+        setIsAgentUnavailable(!missingField);
         appendLiveMessage({ role: "agent", content: message });
         syncLiveSession({
           state: "recoverable-error",
@@ -247,14 +266,18 @@ export default function RoleFitPage() {
 
       const parsedReport = reportUIPayloadSchema.safeParse(result.report ?? result.eligibility?.report);
       if (!parsedReport.success) {
-        const message = "The report response was incomplete and was not displayed. Your role details are preserved, so you can try again.";
+        const message = "I couldn't generate the report this time. Your role details are still here. Please try again later.";
         setApiStatusMessage(message);
+        setErrorContext("report");
+        setIsAgentUnavailable(true);
         appendLiveMessage({ role: "agent", content: message });
         syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
         return;
       }
 
       const report = parsedReport.data;
+      setErrorContext(null);
+      setIsAgentUnavailable(false);
       setLiveReportState({
         provider: result.provider,
         model: result.model,
@@ -274,9 +297,11 @@ export default function RoleFitPage() {
     } catch (error) {
       const timedOut = error instanceof Error && error.name === "AbortError";
       const message = timedOut
-        ? "Report generation took too long and was stopped safely. Your role details are preserved, so you can try again."
-        : "The report service is currently unavailable. Your role details are preserved, so you can try again.";
+        ? "I couldn't generate the report because it took too long. Your role details are still here. Please try again later."
+        : "I couldn't generate the report because the service is unavailable. Your role details are still here. Please try again later.";
       setApiStatusMessage(message);
+      setErrorContext("report");
+      setIsAgentUnavailable(true);
       appendLiveMessage({ role: "agent", content: message });
       syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
     } finally {
@@ -287,18 +312,16 @@ export default function RoleFitPage() {
   }
 
   useEffect(() => {
+    const restoredSession = restoreRoleFitLiveSession();
+    setLiveSession(restoredSession);
+    if (restoredSession.reportPayload) setActivePane("report");
+
     const pendingInput = consumePendingHomeRoleFitInput();
     if (!pendingInput) return;
 
     const submittedText = [pendingInput.text, pendingInput.fileText].filter(Boolean).join("\n\n").trim();
     const uploadPrefix = pendingInput.fileName ? `Uploaded file: ${pendingInput.fileName}` : "";
-    void submitLiveMessage([uploadPrefix, submittedText].filter(Boolean).join("\n\n"));
-  }, []);
-
-  useEffect(() => {
-    const restoredSession = restoreRoleFitLiveSession();
-    setLiveSession(restoredSession);
-    if (restoredSession.reportPayload) setActivePane("report");
+    void submitLiveMessage([uploadPrefix, submittedText].filter(Boolean).join("\n\n"), restoredSession);
   }, []);
 
   useEffect(() => {
@@ -355,6 +378,8 @@ export default function RoleFitPage() {
     setLiveSession(nextSession);
     setLiveReportState(null);
     setApiStatusMessage("");
+    setErrorContext(null);
+    setIsAgentUnavailable(false);
     setRoleInput("");
     setActivePane("chat");
   }
@@ -366,6 +391,7 @@ export default function RoleFitPage() {
       <input
         accept=".txt,.md,.csv,text/plain,text/markdown,text/csv"
         aria-label="Upload job description"
+        disabled={isAgentUnavailable}
         hidden
         onChange={handleRoleFileUpload}
         ref={roleFileInputRef}
@@ -375,13 +401,13 @@ export default function RoleFitPage() {
         className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, styles.liveReportAction].filter(Boolean).join(" ")}
         aria-label={reportActionLabel}
         type="button"
-        disabled={reportLimitReached || isReportRequestInFlight}
+        disabled={reportLimitReached || isReportRequestInFlight || isAgentUnavailable}
         title={reportActionLabel}
         onClick={() => void requestReport()}
       >
         Generate Report
       </button> : null}
-      {hasLiveReport && splitCanvas ? (
+      {isNarrowLayout && activeReport ? (
         <button
           aria-label={activePane === "report" ? "Switch to chat" : "Switch to report"}
           className={styles.paneToggleFab}
@@ -402,27 +428,28 @@ export default function RoleFitPage() {
             <textarea
               placeholder="Paste role details using labels: Company:, Title:, Description:, Responsibilities:, Requirements:"
               aria-label="Role Fit message"
+              disabled={isAgentUnavailable}
               value={roleInput}
               onChange={(event) => setRoleInput(event.target.value)}
             />
             <div className={styles.chatBoxToolbar}>
-              <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description" onClick={() => roleFileInputRef.current?.click()}>
+              <button className={styles.iconToolBtn} disabled={isAgentUnavailable} type="button" title="Upload Job Description" aria-label="Upload Job Description" onClick={() => roleFileInputRef.current?.click()}>
                 <span className={styles.msi} aria-hidden="true">add</span>
               </button>
-              <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
+              <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || isAgentUnavailable || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
                 <span className={styles.msi} aria-hidden="true">arrow_forward</span>
               </button>
             </div>
           </div>
 
           <div className={styles.chipsRow}>
-            <Chip className={styles.chipItem} disabled={isSending} icon="upload_file" kind="action" onClick={() => roleFileInputRef.current?.click()} title="Upload a job description" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending || isAgentUnavailable} icon="upload_file" kind="action" onClick={() => roleFileInputRef.current?.click()} title="Upload a job description" tone="primary">
               <span className={styles.fullChipLabel}>Upload a job description</span><span className={styles.shortChipLabel} aria-hidden="true">Upload</span>
             </Chip>
-            <Chip className={styles.chipItem} disabled={isSending} icon="content_paste" kind="action" onClick={() => void submitLiveMessage("I want to paste job details for validation.")} title="Paste job details" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending || isAgentUnavailable} icon="content_paste" kind="action" onClick={() => void submitLiveMessage("I want to paste job details for validation.")} title="Paste job details" tone="primary">
               <span className={styles.fullChipLabel}>Paste job details</span><span className={styles.shortChipLabel} aria-hidden="true">Paste</span>
             </Chip>
-            <Chip className={styles.chipItem} disabled={isSending} icon="travel_explore" kind="action" onClick={() => void submitLiveMessage("Explore my experience")} title="Explore my experience" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending || isAgentUnavailable} icon="travel_explore" kind="action" onClick={() => void submitLiveMessage("Explore my experience")} title="Explore my experience" tone="primary">
               <span className={styles.fullChipLabel}>Explore my experience</span><span className={styles.shortChipLabel} aria-hidden="true">Explore</span>
             </Chip>
           </div>
@@ -452,18 +479,22 @@ export default function RoleFitPage() {
               <textarea
                 placeholder="Paste or refine role details using labels: Company:, Title:, Description:, Responsibilities:, Requirements:"
                 aria-label="Role Fit follow-up"
+                disabled={isAgentUnavailable}
                 value={roleInput}
                 onChange={(event) => setRoleInput(event.target.value)}
               />
               <div className={styles.chatBoxToolbar}>
-                <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description" onClick={() => roleFileInputRef.current?.click()}>
+                <button className={styles.iconToolBtn} disabled={isAgentUnavailable} type="button" title="Upload Job Description" aria-label="Upload Job Description" onClick={() => roleFileInputRef.current?.click()}>
                   <span className={styles.msi} aria-hidden="true">add</span>
                 </button>
-                <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
+                <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || isAgentUnavailable || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
                   <span className={styles.msi} aria-hidden="true">arrow_forward</span>
                 </button>
               </div>
             </div>
+            {isAgentUnavailable ? (
+              <p className={styles.availabilityNotice} role="status">Role Fit Agent is not available right now. Please try again later.</p>
+            ) : null}
           </div>
 
           {splitCanvas ? (
@@ -486,8 +517,8 @@ export default function RoleFitPage() {
               ) : liveSession.state === "recoverable-error" ? (
                 <div className={styles.errorState} id="role-fit-error" role="alert">
                   <span className={styles.msi} aria-hidden="true">error</span>
-                  <h2>The live agent needs attention</h2>
-                  <p>{apiStatusMessage || "The session is preserved. Please continue in the chat or try again."}</p>
+                  <h2>{errorHeading}</h2>
+                  <p>{apiStatusMessage || "I couldn't complete this request. Please try again later."}</p>
                 </div>
               ) : (
                 activeReport ? <RoleFitLiveReport onStartNewAnalysis={startNewAnalysis} report={activeReport} /> : null
