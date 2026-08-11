@@ -86,7 +86,7 @@ export default function RoleFitPage() {
     : errorContext === "validation"
       ? "A few role details are still missing"
       : "Report not generated";
-  const pageClassName = isLiveMode && liveSplitCanvas
+  const pageClassName = liveSplitCanvas
     ? `${styles.roleFitPage} ${styles.liveSplitPage}`
     : hasConversation
       ? `${styles.roleFitPage} ${styles.conversationPage}`
