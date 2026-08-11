@@ -5,12 +5,12 @@ export async function POST(request: Request) {
   const result = await persistContactLead(await request.json().catch(() => null));
 
   if (!result.ok) {
+    const status = result.reason === "invalid-payload" ? 400 : 200;
     return NextResponse.json(
       { ok: false, message: "I couldn't send the message right now. Please try again." },
-      { status: result.reason === "invalid-payload" ? 400 : 503 },
+      { status },
     );
   }
 
   return NextResponse.json({ ok: true, message: "Thanks - your message was sent." });
 }
-

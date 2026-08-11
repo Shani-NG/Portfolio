@@ -8,6 +8,10 @@ import styles from "./page.module.css";
 type FieldName = "name" | "company" | "message" | "email";
 type TouchedFields = Partial<Record<FieldName, boolean>>;
 type SubmitStatus = "idle" | "submitting" | "success" | "error";
+type ContactResponse = {
+  ok?: boolean;
+  message?: string;
+};
 
 const initialValues: Record<FieldName, string> = {
   name: "",
@@ -96,7 +100,9 @@ export function ContactForm() {
         }),
       });
 
-      if (!response.ok) {
+      const result = (await response.json().catch(() => ({}))) as ContactResponse;
+
+      if (!response.ok || !result.ok) {
         setSubmitStatus("error");
         return;
       }

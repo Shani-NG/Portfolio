@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, test } from "node:test";
 import type { ReportUIPayload } from "../contracts/index.ts";
 import {
@@ -176,5 +178,13 @@ describe("Task E Lite persistence helpers", () => {
       report_id: "TOO-LONG",
       source_context: "free-text-source",
     }).success, false);
+  });
+
+  test("keeps missing contact webhook as a controlled response instead of a network error", async () => {
+    const route = await readFile(join(process.cwd(), "app", "api", "contact", "route.ts"), "utf8");
+    const form = await readFile(join(process.cwd(), "app", "contact", "contact-form.tsx"), "utf8");
+
+    assert.match(route, /result\.reason === "invalid-payload" \? 400 : 200/);
+    assert.match(form, /!response\.ok \|\| !result\.ok/);
   });
 });
