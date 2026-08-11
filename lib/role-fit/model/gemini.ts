@@ -160,7 +160,27 @@ function candidateFinishReason(response: GeminiResponse): string {
 }
 
 export function completeChatAnswer(answer: string): string | null {
-  const normalized = answer.replace(/\s+/g, " ").trim();
+  const cleanedLines = answer
+    .replace(/```(?:\w+)?/g, "")
+    .split(/\r?\n/)
+    .map((line) => line
+      .trim()
+      .replace(/^#{1,6}\s*/, "")
+      .replace(/^>\s*/, "")
+      .replace(/^(?:[*+]\s+)/, "- ")
+      .replace(/\*\*|__/g, "")
+      .replace(/[“”„"]/g, "")
+      .replace(/[ \t]+/g, " ")
+      .trim())
+    .filter(Boolean);
+  const bulletLines = cleanedLines.filter((line) => line.startsWith("- ")).slice(0, 5);
+
+  if (bulletLines.length > 0) {
+    const lead = cleanedLines.find((line) => !line.startsWith("- "));
+    return [lead, ...bulletLines].filter(Boolean).join("\n");
+  }
+
+  const normalized = cleanedLines.join(" ").trim();
   const completeSentences = normalized.match(/[^.!?…]+[.!?…]+/gu)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
 
   if (completeSentences.length < 1) return null;
@@ -298,7 +318,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         models: getCandidateModels(model),
         prompt: reportPrompt,
         maxOutputTokens: input.maxOutputTokens,
-        temperature: 0.15,
+        temperature: 0,
         responseMimeType: "application/json",
       });
 
@@ -308,7 +328,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           models: getCandidateModels(model),
           prompt: `${reportPrompt}\n\nThe previous attempt reached its token limit. Return one complete JSON object that satisfies the schema; keep each rationale concise.`,
           maxOutputTokens: Math.max(input.maxOutputTokens * 2, 4000),
-          temperature: 0.1,
+          temperature: 0,
           responseMimeType: "application/json",
         });
       }

@@ -45,6 +45,31 @@ const fitPresentation = {
 const positiveMatchTypes = new Set<AnalysisItem["matchType"]>(["direct", "semantic", "transferable"]);
 const gapMatchTypes = new Set<AnalysisItem["matchType"]>(["partial", "insufficient-evidence", "real-gap"]);
 
+export function resolveStableFitLevel(analysis: QualitativeReportAnalysis): QualitativeReportAnalysis["fitLevel"] {
+  if (analysis.fitLevel === "out-of-scope") return "out-of-scope";
+
+  const supportedStrengths = analysis.items.filter((item) =>
+    positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.evidenceSourceIds.length > 0,
+  );
+  const limitations = analysis.items.filter((item) => gapMatchTypes.has(item.matchType));
+  const evidencedLimitation = limitations.some((item) =>
+    item.matchType === "real-gap" || (item.matchType === "partial" && item.evidenceSourceIds.length > 0),
+  );
+  if (evidencedLimitation) return "partial";
+  if (supportedStrengths.length === 0) return "insufficient";
+  if (limitations.length > 0) return "partial";
+
+  const centralItems = analysis.items.filter((item) => item.importance !== "supporting");
+  const hasStrongCentralCoverage = centralItems.length > 0 && centralItems.every((item) =>
+    (item.matchType === "direct" || item.matchType === "semantic")
+    && item.impact === "strength"
+    && (item.evidenceConfidence === "high" || item.evidenceConfidence === "medium")
+    && item.evidenceSourceIds.length > 0,
+  );
+
+  return analysis.evidenceConfidence === "high" && hasStrongCentralCoverage ? "strong" : "good";
+}
+
 function splitSentences(value: string): string[] {
   return value.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) ?? [];
 }
@@ -174,10 +199,11 @@ export function composeReportUIPayload(input: {
 
   const semanticIssue = semanticDiagnostic(input.analysis);
   if (semanticIssue) return { ok: false, diagnostic: semanticIssue };
+  const analysis = { ...input.analysis, fitLevel: resolveStableFitLevel(input.analysis) };
 
   const reportItems: ReportItem[] = [];
 
-  for (const [position, analysisItem] of input.analysis.items.entries()) {
+  for (const [position, analysisItem] of analysis.items.entries()) {
     const roleItem = roleItems[analysisItem.roleItemIndex];
     if (!roleItem || seenIndexes.has(analysisItem.roleItemIndex)) {
       return { ok: false, diagnostic: "composition:invalid-role-item-index" };
@@ -215,7 +241,7 @@ export function composeReportUIPayload(input: {
     });
   }
 
-  const referencedSourceIds = [...new Set(input.analysis.items.flatMap((item) => item.evidenceSourceIds))];
+  const referencedSourceIds = [...new Set(analysis.items.flatMap((item) => item.evidenceSourceIds))];
   const sourceToClusterId = new Map<string, string>();
   const clustersByDestination = new Map<string, ReportUIPayload["evidencePanel"]["clusters"][number]>();
 
@@ -264,12 +290,12 @@ export function composeReportUIPayload(input: {
   const strengths = deriveTopStrengths(reportItems);
   const gaps = deriveKeyGaps(reportItems);
   const language = input.language === "he" ? "he" : "en";
-  const fitLevel = input.analysis.fitLevel;
+  const fitLevel = analysis.fitLevel;
   const overallFitVisual = fitLevel === "insufficient" || fitLevel === "out-of-scope"
     ? {
         mode: fitLevel,
         label: fitLevel === "insufficient" ? "Insufficient evidence" : "Outside the supported role scope",
-        rationale: conciseSentences(input.analysis.fitRationale, 2, 260),
+        rationale: conciseSentences(analysis.fitRationale, 2, 260),
       }
     : {
         mode: "fit" as const,
@@ -278,8 +304,8 @@ export function composeReportUIPayload(input: {
         illustrationKey: fitPresentation[fitLevel].illustrationKey,
         colorToken: fitPresentation[fitLevel].colorToken,
         label: fitPresentation[fitLevel].label,
-        rationale: conciseSentences(input.analysis.fitRationale, 2, 260),
-        ...(input.analysis.evidenceConfidence === "low" || input.analysis.evidenceConfidence === "insufficient"
+        rationale: conciseSentences(analysis.fitRationale, 2, 260),
+        ...(analysis.evidenceConfidence === "low" || analysis.evidenceConfidence === "insufficient"
           ? { qualifiers: ["evidence-limited" as const] }
           : {}),
       };
@@ -296,12 +322,12 @@ export function composeReportUIPayload(input: {
     },
     overallFitVisual,
     evidenceConfidence: {
-      level: input.analysis.evidenceConfidence,
-      rationale: conciseSentences(input.analysis.evidenceConfidenceRationale, 2, 220),
+      level: analysis.evidenceConfidence,
+      rationale: conciseSentences(analysis.evidenceConfidenceRationale, 2, 220),
     },
     skillsMatch: {
       items: strengths,
-      visualCoverage: { mode: "qualitative", label: input.analysis.skillsCoverageLabel },
+      visualCoverage: { mode: "qualitative", label: analysis.skillsCoverageLabel },
     },
     requirementMapping: {
       items: reportItems,

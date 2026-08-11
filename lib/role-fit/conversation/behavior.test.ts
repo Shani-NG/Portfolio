@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { existingReportAnswer, missingDetailsAnswer, readyForReportAnswer, reportLimitAnswer, resolveConversationLanguage, roleSubmissionSetupAnswer } from "./behavior.ts";
+import { existingReportAnswer, genericRoleTitleAnswer, isReportConfirmationText, missingDetailsAnswer, readyForReportAnswer, reportLimitAnswer, resolveConversationLanguage, roleSubmissionSetupAnswer } from "./behavior.ts";
 
 describe("Role Fit conversation behavior", () => {
   it("keeps a Hebrew conversation in Hebrew when an English JD is pasted", () => {
@@ -19,10 +19,34 @@ describe("Role Fit conversation behavior", () => {
     assert.match(missingDetailsAnswer({ missingField: "requirements", language: "he", repeatedInput: true }), /^הפרט הזה עדיין חסר:/);
   });
 
+  it("lists multiple missing details as short scannable bullets", () => {
+    assert.equal(
+      missingDetailsAnswer({
+        missingField: "title",
+        missingFields: ["title", "responsibilities", "requirements"],
+        language: "en",
+        repeatedInput: false,
+      }),
+      "To create the report, I still need:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\nYou can add them in one message.",
+    );
+  });
+
+  it("offers approved generic title categories after a no-title answer", () => {
+    const answer = genericRoleTitleAnswer("en");
+    assert.match(answer, /- UX\n- Strategy\n- Innovation\n- AI/);
+  });
+
+  it("accepts short confirmations with normal punctuation", () => {
+    assert.equal(isReportConfirmationText("Yes!"), true);
+    assert.equal(isReportConfirmationText("כן."), true);
+    assert.equal(isReportConfirmationText("not yet"), false);
+  });
+
   it("requests explicit report confirmation after role completion", () => {
     const answer = readyForReportAnswer({ title: "Senior Product Designer", companyName: "Acme", language: "he", repeatedInput: false });
     assert.match(answer, /Senior Product Designer/);
     assert.match(answer, /שנמשיך\?$/);
+    assert.doesNotMatch(answer, /[“”„"]/);
   });
 
   it("provides contextual deterministic copy without generic chatbot filler", () => {

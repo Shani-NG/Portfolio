@@ -1,27 +1,21 @@
 "use client";
 
 import { Chip } from "@/components/ui/chip";
-import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
-import { resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
+import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
+import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import { isReportConfirmationText, resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import styles from "./page.module.css";
-
-type MatchType =
-  | "direct"
-  | "semantic"
-  | "transferable"
-  | "partial"
-  | "insufficient"
-  | "insufficient-evidence"
-  | "real-gap";
 
 type LiveReportState = {
   provider?: string;
   model?: string;
   report?: ReportUIPayload;
 };
+
+type ErrorContext = "conversation" | "report" | "validation" | null;
 
 const reportRequestTimeoutMs = 65_000;
 
@@ -46,35 +40,11 @@ function reportFailureMessage(result: ReportFailureResult): string {
       : "The report cannot be generated until the role is complete and approved.";
   }
 
-  return result.safeMessage ?? "I could not complete a reliable evidence-based report. Your role details are preserved, so you can try again.";
+  return result.safeMessage ?? "I couldn't generate the report this time. Your role details are still here. Please try again later.";
 }
-
-const matchLabels: Record<MatchType, string> = {
-  direct: "Direct evidence",
-  semantic: "Strong semantic match",
-  transferable: "Transferable match",
-  partial: "Partial evidence",
-  insufficient: "Insufficient evidence",
-    "insufficient-evidence": "Insufficient evidence",
-  "real-gap": "Real gap",
-};
-
-const matchTones: Record<MatchType, "success" | "secondary" | "warning"> = {
-  direct: "success",
-  semantic: "success",
-  transferable: "secondary",
-  partial: "warning",
-  insufficient: "warning",
-  "insufficient-evidence": "warning",
-"real-gap": "warning",
-};
 
 function normalizeRepeatedInput(value: string) {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
-}
-
-function isReportConfirmationText(value: string) {
-  return /^(yes|yep|sure|ok|okay|go ahead|generate|continue|confirm|great|nice|sounds good|יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך)$/i.test(value.trim());
 }
 
 export default function RoleFitPage() {
@@ -84,9 +54,17 @@ export default function RoleFitPage() {
   const [isSending, setIsSending] = useState(false);
   const [isReportRequestInFlight, setIsReportRequestInFlight] = useState(false);
   const [liveReportState, setLiveReportState] = useState<LiveReportState | null>(null);
+  const [activePane, setActivePane] = useState<"chat" | "report">("chat");
+  const [isNarrowLayout, setIsNarrowLayout] = useState(false);
+  const [isAgentUnavailable, setIsAgentUnavailable] = useState(false);
+  const [errorContext, setErrorContext] = useState<ErrorContext>(null);
   const reportRequestInFlightRef = useRef(false);
+  const chatPaneRef = useRef<HTMLDivElement>(null);
+  const reportPaneRef = useRef<HTMLElement>(null);
+  const roleFileInputRef = useRef<HTMLInputElement>(null);
   const reportLimitReached = liveSession.completedReportCount >= 2;
-  const hasLiveReport = Boolean(liveSession.reportPayload);
+  const activeReport = liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined;
+  const hasLiveReport = Boolean(activeReport);
   const liveSplitCanvas = liveSession.state === "generating-report" || liveSession.state === "recoverable-error" || liveSession.state === "report-ready";
   const splitCanvas = liveSplitCanvas;
   const hasConversation = liveSession.messages.length > 0 || liveSession.state !== "initial";
@@ -97,6 +75,11 @@ export default function RoleFitPage() {
     : liveSession.pendingReportConfirmation
       ? "Generate confirmed report"
       : "Generate report";
+  const errorHeading = errorContext === "conversation"
+    ? "Role Fit Agent is unavailable"
+    : errorContext === "validation"
+      ? "A few role details are still missing"
+      : "Report not generated";
 
   function syncLiveSession(update: Partial<RoleFitLiveSession>) {
     const nextSession = updateRoleFitLiveSession(update);
@@ -110,17 +93,18 @@ export default function RoleFitPage() {
     return nextSession;
   }
 
-  async function submitLiveMessage(textOverride?: string) {
+  async function submitLiveMessage(textOverride?: string, sessionOverride?: RoleFitLiveSession) {
+    const currentSession = sessionOverride ?? liveSession;
     const submittedText = (textOverride ?? roleInput).trim();
-    if (!submittedText || isSending) return;
-    if (liveSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
+    if (!submittedText || isSending || isAgentUnavailable) return;
+    if (currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
       appendLiveMessage({ role: "user", content: submittedText });
       setRoleInput("");
-      await requestReport();
+      await requestReport(currentSession);
       return;
     }
     const normalizedSubmittedText = normalizeRepeatedInput(submittedText);
-    const normalizedActiveRoleText = normalizeRepeatedInput(liveSession.activeRoleText);
+    const normalizedActiveRoleText = normalizeRepeatedInput(currentSession.activeRoleText);
     const repeatedInput = Boolean(
       normalizedActiveRoleText &&
       (
@@ -129,9 +113,9 @@ export default function RoleFitPage() {
       ),
     );
     const messageForAgent = repeatedInput
-      ? liveSession.activeRoleText
+      ? currentSession.activeRoleText
       : submittedText;
-    const activeLanguage = resolveConversationLanguage(submittedText, liveSession.activeLanguage);
+    const activeLanguage = resolveConversationLanguage(submittedText, currentSession.activeLanguage);
 
     const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
     setRoleInput("");
@@ -139,7 +123,7 @@ export default function RoleFitPage() {
     setApiStatusMessage("");
     setLiveReportState(null);
     syncLiveSession({
-      state: liveSession.reportPayload ? "report-ready" : "general-qa",
+      state: currentSession.reportPayload ? "report-ready" : "general-qa",
       draftInput: "",
       activeLanguage,
     });
@@ -156,15 +140,15 @@ export default function RoleFitPage() {
           message: messageForAgent,
           language: activeLanguage,
           repeatedInput,
-          roleCollectionActive: liveSession.state === "awaiting-role-completion" && !liveSession.reportPayload,
-          clarificationAttempts: liveSession.clarificationAttempts,
-          completedReportCount: liveSession.completedReportCount,
+          roleCollectionActive: currentSession.state === "awaiting-role-completion" && !currentSession.reportPayload,
+          clarificationAttempts: currentSession.clarificationAttempts,
+          completedReportCount: currentSession.completedReportCount,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)),
-          reportContext: liveSession.reportPayload ? JSON.stringify(liveSession.reportPayload).slice(0, 18000) : undefined,
-          roleContext: liveSession.activeRoleText
+          reportContext: currentSession.reportPayload ? JSON.stringify(currentSession.reportPayload).slice(0, 18000) : undefined,
+          roleContext: currentSession.activeRoleText
             ? {
-                roleText: liveSession.activeRoleText,
-                ...(liveSession.pendingRoleField ? { pendingField: liveSession.pendingRoleField } : {}),
+                roleText: currentSession.activeRoleText,
+                ...(currentSession.pendingRoleField ? { pendingField: currentSession.pendingRoleField } : {}),
               }
             : undefined,
         }),
@@ -172,26 +156,32 @@ export default function RoleFitPage() {
 
       const result = await response.json();
       const responseState = (result.state ?? "general-qa") as RoleFitLiveState;
-      const nextState = liveSession.reportPayload && responseState === "general-qa" ? "report-ready" : responseState;
+      const nextState = currentSession.reportPayload && responseState === "general-qa" ? "report-ready" : responseState;
       appendLiveMessage({ role: "agent", content: result.answer ?? "I need a little more context before I can answer safely." });
       syncLiveSession({
         state: nextState,
-        activeRoleText: result.roleText ?? liveSession.activeRoleText,
-        activeRoleTitle: result.validation?.roleDraft?.title?.originalValue ?? liveSession.activeRoleTitle,
-        activeRoleCompany: result.validation?.roleDraft?.company?.originalValue ?? liveSession.activeRoleCompany,
-        pendingRoleField: result.pendingField !== undefined ? result.pendingField : liveSession.pendingRoleField,
+        activeRoleText: result.roleText ?? currentSession.activeRoleText,
+        activeRoleTitle: result.validation?.roleDraft?.title?.originalValue ?? currentSession.activeRoleTitle,
+        activeRoleCompany: result.validation?.roleDraft?.company?.originalValue ?? currentSession.activeRoleCompany,
+        pendingRoleField: result.pendingField !== undefined ? result.pendingField : currentSession.pendingRoleField,
         pendingReportConfirmation: nextState === "awaiting-report-confirmation",
         clarificationAttempts: nextState === "awaiting-role-completion" && !result.clarificationExhausted
-          ? liveSession.clarificationAttempts + 1
+          ? currentSession.clarificationAttempts + 1
           : 0,
         activeLanguage,
       });
 
       if (!response.ok) {
-        setApiStatusMessage(result.safeMessageKey ?? "The live conversation service is currently unavailable.");
+        setApiStatusMessage(result.answer ?? "The Role Fit Agent is not available right now. Please try again later.");
+        setErrorContext("conversation");
+        setIsAgentUnavailable(true);
       }
     } catch {
-      appendLiveMessage({ role: "agent", content: "The live conversation service is currently unavailable. Please try again in a moment." });
+      const message = "The Role Fit Agent is not available right now. Please try again later.";
+      appendLiveMessage({ role: "agent", content: message });
+      setApiStatusMessage(message);
+      setErrorContext("conversation");
+      setIsAgentUnavailable(true);
       syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: false });
     } finally {
       setIsSending(false);
@@ -201,7 +191,7 @@ export default function RoleFitPage() {
   async function requestReport(sessionOverride?: RoleFitLiveSession) {
     const reportSession = sessionOverride ?? liveSession;
 
-    if (reportRequestInFlightRef.current) return;
+    if (reportRequestInFlightRef.current || isAgentUnavailable) return;
     if (reportSession.completedReportCount >= 2) return;
     if (reportSession.reportPayload) {
       syncLiveSession({ state: "report-ready" });
@@ -210,15 +200,15 @@ export default function RoleFitPage() {
     if (!reportSession.pendingReportConfirmation || !reportSession.activeRoleText.trim()) {
       const missingFieldGuidance = {
         company: "The company name is still missing. Please enter the company name so I can complete the role details.",
-        title: "The role title is still missing. Please enter the job title so I can complete the role details.",
+        title: "What is the role title? If there is no title, say so and I will offer a generic category.",
         responsibilities: "The role responsibilities are still missing. Please paste the main responsibilities or expected outcomes.",
         requirements: "The role requirements are still missing. Please paste the required skills, experience, or qualifications.",
       } as const;
       const guidance = reportSession.pendingRoleField
         ? missingFieldGuidance[reportSession.pendingRoleField]
         : reportSession.activeRoleText.trim()
-          ? "I still need complete role details and your confirmation before generating the report. Please add the role title, responsibilities, and requirements; include the company when available."
-          : "To generate a report, paste the job description or upload its details here. I need the role title, responsibilities, and requirements; include the company when available.";
+          ? "To create the report, I still need:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\nYou can add them in one message."
+          : "Paste the role details or upload a text file to begin.";
       appendLiveMessage({
         role: "agent",
         content: guidance,
@@ -228,9 +218,11 @@ export default function RoleFitPage() {
     }
 
     setApiStatusMessage("");
+    setErrorContext(null);
     setLiveReportState(null);
     reportRequestInFlightRef.current = true;
     setIsReportRequestInFlight(true);
+    setActivePane("report");
     syncLiveSession({ state: "generating-report" });
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), reportRequestTimeoutMs);
@@ -254,13 +246,15 @@ export default function RoleFitPage() {
 
       const result = await response.json().catch(() => ({
         state: "malformed-output",
-        safeMessage: "The report service returned an unreadable response. Your role details are preserved, so you can try again.",
+        safeMessage: "I couldn't generate the report this time. Your role details are still here. Please try again later.",
       }));
 
       if (!response.ok || result.state !== "ready") {
         const message = reportFailureMessage(result);
         const missingField = result.validation?.missingFields?.[0] ?? null;
         setApiStatusMessage(message);
+        setErrorContext(missingField ? "validation" : "report");
+        setIsAgentUnavailable(!missingField);
         appendLiveMessage({ role: "agent", content: message });
         syncLiveSession({
           state: "recoverable-error",
@@ -272,14 +266,18 @@ export default function RoleFitPage() {
 
       const parsedReport = reportUIPayloadSchema.safeParse(result.report ?? result.eligibility?.report);
       if (!parsedReport.success) {
-        const message = "The report response was incomplete and was not displayed. Your role details are preserved, so you can try again.";
+        const message = "I couldn't generate the report this time. Your role details are still here. Please try again later.";
         setApiStatusMessage(message);
+        setErrorContext("report");
+        setIsAgentUnavailable(true);
         appendLiveMessage({ role: "agent", content: message });
         syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
         return;
       }
 
       const report = parsedReport.data;
+      setErrorContext(null);
+      setIsAgentUnavailable(false);
       setLiveReportState({
         provider: result.provider,
         model: result.model,
@@ -295,12 +293,15 @@ export default function RoleFitPage() {
         pendingRoleField: null,
         pendingReportConfirmation: false,
       });
+      setActivePane("report");
     } catch (error) {
       const timedOut = error instanceof Error && error.name === "AbortError";
       const message = timedOut
-        ? "Report generation took too long and was stopped safely. Your role details are preserved, so you can try again."
-        : "The report service is currently unavailable. Your role details are preserved, so you can try again.";
+        ? "I couldn't generate the report because it took too long. Your role details are still here. Please try again later."
+        : "I couldn't generate the report because the service is unavailable. Your role details are still here. Please try again later.";
       setApiStatusMessage(message);
+      setErrorContext("report");
+      setIsAgentUnavailable(true);
       appendLiveMessage({ role: "agent", content: message });
       syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
     } finally {
@@ -311,16 +312,32 @@ export default function RoleFitPage() {
   }
 
   useEffect(() => {
+    const restoredSession = restoreRoleFitLiveSession();
+    setLiveSession(restoredSession);
+    if (restoredSession.reportPayload) setActivePane("report");
+
     const pendingInput = consumePendingHomeRoleFitInput();
     if (!pendingInput) return;
 
     const submittedText = [pendingInput.text, pendingInput.fileText].filter(Boolean).join("\n\n").trim();
     const uploadPrefix = pendingInput.fileName ? `Uploaded file: ${pendingInput.fileName}` : "";
-    void submitLiveMessage([uploadPrefix, submittedText].filter(Boolean).join("\n\n"));
+    void submitLiveMessage([uploadPrefix, submittedText].filter(Boolean).join("\n\n"), restoredSession);
   }, []);
 
   useEffect(() => {
-    if (!liveSplitCanvas) return;
+    const media = window.matchMedia("(max-width: 70rem)");
+    const syncLayout = () => setIsNarrowLayout(media.matches);
+    syncLayout();
+    media.addEventListener("change", syncLayout);
+    return () => media.removeEventListener("change", syncLayout);
+  }, []);
+
+  useEffect(() => {
+    if (isNarrowLayout && hasLiveReport) setActivePane("report");
+  }, [activeReport?.reportId, hasLiveReport, isNarrowLayout]);
+
+  useEffect(() => {
+    if (!liveSplitCanvas || isNarrowLayout) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -328,66 +345,123 @@ export default function RoleFitPage() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [liveSplitCanvas]);
+  }, [isNarrowLayout, liveSplitCanvas]);
+
+  function switchPane(nextPane: "chat" | "report") {
+    setActivePane(nextPane);
+    window.requestAnimationFrame(() => {
+      (nextPane === "chat" ? chatPaneRef.current : reportPaneRef.current)?.focus();
+    });
+  }
+
+  function handleRoleFileUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    void file.text()
+      .then((fileText) => {
+        const roleText = fileText.trim();
+        if (!roleText) {
+          appendLiveMessage({ role: "agent", content: "The selected file is empty. Please choose a text file with the role details." });
+          return;
+        }
+        return submitLiveMessage(`Uploaded file: ${file.name}\n\n${roleText}`);
+      })
+      .catch(() => {
+        appendLiveMessage({ role: "agent", content: "I could not read that file. Please choose a TXT, Markdown, or CSV file." });
+      });
+  }
+
+  function startNewAnalysis() {
+    const nextSession = resetRoleFitAnalysis();
+    setLiveSession(nextSession);
+    setLiveReportState(null);
+    setApiStatusMessage("");
+    setErrorContext(null);
+    setIsAgentUnavailable(false);
+    setRoleInput("");
+    setActivePane("chat");
+  }
 
   const chatMessages = liveSession.messages;
 
   return (
     <main className={liveSplitCanvas ? `${styles.roleFitPage} ${styles.liveSplitPage}` : styles.roleFitPage}>
+      <input
+        accept=".txt,.md,.csv,text/plain,text/markdown,text/csv"
+        aria-label="Upload job description"
+        disabled={isAgentUnavailable}
+        hidden
+        onChange={handleRoleFileUpload}
+        ref={roleFileInputRef}
+        type="file"
+      />
       {!hasLiveReport ? <button
         className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, styles.liveReportAction].filter(Boolean).join(" ")}
         aria-label={reportActionLabel}
         type="button"
-        disabled={reportLimitReached || isReportRequestInFlight}
+        disabled={reportLimitReached || isReportRequestInFlight || isAgentUnavailable}
         title={reportActionLabel}
         onClick={() => void requestReport()}
       >
         Generate Report
       </button> : null}
-      {splitCanvas ? (
-        <button className={styles.mobileBackChip} type="button" onClick={() => syncLiveSession({ state: "general-qa" })}>
-          <span className={styles.msi} aria-hidden="true">arrow_back</span>
-          Back to chat
+      {isNarrowLayout && activeReport ? (
+        <button
+          aria-label={activePane === "report" ? "Switch to chat" : "Switch to report"}
+          className={styles.paneToggleFab}
+          onClick={() => switchPane(activePane === "report" ? "chat" : "report")}
+          type="button"
+        >
+          <span className={styles.msi} aria-hidden="true">{activePane === "report" ? "chat" : "description"}</span>
+          <span>{activePane === "report" ? "Chat" : "Report"}</span>
         </button>
       ) : null}
 
       {!hasConversation ? (
         <section className={styles.heroSection} id="role-fit-agent" aria-labelledby="role-fit-title">
           <h1 id="role-fit-title">Ask My Agent</h1>
-          <p>Ask about my background, test a job description, or explore my case studies.</p>
+          <p>Hi! Ask about my work or check a role.</p>
 
           <div className={styles.chatBoxContainer}>
             <textarea
               placeholder="Paste role details using labels: Company:, Title:, Description:, Responsibilities:, Requirements:"
               aria-label="Role Fit message"
+              disabled={isAgentUnavailable}
               value={roleInput}
               onChange={(event) => setRoleInput(event.target.value)}
             />
             <div className={styles.chatBoxToolbar}>
-              <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
+              <button className={styles.iconToolBtn} disabled={isAgentUnavailable} type="button" title="Upload Job Description" aria-label="Upload Job Description" onClick={() => roleFileInputRef.current?.click()}>
                 <span className={styles.msi} aria-hidden="true">add</span>
               </button>
-              <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
+              <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || isAgentUnavailable || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
                 <span className={styles.msi} aria-hidden="true">arrow_forward</span>
               </button>
             </div>
           </div>
 
           <div className={styles.chipsRow}>
-            <Chip className={styles.chipItem} disabled={isSending} icon="upload_file" kind="action" onClick={() => void submitLiveMessage("I want to upload a job description for validation.")} title="Upload a job description" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending || isAgentUnavailable} icon="upload_file" kind="action" onClick={() => roleFileInputRef.current?.click()} title="Upload a job description" tone="primary">
               <span className={styles.fullChipLabel}>Upload a job description</span><span className={styles.shortChipLabel} aria-hidden="true">Upload</span>
             </Chip>
-            <Chip className={styles.chipItem} disabled={isSending} icon="content_paste" kind="action" onClick={() => void submitLiveMessage("I want to paste job details for validation.")} title="Paste job details" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending || isAgentUnavailable} icon="content_paste" kind="action" onClick={() => void submitLiveMessage("I want to paste job details for validation.")} title="Paste job details" tone="primary">
               <span className={styles.fullChipLabel}>Paste job details</span><span className={styles.shortChipLabel} aria-hidden="true">Paste</span>
             </Chip>
-            <Chip className={styles.chipItem} disabled={isSending} icon="travel_explore" kind="action" onClick={() => void submitLiveMessage("Explore my experience")} title="Explore my experience" tone="primary">
+            <Chip className={styles.chipItem} disabled={isSending || isAgentUnavailable} icon="travel_explore" kind="action" onClick={() => void submitLiveMessage("Explore my experience")} title="Explore my experience" tone="primary">
               <span className={styles.fullChipLabel}>Explore my experience</span><span className={styles.shortChipLabel} aria-hidden="true">Explore</span>
             </Chip>
           </div>
         </section>
       ) : (
         <section className={liveSplitCanvas ? `${styles.agentViewContainer} ${styles.liveSplitWorkspace}` : styles.agentViewContainer} id="role-fit-workspace" aria-label="Role Fit workspace">
-          <div className={`${styles.chatPane} ${splitCanvas ? styles.compactHiddenChat : styles.fullWidth}`}>
+          <div
+            aria-hidden={isNarrowLayout && splitCanvas && activePane !== "chat"}
+            className={`${styles.chatPane} ${splitCanvas ? styles.splitChatPane : styles.fullWidth} ${activePane === "chat" ? styles.narrowPaneActive : styles.narrowPaneInactive}`}
+            ref={chatPaneRef}
+            tabIndex={-1}
+          >
             <div className={styles.chatHistory}>
               {chatMessages.map((message, index) => (
                 <div className={`${styles.chatBubble} ${message.role === "user" ? styles.userBubble : styles.agentBubble}`} key={`${message.role}-${index}`}>
@@ -405,22 +479,32 @@ export default function RoleFitPage() {
               <textarea
                 placeholder="Paste or refine role details using labels: Company:, Title:, Description:, Responsibilities:, Requirements:"
                 aria-label="Role Fit follow-up"
+                disabled={isAgentUnavailable}
                 value={roleInput}
                 onChange={(event) => setRoleInput(event.target.value)}
               />
               <div className={styles.chatBoxToolbar}>
-                <button className={styles.iconToolBtn} type="button" title="Upload Job Description" aria-label="Upload Job Description">
+                <button className={styles.iconToolBtn} disabled={isAgentUnavailable} type="button" title="Upload Job Description" aria-label="Upload Job Description" onClick={() => roleFileInputRef.current?.click()}>
                   <span className={styles.msi} aria-hidden="true">add</span>
                 </button>
-                <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
+                <button className={styles.submitBtn} type="button" aria-label="Send message" title="Send message" disabled={isSending || isAgentUnavailable || !roleInput.trim()} onClick={() => void submitLiveMessage()}>
                   <span className={styles.msi} aria-hidden="true">arrow_forward</span>
                 </button>
               </div>
             </div>
+            {isAgentUnavailable ? (
+              <p className={styles.availabilityNotice} role="status">Role Fit Agent is not available right now. Please try again later.</p>
+            ) : null}
           </div>
 
           {splitCanvas ? (
-            <aside className={styles.canvasPane} aria-label="Role Fit report canvas">
+            <aside
+              aria-hidden={isNarrowLayout && activePane !== "report"}
+              className={`${styles.canvasPane} ${activePane === "report" ? styles.narrowPaneActive : styles.narrowPaneInactive}`}
+              aria-label="Role Fit report canvas"
+              ref={reportPaneRef}
+              tabIndex={-1}
+            >
               {liveSession.state === "generating-report" ? (
                 <div className={styles.generatingState} id="role-fit-generating" role="status" aria-live="polite">
                   <div className={styles.generatingBars} aria-hidden="true">
@@ -433,457 +517,16 @@ export default function RoleFitPage() {
               ) : liveSession.state === "recoverable-error" ? (
                 <div className={styles.errorState} id="role-fit-error" role="alert">
                   <span className={styles.msi} aria-hidden="true">error</span>
-                  <h2>The live agent needs attention</h2>
-                  <p>{apiStatusMessage || "The session is preserved. Please continue in the chat or try again."}</p>
+                  <h2>{errorHeading}</h2>
+                  <p>{apiStatusMessage || "I couldn't complete this request. Please try again later."}</p>
                 </div>
               ) : (
-                <LiveReportCanvas
-                  liveReportState={{
-                    report: liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined,
-                    provider: liveReportState?.provider ?? liveSession.reportProvider,
-                    model: liveReportState?.model ?? liveSession.reportModel,
-                  }}
-                />
+                activeReport ? <RoleFitLiveReport onStartNewAnalysis={startNewAnalysis} report={activeReport} /> : null
               )}
             </aside>
           ) : null}
         </section>
       )}
     </main>
-  );
-}
-
-function LiveReportCanvas({ liveReportState }: { liveReportState: LiveReportState | null }) {
-  const report = liveReportState?.report;
-  const [openRequirementIds, setOpenRequirementIds] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!report) {
-      setOpenRequirementIds(new Set());
-      return;
-    }
-
-    const defaultRequirementId =
-      report.requirementMapping.items.find((item) =>
-        item.clusterIds.includes(report.evidencePanel.defaultClusterId ?? ""),
-      )?.itemId ?? report.requirementMapping.items[0]?.itemId;
-
-    setOpenRequirementIds(defaultRequirementId ? new Set([defaultRequirementId]) : new Set());
-  }, [report?.reportId]);
-
-  if (!report) {
-    return (
-      <div className={`${styles.reportShell} ${styles.liveReportCanvas}`} id="role-fit-live-report">
-        <section className={`${styles.bentoCard} ${styles.roleSnapshot}`}>
-          <span className={styles.reportEyebrow}>Role Fit Report</span>
-          <h2>Report unavailable</h2>
-          <p className={styles.fitSummary}>
-            The report response is ready, but no display payload was returned.
-          </p>
-        </section>
-      </div>
-    );
-  }
-
-  const fitLevel =
-    report.overallFitVisual.mode === "fit"
-      ? report.overallFitVisual.level
-      : "partial";
-
-  const reportToneClass =
-    fitLevel === "strong"
-      ? styles.fitStrong
-      : fitLevel === "good"
-        ? styles.fitGood
-        : styles.fitPartial;
-
-  const confidenceLabel = report.evidenceConfidence.level.replaceAll("-", " ");
-
-  const skills = report.skillsMatch.items;
-  const requirements = report.requirementMapping.items;
-  const evidenceClusters = report.evidencePanel.clusters;
-
-  const strengths = report.topStrengths.items;
-  const gaps = report.keyGaps.items;
-
-  const skillsCoverageLabel = (() => {
-    const coverage = report.skillsMatch.visualCoverage;
-
-    if (coverage.mode === "qualitative") {
-      return coverage.label;
-    }
-
-    if (coverage.mode === "traceable-count") {
-      return `${coverage.matchedCount}/${coverage.totalCount}`;
-    }
-
-    return "Evidence-based";
-  })();
-
-  function findClusterForItem(clusterIds: string[]) {
-    return (
-      evidenceClusters.find((cluster) => clusterIds.includes(cluster.clusterId)) ??
-      null
-    );
-  }
-
-  const fitValue = report.overallFitVisual.mode === "fit" ? report.overallFitVisual.fitVisualValue : 0;
-  const progressOffset = 327 - (327 * Math.min(100, Math.max(0, fitValue))) / 100;
-  const fitIllustration = fitLevel === "strong" ? "account_tree" : fitLevel === "good" ? "schema" : "alt_route";
-  const additionalSkillCount = Math.max(0, skills.length - 5);
-  const visibleSkills = skills.slice(0, 5);
-  const remainingSkills = skills.slice(5).map((skill) => skill.displayLabel || skill.originalText).join(" · ");
-  const locationValue = [report.roleSnapshot.location, report.roleSnapshot.workModel].filter(Boolean).join(" · ") || "Not specified";
-  const experienceValue = report.roleSnapshot.yearsOfExperience
-    ? `${report.roleSnapshot.yearsOfExperience}+ years`
-    : report.roleSnapshot.seniority || "Not specified";
-
-  return (
-    <div
-      className={`${styles.reportShell} ${styles.liveReportCanvas} ${reportToneClass}`}
-      dir={report.language === "he" ? "rtl" : "ltr"}
-      id="role-fit-live-report"
-    >
-      <header className={styles.reportHeader}>
-        <div className={styles.reportIdentity}>
-          <div className={styles.reportBrand}>
-            <div className={styles.avatar}>S</div>
-            <div>
-              <h1>Shani Nakash-Gomel - Smart Role Fit</h1>
-              <p>A concise role-fit report grounded in verified portfolio evidence.</p>
-            </div>
-          </div>
-        </div>
-        <div className={styles.fitLevelChips} aria-label={`Fit level: ${report.overallFitVisual.label}`}>
-          {(["strong", "good", "partial"] as const).map((level) => (
-            <span
-              aria-current={fitLevel === level ? "true" : undefined}
-              className={`${styles.fitLevelChip} ${fitLevel === level ? styles.fitLevelSelected : ""}`}
-              key={level}
-              title={level}
-            >
-              {level}
-            </span>
-          ))}
-        </div>
-      </header>
-
-      <div className={styles.reportGrid}>
-        <section
-          className={`${styles.bentoCard} ${styles.roleSnapshot}`}
-          id="live-analyzed-job-profile"
-          aria-label="Live Role Fit report"
-        >
-          <div className={styles.snapshotTop}>
-            <div className={styles.snapshotCopy}>
-              <span className={styles.reportEyebrow}>Analyzed Job Profile</span>
-              <h2>{report.roleSnapshot.title}</h2>
-              <p>
-                <span className={styles.msi} aria-hidden="true">
-                  business
-                </span>{" "}
-                {report.roleSnapshot.company}
-              </p>
-            </div>
-
-          </div>
-
-          <p className={styles.fitSummary}>
-            {report.overallFitVisual.rationale}
-          </p>
-
-          <div className={styles.statsGrid}>
-            <Stat
-              icon="business"
-              label="Company"
-              value={report.roleSnapshot.company}
-            />
-            <Stat
-              icon="workspace_premium"
-              label="Required experience"
-              value={experienceValue}
-            />
-            <Stat
-              icon="location_on"
-              label="Location & work model"
-              value={locationValue}
-            />
-            <Stat
-              icon="verified"
-              label="Evidence confidence"
-              value={confidenceLabel}
-            />
-          </div>
-        </section>
-
-        <section
-          className={`${styles.bentoCard} ${styles.skillsCard}`}
-          id="live-skills-match"
-        >
-          <div className={styles.progressWrap} aria-label={`${report.overallFitVisual.label}: ${skillsCoverageLabel}`}>
-            <svg viewBox="0 0 120 120" aria-hidden="true">
-              <circle cx="60" cy="60" r="52" className={styles.progressTrack} />
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                className={styles.progressCircle}
-                strokeDasharray="327"
-                strokeDashoffset={progressOffset}
-              />
-            </svg>
-            <div className={styles.fitIllustration} aria-hidden="true">
-              <span className={styles.msi}>{fitIllustration}</span>
-              <i />
-              <i />
-            </div>
-          </div>
-          <h3>Core Matching Skills</h3>
-          <p className={styles.skillsSubtitle}>The strongest capabilities supporting this fit.</p>
-
-          <div className={styles.skillsList}>
-            {visibleSkills.map((skill) => (
-              <Chip className={styles.skillChip} kind="info" key={skill.itemId}>
-                {skill.displayLabel || skill.originalText}
-              </Chip>
-            ))}
-            {additionalSkillCount ? <span className={styles.moreSkillsChip} title={remainingSkills}>+{additionalSkillCount} more</span> : null}
-          </div>
-        </section>
-
-        <section
-          className={`${styles.bentoCard} ${styles.evidenceSection}`}
-          id="live-requirements-evidence"
-        >
-          <div className={styles.sectionHeader}>
-            <div>
-              <span className={styles.reportEyebrow}>
-                Requirements & Evidence Mapping
-              </span>
-              <h3>Evidence Behind the Match</h3>
-            </div>
-
-            <Chip
-              className={styles.guidanceChip}
-              icon="touch_app"
-              kind="info"
-            >
-              Tap a requirement to view its portfolio evidence
-            </Chip>
-          </div>
-
-          <div className={styles.requirementsList}>
-              {requirements.map((requirement) => {
-                const cluster = findClusterForItem(requirement.clusterIds);
-                const isOpen = openRequirementIds.has(requirement.itemId);
-
-                return (
-                  <article
-                    className={`${styles.requirementDisclosure} ${isOpen ? styles.activeRequirement : ""}`}
-                    key={requirement.itemId}
-                  >
-                    <button
-                      className={styles.requirementItem}
-                      type="button"
-                      aria-expanded={isOpen}
-                      aria-controls={`evidence-${requirement.itemId}`}
-                      onClick={() => {
-                        setOpenRequirementIds((current) => {
-                          const next = new Set(current);
-                          if (next.has(requirement.itemId)) next.delete(requirement.itemId);
-                          else next.add(requirement.itemId);
-                          return next;
-                        });
-                      }}
-                    >
-                      <span className={styles.requirementIcon} aria-hidden="true">
-                        <span className={styles.msi}>
-                        {requirement.impact === "gap"
-                          ? "warning"
-                          : requirement.matchType === "direct"
-                            ? "verified"
-                            : "link"}
-                        </span>
-                      </span>
-
-                      <span className={styles.requirementCopy}>
-                        <strong title={requirement.displayLabel || requirement.originalText}>
-                          {requirement.displayLabel || requirement.originalText}
-                        </strong>
-
-                        <small title={requirement.shortRationale}>{requirement.shortRationale}</small>
-
-                        <Chip
-                          className={styles.matchChip}
-                          kind="info"
-                          tone={matchTones[requirement.matchType]}
-                        >
-                          {matchLabels[requirement.matchType]} ·{" "}
-                          {requirement.evidenceConfidence.replaceAll("-", " ")}
-                        </Chip>
-                      </span>
-
-                      <span className={`${styles.msi} ${styles.requirementChevron}`} aria-hidden="true">
-                        expand_more
-                      </span>
-                    </button>
-
-                    <div className={styles.requirementPanelWrap} id={`evidence-${requirement.itemId}`} aria-hidden={!isOpen}>
-                      <div className={styles.requirementPanelInner}>
-                        {cluster ? <LiveEvidencePanel cluster={cluster} /> : (
-                          <div className={styles.noEvidenceState}>
-                            <span className={styles.msi} aria-hidden="true">search_off</span>
-                            <strong>No verified portfolio evidence found</strong>
-                            <p>This requirement is not supported by the approved portfolio evidence.</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-        </section>
-
-        <ListCard
-          id="live-top-strengths"
-          icon="check_circle"
-          title="Top Strengths"
-          items={strengths}
-          tone="strength"
-        />
-
-        <ListCard
-          id="live-key-gaps"
-          icon="warning"
-          title="Key Gaps"
-          items={gaps}
-          tone="gap"
-          emptyTitle="No material gaps detected"
-          emptyBody="Based on the submitted role and available evidence."
-        />
-
-        <section className={styles.ctaSection} id="live-role-fit-contact">
-          <p>{report.disclaimer.text}</p>
-
-          {report.contactCta.enabled && report.contactCta.href ? (
-          <a href={report.contactCta.href} className={styles.ctaButton}>
-            <span className={styles.msi} aria-hidden="true">
-              mail
-            </span>
-            <span>{report.contactCta.label}</span>
-          </a>
-          ) : null}
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function LiveEvidencePanel({
-  cluster,
-}: {
-  cluster: ReportUIPayload["evidencePanel"]["clusters"][number];
-}) {
-  const hasLink = cluster.destination.mode !== "no-link";
-
-  return (
-    <div className={styles.projectContent}>
-      <div>
-        <div className={styles.verifiedLabel}>
-          <span className={styles.msi} aria-hidden="true">
-            folder_open
-          </span>
-          Verified Portfolio Evidence
-        </div>
-
-        <h4>{cluster.project?.title || cluster.title}</h4>
-        <p>{cluster.summary}</p>
-
-      </div>
-
-      {hasLink ? (
-        <a
-          href={cluster.destination.mode === "no-link" ? "#" : cluster.destination.href}
-          className={styles.projectLink}
-        >
-          <span>
-            View Case Study
-          </span>
-
-          <span className={styles.msi} aria-hidden="true">
-            arrow_forward
-          </span>
-        </a>
-      ) : (
-        <p className={`${styles.projectLink} ${styles.sourceLabel}`}>
-          Source: {cluster.title}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Stat({ icon, label, value }: { icon: string; label: string; value: string }) {
-  return (
-    <div className={styles.statCard}>
-      <div><span className={styles.msi} aria-hidden="true">{icon}</span></div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-type ReportListItem = string | Pick<ReportUIPayload["requirementMapping"]["items"][number], "displayLabel" | "originalText" | "shortRationale">;
-
-function ListCard({
-  id,
-  icon,
-  title,
-  items,
-  tone,
-  emptyTitle,
-  emptyBody,
-}: {
-  id: string;
-  icon: string;
-  title: string;
-  items: ReportListItem[];
-  tone: "strength" | "gap";
-  emptyTitle?: string;
-  emptyBody?: string;
-}) {
-  const hasItems = items.length > 0;
-
-  return (
-    <section className={`${styles.bentoCard} ${styles.listCard}`} id={id}>
-      <h3 className={tone === "strength" ? styles.strengthTitle : styles.gapTitle}>
-        <span className={styles.msi} aria-hidden="true">{icon}</span>
-        {title}
-      </h3>
-      {hasItems ? (
-        <ul>
-        {items.map((item) => {
-          const label = typeof item === "string" ? item : item.displayLabel || item.originalText;
-          const rationale = typeof item === "string" ? "" : item.shortRationale;
-
-          return (
-          <li key={`${label}-${rationale}`}>
-            <span className={styles.msi} aria-hidden="true">{tone === "strength" ? "check_circle" : "error"}</span>
-            <span>
-              <strong>{label}</strong>
-              {rationale ? <small>{rationale}</small> : null}
-            </span>
-          </li>
-          );
-        })}
-      </ul>
-      ) : (
-        <div className={styles.emptyGapState}>
-          <strong>{emptyTitle ?? "No items to show"}</strong>
-          {emptyBody ? <p>{emptyBody}</p> : null}
-        </div>
-      )}
-    </section>
   );
 }

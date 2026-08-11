@@ -34,10 +34,51 @@ function fieldQuestion(field: ConversationRoleField | undefined, language: "he" 
   return "What key role detail is still missing?";
 }
 
-export function missingDetailsAnswer(input: { missingField: ConversationRoleField | undefined; language: "he" | "en" | "mixed"; repeatedInput: boolean }) {
-  const question = fieldQuestion(input.missingField, input.language);
+export function isReportConfirmationText(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[.!?…]+$/u, "").trim();
+  return /^(yes|yep|sure|ok|okay|go ahead|generate|continue|confirm|great|nice|sounds good|יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך)$/i.test(normalized);
+}
+
+function fieldLabel(field: ConversationRoleField, language: "he" | "en" | "mixed") {
+  if (isHebrewLanguage(language)) {
+    return {
+      company: "שם החברה, אם ידוע",
+      title: "שם המשרה",
+      responsibilities: "תחומי אחריות מרכזיים",
+      requirements: "דרישות או כישורים מרכזיים",
+    }[field];
+  }
+
+  return {
+    company: "Company name, if available",
+    title: "Role title",
+    responsibilities: "Main responsibilities",
+    requirements: "Main requirements or qualifications",
+  }[field];
+}
+
+export function missingDetailsAnswer(input: {
+  missingField: ConversationRoleField | undefined;
+  missingFields?: ConversationRoleField[];
+  language: "he" | "en" | "mixed";
+  repeatedInput: boolean;
+}) {
+  const fields = [...new Set(input.missingFields ?? (input.missingField ? [input.missingField] : []))];
+  if (fields.length > 1) {
+    const heading = isHebrewLanguage(input.language) ? "כדי ליצור את הדוח חסרים:" : "To create the report, I still need:";
+    const action = isHebrewLanguage(input.language) ? "אפשר להוסיף את הפרטים בהודעה אחת." : "You can add them in one message.";
+    return `${heading}\n${fields.map((field) => `- ${fieldLabel(field, input.language)}`).join("\n")}\n${action}`;
+  }
+
+  const question = fieldQuestion(fields[0] ?? input.missingField, input.language);
   if (!input.repeatedInput) return question;
   return isHebrewLanguage(input.language) ? `הפרט הזה עדיין חסר: ${question}` : `That detail is still missing: ${question}`;
+}
+
+export function genericRoleTitleAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "איזה סוג תפקיד זה?\n- UX\n- Strategy\n- Innovation\n- AI\nאבנה מהבחירה שם משרה גנרי."
+    : "What type of role is it?\n- UX\n- Strategy\n- Innovation\n- AI\nI will use the selection as a generic role title.";
 }
 
 export function clarificationLimitAnswer(language: "he" | "en" | "mixed") {
@@ -48,14 +89,14 @@ export function clarificationLimitAnswer(language: "he" | "en" | "mixed") {
 
 export function readyForReportAnswer(input: { title: string; companyName?: string; language: "he" | "en" | "mixed"; repeatedInput: boolean }) {
   if (isHebrewLanguage(input.language)) {
-    const roleLabel = input.title ? ` עבור „${input.title}”` : "";
+    const roleLabel = input.title ? ` עבור ${input.title}` : "";
     const companyLabel = input.companyName ? ` ב־${input.companyName}` : "";
     return input.repeatedInput
       ? `יש לי כבר את כל הפרטים${roleLabel}${companyLabel}. להפיק את הדוח?`
       : `יש לי את כל מה שאני צריכה כדי להפיק דוח${roleLabel}${companyLabel}. שנמשיך?`;
   }
 
-  const roleLabel = input.title ? ` for “${input.title}”` : "";
+  const roleLabel = input.title ? ` for ${input.title}` : "";
   const companyLabel = input.companyName ? ` at ${input.companyName}` : "";
   return input.repeatedInput
     ? `I already have all the role details${roleLabel}${companyLabel}. Shall I generate the report?`
