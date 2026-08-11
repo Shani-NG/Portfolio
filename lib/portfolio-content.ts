@@ -92,7 +92,8 @@ export const roleFitProjectCard = {
   title: "Role Fit Agent",
   href: "/experience/role-fit-agent",
   summary: "A conversation-based portfolio agent for evidence-based role-fit analysis.",
-  visual: "placeholder",
+  image: "/assets/project-role-fit-agent.png",
+  imageAlt: "Role Fit Agent orchestration and evidence-based report interface.",
   accent: "rose",
 } as const;
 

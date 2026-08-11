@@ -71,6 +71,10 @@
   transition: transform var(--ds-duration-base) var(--ds-ease-standard);
 }
 
+.projectThumbTop img {
+  object-position: center top;
+}
+
 .designSystemThumb {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

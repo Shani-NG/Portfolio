@@ -122,10 +122,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--ds-space-xs);
   min-width: 9rem;
   min-height: 2.75rem;
   border: var(--ds-border-width) solid color-mix(in srgb, var(--ds-color-action-primary) 72%, transparent);
-  border-radius: 999px;
+  border-radius: var(--ds-radius-sm);
   background: transparent;
   color: var(--ds-color-action-primary-hover);
   font-size: var(--ds-type-button-size);

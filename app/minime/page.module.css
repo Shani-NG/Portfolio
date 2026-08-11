@@ -37,6 +37,13 @@
   top: var(--site-header-height);
 }
 
+.conversationPage {
+  position: fixed;
+  inset: var(--site-header-height) 0 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .msi {
   direction: ltr;
   display: inline-block;
@@ -248,9 +255,11 @@
 .agentViewContainer {
   display: flex;
   gap: 24px;
+  height: calc(100svh - var(--site-header-height) - 48px);
   margin: 24px auto 0;
   max-width: 1400px;
-  min-height: calc(100vh - var(--site-header-height) - 72px);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .liveSplitWorkspace {
@@ -274,8 +283,11 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  height: 100%;
   justify-content: space-between;
   max-width: 450px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .fullWidth {
@@ -290,6 +302,7 @@
   flex-direction: column;
   gap: 16px;
   margin-bottom: 24px;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1133,6 +1146,7 @@
   }
 
   .agentViewContainer {
+    height: calc(100svh - var(--site-header-height) - 32px);
     margin-top: 16px;
   }
 

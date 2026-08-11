@@ -330,9 +330,11 @@ function MonitoringCaseStudy() {
                     <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
                     <div className={section.cards.length === 2 ? styles.monitoringCardGridTwo : styles.monitoringCardGridThree}>
                       {section.cards.map(([title, body, icon]) => (
-                        <article className={styles.monitoringInfoCard} key={title}>
-                          <span className={styles.monitoringCardIcon}><MonitoringIcon name={icon} /></span>
-                          <h3>{title}</h3>
+                        <article className={[styles.monitoringInfoCard, styles.monitoringCompactCard].join(" ")} key={title}>
+                          <div className={styles.monitoringCardHeader}>
+                            <span className={styles.monitoringCardIcon}><MonitoringIcon name={icon} /></span>
+                            <h3>{title}</h3>
+                          </div>
                           <p>{body}</p>
                         </article>
                       ))}
@@ -979,7 +981,7 @@ function C4iHtmlCaseStudy() {
         </section>
       </ScrollReveal>
 
-      <ScrollReveal mode="creative">
+      <ScrollReveal mode="topDown">
         <section className={styles.c4iHtmlSection} id="ux-engineering-through-integration">
           <div className={styles.c4iHtmlWrap}>
             <div className={styles.c4iSectionHead}>
@@ -1166,7 +1168,7 @@ function KmsSectionView({ section, index }: { section: KmsSection; index: number
   if (section.id === "validation-before-release") {
     return (
       <ScrollReveal mode={revealMode}>
-        <section className={[styles.kmsSection, styles.kmsFeatureSection].join(" ")} id={section.id}>
+        <section className={[styles.kmsSection, styles.kmsFeatureSection, styles.kmsValidationSection].join(" ")} id={section.id}>
           <div className={styles.kmsFeatureInner}>
             <div className={styles.kmsSectionCopy}>
               <p className={styles.kmsEyebrow}>{section.label}</p>
@@ -1192,34 +1194,39 @@ function KmsSectionView({ section, index }: { section: KmsSection; index: number
     <ScrollReveal mode={revealMode}>
       <section className={[styles.kmsSection, isGuidance ? styles.kmsGuidanceSection : ""].join(" ")} id={guidanceSection.id}>
         <div className={styles.kmsGuidanceInner}>
-          <div className={styles.kmsGuidanceHeader}>
-            <p className={styles.kmsEyebrow}>{guidanceSection.label}</p>
-            <h2>{guidanceSection.title}</h2>
-            <p className={styles.kmsBody}>{guidanceSection.body}</p>
-          </div>
+          <div className={styles.kmsGuidanceContent}>
+            <div className={styles.kmsGuidanceHeader}>
+              <p className={styles.kmsEyebrow}>{guidanceSection.label}</p>
+              <h2>{guidanceSection.title}</h2>
+              <p className={styles.kmsBody}>{guidanceSection.body}</p>
+            </div>
 
-          <KmsVisualImage visual={kmsCaseStudy.visuals.contextual} className={styles.kmsGuidanceVisual} />
-
-          <div className={styles.kmsGuidanceCards}>
-            <article className={styles.kmsInfoCard}>
-              <h3>{guidanceSection.cardsTitle}</h3>
-              <div className={styles.kmsGuidanceList}>
-                {guidanceSection.points.map((point) => {
-                  const title = typeof point === "string" ? point : point[0];
-                  const body = typeof point === "string" ? null : point[1];
-                  return (
-                    <div key={title} className={styles.kmsGuidanceItem}>
-                      <span><MaterialIcon name="info" /></span>
-                      <div>
-                        <h4>{title}</h4>
-                        {body ? <p>{body}</p> : null}
+            <div className={styles.kmsGuidanceCards}>
+              <article className={styles.kmsInfoCard}>
+                <h3>{guidanceSection.cardsTitle}</h3>
+                <div className={styles.kmsGuidanceList}>
+                  {guidanceSection.points.map((point) => {
+                    const title = typeof point === "string" ? point : point[0];
+                    const body = typeof point === "string" ? null : point[1];
+                    return (
+                      <div key={title} className={styles.kmsGuidanceItem}>
+                        <span><MaterialIcon name="info" /></span>
+                        <div>
+                          <h4>{title}</h4>
+                          {body ? <p>{body}</p> : null}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </article>
+                    );
+                  })}
+                </div>
+              </article>
+              <article className={styles.kmsInfoCard}>
+                <h3>{guidanceSection.secondaryTitle}</h3>
+                <p>{guidanceSection.secondaryBody}</p>
+              </article>
+            </div>
           </div>
+          <KmsVisualImage visual={kmsCaseStudy.visuals.foundation} className={styles.kmsGuidanceVisual} />
         </div>
       </section>
     </ScrollReveal>
@@ -1479,9 +1486,11 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
           <div className={styles.epdTimeline}>
             {section.timeline.map(([icon, title, body], timelineIndex) => (
               <article key={title}>
-                <div>
-                  <span><EpdIcon name={icon} /></span>
-                  <h3>{title}</h3>
+                <div className={styles.epdTimelineCopy}>
+                  <div className={styles.epdTimelineHeading}>
+                    <span><EpdIcon name={icon} /></span>
+                    <h3>{title}</h3>
+                  </div>
                   <p>{body}</p>
                 </div>
                 <EpdTimelineVisual index={timelineIndex} />

@@ -73,6 +73,10 @@ export const scrollModes = {
     name: "creative",
     intent: "Use a restrained image or accent reveal for a meaningful focal moment.",
   },
+  topDown: {
+    name: "topDown",
+    intent: "Reveal a section from top to bottom while preserving its reading order.",
+  },
 } as const;
 
 export type ScrollMode = keyof typeof scrollModes;

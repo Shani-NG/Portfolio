@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import styles from "./hero-motion.module.css";
 
 const heroSessionKey = "portfolio-hero-animation-complete";
@@ -235,7 +236,8 @@ export function HeroMotion() {
             <div className={styles.pointerGlow} aria-hidden="true" />
           </div>
           <a className={styles.contactCta} href="/contact?source=portfolio-cta">
-            Let&apos;s Connect
+            LET&apos;S CONNECT
+            <MaterialIcon name="arrow_forward" />
           </a>
         </div>
       </div>

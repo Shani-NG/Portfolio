@@ -86,6 +86,11 @@ export default function RoleFitPage() {
     : errorContext === "validation"
       ? "A few role details are still missing"
       : "Report not generated";
+  const pageClassName = isLiveMode && liveSplitCanvas
+    ? `${styles.roleFitPage} ${styles.liveSplitPage}`
+    : hasConversation
+      ? `${styles.roleFitPage} ${styles.conversationPage}`
+      : styles.roleFitPage;
 
   function syncLiveSession(update: Partial<RoleFitLiveSession>) {
     const nextSession = updateRoleFitLiveSession(update);
@@ -393,7 +398,7 @@ export default function RoleFitPage() {
   const chatMessages = liveSession.messages;
 
   return (
-    <main className={liveSplitCanvas ? `${styles.roleFitPage} ${styles.liveSplitPage}` : styles.roleFitPage}>
+    <main className={pageClassName}>
       <input
         accept=".txt,.md,.csv,text/plain,text/markdown,text/csv"
         aria-label="Upload job description"

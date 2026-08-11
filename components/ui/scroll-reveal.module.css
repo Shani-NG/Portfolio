@@ -3,7 +3,8 @@
 }
 
 .overlap,
-.creative {
+.creative,
+.topDown {
   opacity: 0;
   transform: translateY(var(--ds-distance-md));
   will-change: opacity, transform;
@@ -14,7 +15,8 @@
 }
 
 .overlap.visible,
-.creative.visible {
+.creative.visible,
+.topDown.visible {
   opacity: 1;
   transform: translateY(0);
 }
@@ -38,6 +40,19 @@
   transform: translateY(0) scale(1);
 }
 
+.topDown {
+  clip-path: inset(0 0 100% 0);
+  opacity: 1;
+  transform: none;
+  will-change: clip-path;
+  transition: clip-path var(--ds-duration-slow) var(--ds-ease-enter);
+  transition-delay: var(--scroll-reveal-delay, 0ms);
+}
+
+.topDown.visible {
+  clip-path: inset(0);
+}
+
 .static {
   opacity: 1;
 }
@@ -45,8 +60,10 @@
 @media (prefers-reduced-motion: reduce) {
   .overlap,
   .creative,
+  .topDown,
   .overlap.visible,
-  .creative.visible {
+  .creative.visible,
+  .topDown.visible {
     clip-path: none;
     opacity: 1;
     transform: none;

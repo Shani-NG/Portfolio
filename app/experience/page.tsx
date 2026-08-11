@@ -10,6 +10,8 @@ const designSystemCard = {
   summary:
     "A code-first preview for approving color roles, typography hierarchy, button behavior and reusable card composition before applying the system to portfolio pages.",
   href: "/design-system",
+  image: "/assets/project-design-system.png",
+  imageAlt: "Design-system tokens connecting design decisions to production code.",
 } as const;
 
 export default function ExperiencePage() {
@@ -26,7 +28,7 @@ export default function ExperiencePage() {
         {selectedWorkCards.map((project) => (
           <Link className={styles.projectCard} href={project.href} key={project.href}>
             {"image" in project ? (
-              <div className={styles.projectThumb}>
+              <div className={[styles.projectThumb, project.href === "/experience/role-fit-agent" || project.href === "/design-system" ? styles.projectThumbTop : ""].filter(Boolean).join(" ")}>
                 <Image src={project.image} alt={project.imageAlt} fill sizes="(max-width: 48rem) 100vw, (max-width: 72rem) 50vw, 33vw" />
               </div>
             ) : (
