@@ -2,6 +2,7 @@ import { reportUIPayloadSchema, type ReportUIPayload, type RoleValidationResult 
 import { resolveApprovedEvidenceDestination } from "../knowledge/evidence-destinations.ts";
 import type { ApprovedEvidenceBundle } from "../knowledge/load-approved-evidence.ts";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
+import { createReportId } from "../persistence/task-e.ts";
 
 type RoleDraft = RoleValidationResult["roleDraft"];
 type AnalysisItem = QualitativeReportAnalysis["items"][number];
@@ -310,6 +311,7 @@ export function composeReportUIPayload(input: {
   const totalRequirements = reportItems.length;
   const language = input.language === "he" ? "he" : "en";
   const fitLevel = analysis.fitLevel;
+  const reportId = createReportId();
   const overallFitVisual = fitLevel === "insufficient" || fitLevel === "out-of-scope"
     ? {
         mode: fitLevel,
@@ -331,7 +333,7 @@ export function composeReportUIPayload(input: {
 
   const parsed = reportUIPayloadSchema.safeParse({
     schemaVersion: "1.0",
-    reportId: crypto.randomUUID(),
+    reportId,
     createdAt: new Date().toISOString(),
     language,
     state: "ready",
@@ -370,7 +372,7 @@ export function composeReportUIPayload(input: {
     contactCta: {
       variant: fitLevel,
       label: "Contact Shani",
-      href: "/contact",
+      href: `/contact?source=role-fit-report-cta&report_id=${encodeURIComponent(reportId)}`,
       enabled: true,
     },
   });

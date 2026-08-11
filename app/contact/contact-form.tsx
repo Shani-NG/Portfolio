@@ -1,11 +1,13 @@
 "use client";
 
 import { type FormEvent, useId, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import styles from "./page.module.css";
 
 type FieldName = "name" | "company" | "message" | "email";
 type TouchedFields = Partial<Record<FieldName, boolean>>;
+type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
 const initialValues: Record<FieldName, string> = {
   name: "",
@@ -31,9 +33,11 @@ function validateField(name: FieldName, value: string | undefined) {
 
 export function ContactForm() {
   const formId = useId();
+  const searchParams = useSearchParams();
   const [values, setValues] = useState(initialValues);
   const [touched, setTouched] = useState<TouchedFields>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
 
   const errors = useMemo(
     () => ({
@@ -46,6 +50,15 @@ export function ContactForm() {
   );
 
   const hasErrors = Object.values(errors).some(Boolean);
+  const sourceContext = useMemo(() => {
+    const source = searchParams.get("source");
+    if (source === "role-fit-report-cta" || source === "portfolio-cta") return source;
+    return "direct-contact-page";
+  }, [searchParams]);
+  const reportId = useMemo(() => {
+    const value = searchParams.get("report_id")?.trim().toUpperCase() ?? "";
+    return /^[A-Z0-9]{1,5}$/.test(value) ? value : "";
+  }, [searchParams]);
 
   function getFieldState(name: FieldName) {
     const shouldValidate = touched[name] || submitAttempted;
@@ -55,7 +68,7 @@ export function ContactForm() {
     return errors[name] ? styles.invalidField : styles.validField;
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitAttempted(true);
     setTouched({
@@ -64,6 +77,37 @@ export function ContactForm() {
       message: true,
       email: true,
     });
+
+    if (hasErrors || submitStatus === "submitting") return;
+
+    setSubmitStatus("submitting");
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: values.name,
+          company: values.company,
+          message: values.message,
+          email: values.email,
+          source_context: sourceContext,
+          report_id: sourceContext === "role-fit-report-cta" ? reportId : "",
+        }),
+      });
+
+      if (!response.ok) {
+        setSubmitStatus("error");
+        return;
+      }
+
+      setSubmitStatus("success");
+      setValues(initialValues);
+      setTouched({});
+      setSubmitAttempted(false);
+    } catch {
+      setSubmitStatus("error");
+    }
   }
 
   function updateValue(name: FieldName, value: string) {
@@ -244,16 +288,21 @@ export function ContactForm() {
           type="submit"
           variant="primary"
           tone="outlined"
-          disabled={hasErrors && submitAttempted}
+          disabled={(hasErrors && submitAttempted) || submitStatus === "submitting"}
         >
-          Send Info
+          {submitStatus === "submitting" ? "Sending..." : "Send Info"}
         </Button>
       </div>
 
-      {submitAttempted && !hasErrors ? (
-        <p className={styles.statusMessage} role="status">
-          The form is valid. Contact submission is not yet connected to a
-          server handler.
+      {submitStatus === "success" ? (
+        <p className={`${styles.statusMessage} ${styles.successMessage}`} role="status">
+          Thanks - your message was sent.
+        </p>
+      ) : null}
+
+      {submitStatus === "error" ? (
+        <p className={styles.statusMessage} role="alert">
+          I couldn&apos;t send the message right now. Please try again.
         </p>
       ) : null}
     </form>

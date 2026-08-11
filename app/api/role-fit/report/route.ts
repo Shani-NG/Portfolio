@@ -4,6 +4,7 @@ import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { logRoleFitEvent, logRoleFitReportSummary, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
+import { persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
 import { evaluateReportEligibility } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
@@ -274,7 +275,7 @@ export async function POST(request: Request) {
   after(async () => {
     const reportId = report.reportId;
     const title = validation.roleDraft.title?.originalValue ?? "";
-    await Promise.all([
+    const tasks: Promise<unknown>[] = [
       logRoleFitEvent({
         eventName: "report.completed",
         conversationId,
@@ -315,7 +316,13 @@ export async function POST(request: Request) {
         reportStatus: eligibility.state === "ready" ? "ready" : "failed",
         reportId,
       }),
-    ]);
+    ];
+
+    if (eligibility.state === "ready") {
+      tasks.push(persistCompletedReport(report, { roleFamily: inferRoleFamily(title) }));
+    }
+
+    await Promise.all(tasks);
   });
 
   return NextResponse.json({

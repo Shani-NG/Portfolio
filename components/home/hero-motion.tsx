@@ -234,7 +234,7 @@ export function HeroMotion() {
             <img className={`${styles.stageImage} ${styles.profile}`} src="/assets/hero-bg-profile.png" alt="Shani Nakash-Gomel" />
             <div className={styles.pointerGlow} aria-hidden="true" />
           </div>
-          <a className={styles.contactCta} href="/contact">
+          <a className={styles.contactCta} href="/contact?source=portfolio-cta">
             Let&apos;s Connect
           </a>
         </div>

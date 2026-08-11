@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test lib/access.test.ts lib/role-fit/validation.test.ts lib/role-fit/lexicon.test.ts lib/role-fit/client/session.test.ts lib/role-fit/conversation/behavior.test.ts lib/role-fit/conversation/runtime-contract.test.ts lib/role-fit/model/index.test.ts lib/role-fit/model/gemini.test.ts lib/role-fit/prompts/assembly.test.ts lib/role-fit/report/compose-report.test.ts lib/role-fit/runtime/policy.test.ts lib/role-fit/server/eligibility.test.ts lib/role-fit/server/role-understanding.test.ts",
+    "test": "node --test lib/access.test.ts lib/role-fit/validation.test.ts lib/role-fit/lexicon.test.ts lib/role-fit/client/session.test.ts lib/role-fit/conversation/behavior.test.ts lib/role-fit/conversation/runtime-contract.test.ts lib/role-fit/model/index.test.ts lib/role-fit/model/gemini.test.ts lib/role-fit/persistence/task-e.test.ts lib/role-fit/prompts/assembly.test.ts lib/role-fit/report/compose-report.test.ts lib/role-fit/runtime/policy.test.ts lib/role-fit/server/eligibility.test.ts lib/role-fit/server/role-understanding.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
