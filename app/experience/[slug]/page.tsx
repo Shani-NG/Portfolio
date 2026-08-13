@@ -208,7 +208,7 @@ function MonitoringVisual({
 }) {
   return (
     <div className={[styles.monitoringVisual, styles[`monitoringVisual${height[0].toUpperCase()}${height.slice(1)}`]].join(" ")}>
-      <Image src={src} alt={alt} fill sizes="(max-width: 48rem) 100vw, 52vw" />
+      <img src={src} alt={alt} loading="lazy" decoding="async" />
     </div>
   );
 }
@@ -278,7 +278,7 @@ function MonitoringCaseStudy() {
 
         if ("columns" in section) {
           return (
-            <ScrollReveal mode="overlap" key={section.id}>
+            <ScrollReveal className={styles.monitoringReveal} mode="overlap" key={section.id}>
               <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
                 <div className={[styles.monitoringWrap, styles.monitoringMeasurementGrid].join(" ")}>
                   <div className={styles.monitoringMeasurementCopy}>
@@ -294,7 +294,7 @@ function MonitoringCaseStudy() {
 
         if ("findings" in section) {
           return (
-            <ScrollReveal mode="creative" key={section.id}>
+            <ScrollReveal className={styles.monitoringReveal} mode="creative" key={section.id}>
               <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
                 <div className={[styles.monitoringWrap, styles.monitoringLoopGrid].join(" ")}>
                   <div>
@@ -323,7 +323,7 @@ function MonitoringCaseStudy() {
           const isDeepDiveThree = section.id === "first-week-product-value";
           const useCompactCardHeader = isPersonalContext || isDeepDiveThree;
           return (
-            <ScrollReveal mode={index % 2 === 0 ? "creative" : "overlap"} key={section.id}>
+            <ScrollReveal className={styles.monitoringReveal} mode={index % 2 === 0 ? "creative" : "overlap"} key={section.id}>
               <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
                 <div className={[styles.monitoringWrap, isPersonalContext ? styles.monitoringPersonalGrid : isDeepDiveThree ? styles.monitoringDeepDiveThree : ""].join(" ")}>
                   <MonitoringVisual src={section.visualSrc} alt={section.visualAlt} height={section.visualHeight} />
@@ -355,7 +355,7 @@ function MonitoringCaseStudy() {
         }
 
         return (
-          <ScrollReveal mode={index % 2 === 0 ? "creative" : "overlap"} key={section.id}>
+          <ScrollReveal className={styles.monitoringReveal} mode={index % 2 === 0 ? "creative" : "overlap"} key={section.id}>
             <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
               <div className={[styles.monitoringWrap, styles.monitoringSplit, section.layout === "text-right" ? styles.monitoringSplitReverse : "", section.layout === "overview" ? styles.monitoringOverviewStack : ""].join(" ")}>
                 <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
@@ -397,7 +397,9 @@ function BigRedSectionView({ section, index }: { section: BigRedSection; index: 
               <span className={styles.sectionIcon}><MaterialIcon name={sectionIcon} /></span>
               <Eyebrow className={styles.sectionKickerEyebrow} color="primaryHover">{section.title}</Eyebrow>
             </div>
-            <h2>{section.title}</h2>
+            <h2>
+              When creating the guide became harder than <span className={styles.kmsKeepTogether}>using it.</span>
+            </h2>
           </div>
           <div className={styles.changeGrid}>
             <div>
@@ -1512,9 +1514,6 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
 }
 
 function EpdCaseStudy() {
-  const currentProjectIndex = projectCards.findIndex((project) => project.href === "/experience/ux-from-the-heart");
-  const nextProject = projectCards[(currentProjectIndex + 1) % projectCards.length];
-
   return (
     <main className={[styles.page, styles.epdPage].join(" ")}>
       <section className={styles.epdHero} data-ds-theme="dark" id={epdCaseStudy.heroAnchor}>
@@ -1559,12 +1558,11 @@ function EpdCaseStudy() {
               </div>
             </div>
             <dl className={styles.epdSnapshot}>
-              {epdCaseStudy.snapshot.map(([term, value, detail], snapshotIndex) => (
+              {epdCaseStudy.snapshot.map(([term, value], snapshotIndex) => (
                 <div className={styles.epdSnapshotCard} key={term}>
                   <span>{String(snapshotIndex + 1).padStart(2, "0")}</span>
                   <dt>{term}</dt>
                   <dd>{value}</dd>
-                  <small>{detail}</small>
                 </div>
               ))}
             </dl>
@@ -1602,7 +1600,7 @@ function EpdCaseStudy() {
         </div>
       </section>
 
-      <ContextFab href={nextProject.href} label="Next Case Study" icon="arrow_forward" />
+      <ContextFab href="/experience/role-fit-agent" label="Next Case Study" icon="arrow_forward" />
     </main>
   );
 }
@@ -1667,7 +1665,7 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
           </div>
         </section>
 
-        <ContextFab href="/experience" label="Back to Experience" />
+        <ContextFab href="/experience/ux-from-the-heart" label="Next Case Study" icon="arrow_forward" />
       </main>
     );
   }

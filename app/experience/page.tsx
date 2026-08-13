@@ -7,8 +7,7 @@ import styles from "./page.module.css";
 const designSystemCard = {
   category: "DESIGN SYSTEM",
   title: "Elegant, soft and technical foundations.",
-  summary:
-    "A code-first preview for approving color roles, typography hierarchy, button behavior and reusable card composition before applying the system to portfolio pages.",
+  summary: "A code-first preview",
   href: "/design-system",
   image: "/assets/project-design-system.png",
   imageAlt: "Design-system tokens connecting design decisions to production code.",
@@ -22,7 +21,11 @@ export default function ExperiencePage() {
       <section className={styles.hero}>
         <p className={styles.eyebrow}>Experience</p>
         <h1>Selected work.</h1>
-      <p>Six case studies and one design-system foundation from complex systems, product learning, operational clarity, and AI-ready knowledge work.</p>
+        <div className={styles.heroFocus} aria-label="Areas of expertise">
+          <span>UX Strategy</span>
+          <span>Product Design</span>
+          <span>AI Solutions</span>
+        </div>
       </section>
       <section className={styles.projectGrid} aria-label="Case studies">
         {selectedWorkCards.map((project) => (

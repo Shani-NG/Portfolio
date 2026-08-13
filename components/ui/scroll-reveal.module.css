@@ -22,7 +22,8 @@
 }
 
 .overlap:has(:target),
-.creative:has(:target) {
+.creative:has(:target),
+.topDown:has(:target) {
   clip-path: none;
   opacity: 1;
   transform: none;

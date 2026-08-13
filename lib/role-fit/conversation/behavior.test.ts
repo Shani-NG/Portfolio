@@ -56,6 +56,7 @@ describe("Role Fit conversation behavior", () => {
   it("provides contextual deterministic copy without generic chatbot filler", () => {
     assert.match(roleSubmissionSetupAnswer("he"), /להעלות קובץ או להדביק/);
     assert.match(existingReportAnswer("en"), /active report/);
-    assert.match(reportLimitAnswer("en"), /report limit/);
+    assert.match(reportLimitAnswer("en"), /existing report remains available/);
+    assert.match(reportLimitAnswer("en"), /this role or other roles/);
   });
 });

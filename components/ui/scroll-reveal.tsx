@@ -24,6 +24,9 @@ export function ScrollReveal({ children, mode = "overlap", className, delayMs = 
       const target = targetId ? document.getElementById(targetId) : null;
       if (target && element.contains(target)) {
         setIsVisible(true);
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+        });
         return true;
       }
       return false;
@@ -38,7 +41,7 @@ export function ScrollReveal({ children, mode = "overlap", className, delayMs = 
           observer.disconnect();
         }
       },
-      { threshold: 0.2, rootMargin: "0px 0px -8%" },
+      { threshold: 0, rootMargin: "0px 0px -8%" },
     );
 
     observer.observe(element);
@@ -50,15 +53,15 @@ export function ScrollReveal({ children, mode = "overlap", className, delayMs = 
   }, []);
 
   return (
-    <div
-      className={[styles.reveal, styles[mode], isVisible ? styles.visible : "", className]
-        .filter(Boolean)
-        .join(" ")}
-      ref={ref}
-      data-scroll-mode={mode}
-      style={{ "--scroll-reveal-delay": `${delayMs}ms` } as CSSProperties}
-    >
-      {children}
+    <div className={styles.reveal} ref={ref} data-scroll-mode={mode}>
+      <div
+        className={[styles[mode], isVisible ? styles.visible : "", className]
+          .filter(Boolean)
+          .join(" ")}
+        style={{ "--scroll-reveal-delay": `${delayMs}ms` } as CSSProperties}
+      >
+        {children}
+      </div>
     </div>
   );
 }

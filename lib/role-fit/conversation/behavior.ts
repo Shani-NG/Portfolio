@@ -119,8 +119,8 @@ export function existingReportAnswer(language: "he" | "en" | "mixed") {
 
 export function reportLimitAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
-    ? "הגעת למגבלת הדוחות בסשן הזה. עדיין אפשר לשאול על הדוח הנוכחי או להמשיך לסייר בפורטפוליו."
-    : "You’ve reached the report limit for this session. You can still ask about the current report or explore the portfolio.";
+    ? "מצטערת, לא ניתן ליצור דוח נוסף כרגע. הדוח הקיים נשאר זמין, ואפשר להמשיך לשאול אותי שאלות על המשרה הזו או על משרות אחרות."
+    : "Sorry, I can’t create another report right now. Your existing report remains available, and you can keep asking me questions about this role or other roles.";
 }
 
 export function looksLikeRoleSubmissionSetup(message: string) {

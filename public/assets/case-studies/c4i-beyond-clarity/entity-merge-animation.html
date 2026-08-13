@@ -19,7 +19,7 @@
     height: auto;
     max-height: 100%;
     aspect-ratio: 1;
-    background: #0b0b0d;
+    background: transparent;
   }
 </style>
 </head>
@@ -30,6 +30,21 @@ const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 const cx = W / 2, cy = H / 2;
+
+function syncSectionBackground() {
+  const section = window.frameElement?.closest('section');
+  const background = section ? window.parent.getComputedStyle(section).backgroundColor : 'transparent';
+  document.documentElement.style.backgroundColor = background;
+  document.body.style.backgroundColor = background;
+}
+
+syncSectionBackground();
+if (window.parent !== window) {
+  new MutationObserver(syncSectionBackground).observe(window.parent.document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class', 'data-theme', 'data-ds-theme'],
+  });
+}
 
 // ---- config ----
 const colors = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#D85A30', '#5DCAA5'];

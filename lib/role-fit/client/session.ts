@@ -39,6 +39,7 @@ export type RoleFitLiveSession = {
   reportModel: string;
   completedReportCount: 0 | 1 | 2;
   pendingReportConfirmation: boolean;
+  expandedEvidenceItemIds: string[] | null;
 };
 
 const idleExpiryMs = 24 * 60 * 60 * 1000;
@@ -81,6 +82,7 @@ function createSession(): RoleFitLiveSession {
     reportModel: "",
     completedReportCount: 0,
     pendingReportConfirmation: false,
+    expandedEvidenceItemIds: null,
   };
 }
 
@@ -97,6 +99,7 @@ type PersistedRoleFitSession = {
   reportProvider: string;
   reportModel: string;
   completedReportCount: 0 | 1 | 2;
+  expandedEvidenceItemIds: string[] | null;
 };
 
 export function serializeRoleFitSession(session: RoleFitLiveSession): PersistedRoleFitSession {
@@ -117,6 +120,7 @@ export function serializeRoleFitSession(session: RoleFitLiveSession): PersistedR
     reportProvider: session.reportProvider,
     reportModel: session.reportModel,
     completedReportCount: session.completedReportCount,
+    expandedEvidenceItemIds: session.expandedEvidenceItemIds,
   };
 }
 
@@ -175,6 +179,9 @@ function readPersistedSession(): RoleFitLiveSession | null {
       reportProvider: typeof value.reportProvider === "string" ? value.reportProvider : "",
       reportModel: typeof value.reportModel === "string" ? value.reportModel : "",
       completedReportCount: value.completedReportCount as 0 | 1 | 2,
+      expandedEvidenceItemIds: Array.isArray(value.expandedEvidenceItemIds)
+        ? value.expandedEvidenceItemIds.filter((itemId): itemId is string => typeof itemId === "string")
+        : null,
     };
   } catch {
     return null;

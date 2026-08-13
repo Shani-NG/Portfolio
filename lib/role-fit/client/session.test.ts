@@ -44,6 +44,7 @@ describe("Role Fit report session persistence", () => {
       activeRoleCompany: "Secret company marker",
       draftInput: "DRAFT_MARKER",
       messages: [{ id: "message_1", role: "user", content: "MESSAGE_MARKER" }],
+      expandedEvidenceItemIds: ["requirement_2", "requirement_4"],
     });
 
     const serialized = JSON.stringify(serializeRoleFitSession(session));
@@ -51,6 +52,7 @@ describe("Role Fit report session persistence", () => {
     assert.match(serialized, /report_1/);
     assert.equal(JSON.parse(serialized).completedReportCount, 1);
     assert.equal(JSON.parse(serialized).state, "report-ready");
+    assert.deepEqual(JSON.parse(serialized).expandedEvidenceItemIds, ["requirement_2", "requirement_4"]);
     assert.doesNotMatch(serialized, /RAW_JOB_DESCRIPTION_MARKER|DRAFT_MARKER|MESSAGE_MARKER|Secret title marker|Secret company marker/);
   });
 
@@ -71,6 +73,7 @@ describe("Role Fit report session persistence", () => {
       activeRoleText: "Title: UX Position",
       pendingRoleField: "responsibilities",
       messages: [{ id: "message_navigation", role: "user", content: "Continue this conversation" }],
+      expandedEvidenceItemIds: ["requirement_navigation"],
     });
 
     const restored = restoreRoleFitLiveSession();
@@ -78,5 +81,6 @@ describe("Role Fit report session persistence", () => {
     assert.equal(restored.activeRoleText, "Title: UX Position");
     assert.equal(restored.pendingRoleField, "responsibilities");
     assert.equal(restored.messages.at(-1)?.content, "Continue this conversation");
+    assert.deepEqual(restored.expandedEvidenceItemIds, ["requirement_navigation"]);
   });
 });

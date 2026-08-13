@@ -3,7 +3,7 @@
 import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
-import { isReportConfirmationText, resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
+import { isReportConfirmationText, reportLimitAnswer, resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -68,12 +68,15 @@ export default function RoleFitPage() {
   const chatPaneRef = useRef<HTMLDivElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
   const roleFileInputRef = useRef<HTMLInputElement>(null);
   const reportLimitReached = liveSession.completedReportCount >= 2;
   const activeReport = liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined;
   const hasLiveReport = Boolean(activeReport);
-  const liveSplitCanvas = liveSession.state === "generating-report" || liveSession.state === "recoverable-error" || liveSession.state === "report-ready";
+  const liveSplitCanvas = liveSession.state === "generating-report"
+    || liveSession.state === "report-ready"
+    || (liveSession.state === "recoverable-error" && (Boolean(activeReport) || errorContext === "report" || errorContext === "validation"));
   const splitCanvas = liveSplitCanvas;
   const hasConversation = liveSession.messages.length > 0 || liveSession.state !== "initial";
   const reportActionLabel = reportLimitReached
@@ -187,15 +190,18 @@ export default function RoleFitPage() {
       if (!response.ok) {
         setApiStatusMessage(result.answer ?? "The Role Fit Agent is not available right now. Please try again later.");
         setErrorContext("conversation");
-        setIsAgentUnavailable(true);
+        setIsAgentUnavailable(false);
       }
     } catch {
       const message = "The Role Fit Agent is not available right now. Please try again later.";
       appendLiveMessage({ role: "agent", content: message });
       setApiStatusMessage(message);
       setErrorContext("conversation");
-      setIsAgentUnavailable(true);
-      syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: false });
+      setIsAgentUnavailable(false);
+      syncLiveSession({
+        state: currentSession.reportPayload ? "report-ready" : "recoverable-error",
+        pendingReportConfirmation: false,
+      });
     } finally {
       setIsSending(false);
     }
@@ -204,8 +210,13 @@ export default function RoleFitPage() {
   async function requestReport(sessionOverride?: RoleFitLiveSession) {
     const reportSession = sessionOverride ?? liveSession;
 
+    if (reportSession.completedReportCount >= 2) {
+      appendLiveMessage({ role: "agent", content: reportLimitAnswer(reportSession.activeLanguage) });
+      syncLiveSession({ state: reportSession.reportPayload ? "report-ready" : "general-qa", pendingReportConfirmation: false });
+      setActivePane("chat");
+      return;
+    }
     if (reportRequestInFlightRef.current || isAgentUnavailable) return;
-    if (reportSession.completedReportCount >= 2) return;
     if (reportSession.reportPayload) {
       syncLiveSession({ state: "report-ready" });
       return;
@@ -305,6 +316,9 @@ export default function RoleFitPage() {
         completedReportCount: (reportSession.completedReportCount + 1) as 1 | 2,
         pendingRoleField: null,
         pendingReportConfirmation: false,
+        expandedEvidenceItemIds: report.requirementMapping.defaultSelectedItemId
+          ? [report.requirementMapping.defaultSelectedItemId]
+          : report.requirementMapping.items[0]?.itemId ? [report.requirementMapping.items[0].itemId] : [],
       });
       setActivePane("report");
     } catch (error) {
@@ -359,6 +373,12 @@ export default function RoleFitPage() {
         return;
       }
 
+      const page = pageRef.current;
+      if (page && page.scrollHeight > page.clientHeight) {
+        page.scrollTo({ top: page.scrollHeight, behavior: scrollBehavior });
+        return;
+      }
+
       chatEndRef.current?.scrollIntoView({ block: "end", behavior: scrollBehavior });
     });
   }, [liveSession.messages.length, isSending]);
@@ -401,6 +421,13 @@ export default function RoleFitPage() {
   }
 
   function startNewAnalysis() {
+    if (liveSession.completedReportCount >= 2) {
+      appendLiveMessage({ role: "agent", content: reportLimitAnswer(liveSession.activeLanguage) });
+      syncLiveSession({ state: liveSession.reportPayload ? "report-ready" : "general-qa", pendingReportConfirmation: false });
+      setActivePane("chat");
+      return;
+    }
+
     const nextSession = resetRoleFitAnalysis();
     setLiveSession(nextSession);
     setLiveReportState(null);
@@ -414,7 +441,7 @@ export default function RoleFitPage() {
   const chatMessages = liveSession.messages;
 
   return (
-    <main className={pageClassName}>
+    <main className={pageClassName} ref={pageRef}>
       <input
         accept=".txt,.md,.csv,text/plain,text/markdown,text/csv"
         aria-label="Upload job description"
@@ -428,7 +455,7 @@ export default function RoleFitPage() {
         className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, styles.liveReportAction].filter(Boolean).join(" ")}
         aria-label={reportActionLabel}
         type="button"
-        disabled={reportLimitReached || isReportRequestInFlight || isAgentUnavailable}
+        disabled={isReportRequestInFlight || isAgentUnavailable}
         title={reportActionLabel}
         onClick={() => void requestReport()}
       >
@@ -542,14 +569,21 @@ export default function RoleFitPage() {
                   </div>
                   <p>Analyzing job requirements & matching Evidence Cards...</p>
                 </div>
-              ) : liveSession.state === "recoverable-error" ? (
+              ) : liveSession.state === "recoverable-error" && !activeReport ? (
                 <div className={styles.errorState} id="role-fit-error" role="alert">
                   <span className={styles.msi} aria-hidden="true">error</span>
                   <h2>{errorHeading}</h2>
                   <p>{apiStatusMessage || "I couldn't complete this request. Please try again later."}</p>
                 </div>
               ) : (
-                activeReport ? <RoleFitLiveReport onStartNewAnalysis={startNewAnalysis} report={activeReport} /> : null
+                activeReport ? (
+                  <RoleFitLiveReport
+                    onStartNewAnalysis={startNewAnalysis}
+                    onOpenEvidenceItemIdsChange={(expandedEvidenceItemIds) => syncLiveSession({ expandedEvidenceItemIds })}
+                    openEvidenceItemIds={liveSession.expandedEvidenceItemIds}
+                    report={activeReport}
+                  />
+                ) : null
               )}
             </aside>
           ) : null}

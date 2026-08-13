@@ -11,8 +11,8 @@ type ReportItem = ReportUIPayload["requirementMapping"]["items"][number];
 type EvidenceCluster = ReportUIPayload["evidencePanel"]["clusters"][number];
 
 const fitAssets = {
-  "fit-strong": "/assets/role-fit/fit-strong.png",
-  "fit-good": "/assets/role-fit/fit-good.png",
+  "fit-strong": "/assets/role-fit/fit-good.png",
+  "fit-good": "/assets/role-fit/fit-strong.png",
   "fit-partial": "/assets/role-fit/fit-partial.png",
 } as const;
 
@@ -162,10 +162,6 @@ function EvidenceContent({
     <div className={styles.evidenceContent}>
       {clusters.map((cluster) => (
         <div className={styles.evidenceBlock} key={cluster.clusterId}>
-          <div className={styles.evidenceLabel}>
-            <MaterialIcon name="folder_open" />
-            <span>Portfolio Evidence</span>
-          </div>
           <h4>{cluster.project?.title || cluster.title}</h4>
           <p>{cluster.summary}</p>
           <div className={styles.supportReason}>
@@ -179,13 +175,27 @@ function EvidenceContent({
   );
 }
 
-function EvidenceSection({ report }: { report: ReportUIPayload }) {
+function EvidenceSection({
+  report,
+  openEvidenceItemIds,
+  onOpenEvidenceItemIdsChange,
+}: {
+  report: ReportUIPayload;
+  openEvidenceItemIds: string[] | null;
+  onOpenEvidenceItemIdsChange: (itemIds: string[]) => void;
+}) {
   const defaultItemId = report.requirementMapping.defaultSelectedItemId ?? report.requirementMapping.items[0]?.itemId;
-  const [openIds, setOpenIds] = useState<Set<string>>(() => defaultItemId ? new Set([defaultItemId]) : new Set());
+  const validItemIds = new Set(report.requirementMapping.items.map((item) => item.itemId));
+  const restoredOpenIds = openEvidenceItemIds?.filter((itemId) => validItemIds.has(itemId));
+  const [openIds, setOpenIds] = useState<Set<string>>(() => restoredOpenIds
+    ? new Set(restoredOpenIds)
+    : defaultItemId ? new Set([defaultItemId]) : new Set());
   const clusterById = new Map(report.evidencePanel.clusters.map((cluster) => [cluster.clusterId, cluster]));
 
   useEffect(() => {
-    setOpenIds(defaultItemId ? new Set([defaultItemId]) : new Set());
+    const currentItemIds = new Set(report.requirementMapping.items.map((item) => item.itemId));
+    const nextIds = openEvidenceItemIds?.filter((itemId) => currentItemIds.has(itemId));
+    setOpenIds(nextIds ? new Set(nextIds) : defaultItemId ? new Set([defaultItemId]) : new Set());
   }, [defaultItemId, report.reportId]);
 
   return (
@@ -202,25 +212,32 @@ function EvidenceSection({ report }: { report: ReportUIPayload }) {
           const isOpen = openIds.has(item.itemId);
           const panelId = `evidence-panel-${report.reportId}-${item.itemId}`;
           const clusters = item.clusterIds.map((id) => clusterById.get(id)).filter((cluster): cluster is EvidenceCluster => Boolean(cluster));
+          const caseStudyTitles = [...new Set(clusters.map((cluster) => cluster.project?.title || cluster.title))];
+          const evidenceSourceLabel = caseStudyTitles.length === 0
+            ? "No case studies"
+            : caseStudyTitles.length === 1
+            ? caseStudyTitles[0]
+            : `${caseStudyTitles.length} Case studies`;
           return (
             <article className={`${styles.requirement} ${isOpen ? styles.requirementOpen : ""}`} key={item.itemId}>
               <button
                 aria-controls={panelId}
                 aria-expanded={isOpen}
                 className={styles.requirementTrigger}
-                onClick={() => setOpenIds((current) => {
-                  const next = new Set(current);
+                onClick={() => {
+                  const next = new Set(openIds);
                   if (next.has(item.itemId)) next.delete(item.itemId);
                   else next.add(item.itemId);
-                  return next;
-                })}
+                  setOpenIds(next);
+                  onOpenEvidenceItemIdsChange([...next]);
+                }}
                 type="button"
               >
                 <span className={styles.requirementIcon}><MaterialIcon name={requirementIcons[index % requirementIcons.length]} /></span>
                 <span className={styles.requirementCopy}>
                   <strong title={item.displayLabel || item.originalText}>{item.displayLabel || item.originalText}</strong>
                   <small title={item.shortRationale}>{item.shortRationale}</small>
-                  <span className={styles.matchLabel}>{matchLabels[item.matchType]} | {item.evidenceConfidence.replaceAll("-", " ")}</span>
+                  <span className={styles.matchLabel}>{evidenceSourceLabel} | {item.evidenceConfidence.replaceAll("-", " ")}</span>
                 </span>
                 <MaterialIcon className={styles.chevron} name="expand_more" />
               </button>
@@ -258,7 +275,17 @@ function ListCard({ title, tone, items, wide = false }: { title: string; tone: "
   );
 }
 
-export function RoleFitLiveReport({ report, onStartNewAnalysis }: { report: ReportUIPayload; onStartNewAnalysis: () => void }) {
+export function RoleFitLiveReport({
+  report,
+  onStartNewAnalysis,
+  openEvidenceItemIds,
+  onOpenEvidenceItemIdsChange,
+}: {
+  report: ReportUIPayload;
+  onStartNewAnalysis: () => void;
+  openEvidenceItemIds: string[] | null;
+  onOpenEvidenceItemIdsChange: (itemIds: string[]) => void;
+}) {
   const fitClass = report.overallFitVisual.mode === "fit"
     ? styles[report.overallFitVisual.level]
     : styles.limited;
@@ -267,7 +294,6 @@ export function RoleFitLiveReport({ report, onStartNewAnalysis }: { report: Repo
     <div className={`${styles.report} ${fitClass}`} dir={report.language === "he" ? "rtl" : "ltr"} id="role-fit-live-report">
       <header className={styles.reportHeader}>
         <div className={styles.brand}>
-          <span className={styles.avatar} aria-hidden="true">S</span>
           <div>
             <h1>Shani Nakash-Gomel - Smart Role Fit</h1>
             <p>A concise role-fit report grounded in verified portfolio evidence.</p>
@@ -282,7 +308,11 @@ export function RoleFitLiveReport({ report, onStartNewAnalysis }: { report: Repo
       <div className={styles.reportGrid}>
         <FitSummary report={report} />
         <ProfileCard report={report} />
-        <EvidenceSection report={report} />
+        <EvidenceSection
+          report={report}
+          openEvidenceItemIds={openEvidenceItemIds}
+          onOpenEvidenceItemIdsChange={onOpenEvidenceItemIdsChange}
+        />
         <ListCard items={report.topStrengths.items} title="Top Strengths" tone="strength" wide={report.keyGaps.items.length === 0} />
         {report.keyGaps.items.length > 0 ? <ListCard items={report.keyGaps.items} title="Key Gaps" tone="gap" /> : null}
         <p className={styles.disclaimer}>{report.disclaimer.text}</p>

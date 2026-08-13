@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ContextFab } from "@/components/site/context-fab";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import styles from "./page.module.css";
 
@@ -767,6 +768,7 @@ export default function RoleFitAgentCaseStudyPage() {
           </Link>
         </div>
       </section>
+      <ContextFab href="/design-system" label="Next Case Study" icon="arrow_forward" />
     </main>
   );
 }
