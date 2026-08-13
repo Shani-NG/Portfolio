@@ -139,7 +139,9 @@ describe("Gemini chat completion guard", () => {
     const firstConfig = requests[0]?.generationConfig as Record<string, unknown>;
     const retryConfig = requests[1]?.generationConfig as Record<string, unknown>;
     assert.equal(firstConfig.responseMimeType, "application/json");
+    assert.deepEqual(firstConfig.thinkingConfig, { thinkingLevel: "minimal" });
     assert.equal(firstConfig.maxOutputTokens, 2500);
+    assert.deepEqual(retryConfig.thinkingConfig, { thinkingLevel: "minimal" });
     assert.equal(retryConfig.maxOutputTokens, 5000);
   });
 

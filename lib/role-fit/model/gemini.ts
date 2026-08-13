@@ -90,7 +90,7 @@ async function generateGeminiContent(input: {
   maxOutputTokens: number;
   temperature: number;
   responseMimeType?: "application/json";
-  thinkingLevel?: "low" | "medium" | "high";
+  thinkingLevel?: "minimal" | "low" | "medium" | "high";
 }): Promise<GeminiCallResult> {
   let lastError: GeminiCallResult | undefined;
 
@@ -330,6 +330,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         maxOutputTokens: input.maxOutputTokens,
         temperature: 0,
         responseMimeType: "application/json",
+        thinkingLevel: "minimal",
       });
 
       let invalidDetail = "qualitative-analysis:unknown";
@@ -385,6 +386,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           maxOutputTokens: Math.max(input.maxOutputTokens * 2, 4000),
           temperature: 0,
           responseMimeType: "application/json",
+          thinkingLevel: "minimal",
         });
       }
 
