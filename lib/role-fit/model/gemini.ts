@@ -72,6 +72,21 @@ function safeSchemaDiagnostic(error: z.ZodError) {
     .join(",");
 }
 
+function getRoleIndexConstraint(runtimeState: string | undefined) {
+  if (!runtimeState) return null;
+
+  try {
+    const parsed = JSON.parse(runtimeState) as { roleItems?: unknown[] };
+    if (!Array.isArray(parsed.roleItems) || parsed.roleItems.length === 0) return null;
+    return {
+      allowedIndexes: parsed.roleItems.map((_, index) => index),
+      maxItems: Math.min(parsed.roleItems.length, 5),
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function readProviderError(response: Response): Promise<string> {
   const fallback = `${response.status} ${response.statusText}`;
 
@@ -307,12 +322,15 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         conversationContext: input.conversationContext,
         userInput: input.roleText,
       });
+      const roleIndexConstraint = getRoleIndexConstraint(input.runtimeState);
 
       const reportPrompt = [
         prompt,
         "Return only qualitative report analysis. The application owns IDs, timestamps, links, evidence clusters, UI composition, and final schema validation.",
         `Exact qualitative analysis JSON Schema: ${reportAnalysisJsonSchema}`,
-        "roleItemIndex must reference the zero-based roleItems list in Runtime State. Do not rewrite or add role requirements.",
+        roleIndexConstraint
+          ? `Return at most ${roleIndexConstraint.maxItems} items. The only allowed roleItemIndex values are [${roleIndexConstraint.allowedIndexes.join(", ")}]. Use each index at most once and do not split one compound role item into several analysis items.`
+          : "roleItemIndex must reference the zero-based roleItems list in Runtime State. Use each index at most once and do not rewrite, split, or add role requirements.",
         "Use only exact APPROVED_SOURCE_ID values supplied in Retrieved Approved Evidence. Prefer case-study evidence over CV/profile evidence whenever both support the same claim. Positive or partial matches require at least one supporting evidenceSourceId; gaps may use an empty list.",
         "Each displayLabel must be a short capability name, not a sentence. Each shortRationale must be one concrete evidence-based insight and must not repeat the displayLabel.",
         "First identify the underlying professional capability. Keyword overlap is only for finding candidate evidence and never proves a match. Do not match from a shared word, similar title, buzzword, project name, or generic UX term alone.",
@@ -358,9 +376,18 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           try {
             const parsed = qualitativeReportAnalysisSchema.safeParse(extractJson(text));
             if (parsed.success) {
-              return { ok: true, provider: "gemini", model: response.model, analysis: parsed.data satisfies QualitativeReportAnalysis };
+              const indexes = parsed.data.items.map((item) => item.roleItemIndex);
+              const hasInvalidIndex = roleIndexConstraint
+                ? indexes.some((index) => !roleIndexConstraint.allowedIndexes.includes(index))
+                : false;
+              const hasDuplicateIndex = new Set(indexes).size !== indexes.length;
+              if (!hasInvalidIndex && !hasDuplicateIndex) {
+                return { ok: true, provider: "gemini", model: response.model, analysis: parsed.data satisfies QualitativeReportAnalysis };
+              }
+              invalidDetail = `qualitative-analysis-role-index:allowed=${roleIndexConstraint?.allowedIndexes.join(",") ?? "runtime"};received=${indexes.join(",")}`;
+            } else {
+              invalidDetail = `qualitative-analysis-schema:${safeSchemaDiagnostic(parsed.error)}`;
             }
-            invalidDetail = `qualitative-analysis-schema:${safeSchemaDiagnostic(parsed.error)}`;
           } catch {
             invalidDetail = "qualitative-analysis-json:invalid-json";
           }

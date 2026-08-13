@@ -185,4 +185,47 @@ describe("Gemini chat completion guard", () => {
     assert.equal(result.ok, true);
     assert.equal(requests.length, 2);
   });
+
+  it("repairs a report that references a role item outside the runtime index set", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
+    const requests: Array<Record<string, unknown>> = [];
+    const analysisWithIndex = (roleItemIndex: number) => JSON.stringify({
+      fitLevel: "good",
+      fitRationale: "Approved evidence supports the role context.",
+      evidenceConfidence: "high",
+      evidenceConfidenceRationale: "The assessment uses approved project evidence.",
+      skillsCoverageLabel: "Evidence-backed coverage",
+      items: [{
+        roleItemIndex,
+        displayLabel: "Complex product strategy",
+        importance: "core",
+        matchType: "direct",
+        impact: "strength",
+        evidenceConfidence: "high",
+        shortRationale: "Approved evidence shows this capability.",
+        evidenceSourceIds: ["c4i"],
+      }],
+    });
+    globalThis.fetch = async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return requests.length === 1
+        ? geminiResponse(analysisWithIndex(3), "STOP")
+        : geminiResponse(analysisWithIndex(0), "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(requests.length, 2);
+    const retryPrompt = String((requests[1]?.contents as Array<{ parts: Array<{ text: string }> }>)[0]?.parts[0]?.text);
+    assert.match(retryPrompt, /allowed=0;received=3/);
+  });
 });
