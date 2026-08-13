@@ -83,6 +83,13 @@ describe("Role Fit runtime conversation contract", () => {
     assert.ok(submitIndex > consumeIndex);
   });
 
+  it("restores the persisted report before creating page state", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+
+    assert.match(page, /useState<RoleFitLiveSession>\(\(\) => restoreRoleFitLiveSession\(\)\)/);
+    assert.doesNotMatch(page, /useState<RoleFitLiveSession>\(\(\) => getRoleFitLiveSession\(\)\)/);
+  });
+
   it("renders the narrow report switch from the active report in both directions", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
 

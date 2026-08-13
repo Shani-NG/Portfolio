@@ -2,7 +2,7 @@
 
 import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
-import { appendRoleFitMessage, consumePendingHomeRoleFitInput, getRoleFitLiveSession, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import { appendRoleFitMessage, consumePendingHomeRoleFitInput, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
 import { isReportConfirmationText, resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
@@ -54,7 +54,7 @@ function normalizeRepeatedInput(value: string) {
 }
 
 export default function RoleFitPage() {
-  const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => getRoleFitLiveSession());
+  const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => restoreRoleFitLiveSession());
   const [roleInput, setRoleInput] = useState("");
   const [apiStatusMessage, setApiStatusMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
