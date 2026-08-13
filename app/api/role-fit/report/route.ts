@@ -176,7 +176,7 @@ export async function POST(request: Request) {
   const provider = getRoleFitModelProvider();
   const approvedEvidence = await loadApprovedEvidence(parsedRequest.data.roleText);
   const roleItems = getRoleAnalysisItems(validation.roleDraft);
-  const modelResult = await provider.generateReport({
+  let modelResult = await provider.generateReport({
     roleText: parsedRequest.data.roleText,
     language: parsedRequest.data.language,
     task: "analysis",
@@ -186,6 +186,14 @@ export async function POST(request: Request) {
   });
 
   if (!modelResult.ok) {
+    const failedModelResult = modelResult;
+    console.error("[role-fit-report] model generation failed", {
+      traceId,
+      provider: failedModelResult.provider,
+      model: failedModelResult.model,
+      error: failedModelResult.error,
+      detail: failedModelResult.detail,
+    });
     after(() =>
       logRoleFitEvent({
         eventName: "report.failed",
@@ -196,10 +204,10 @@ export async function POST(request: Request) {
         outcome: "failure",
         durationMs: Date.now() - startedAt,
         metadata: {
-          error: modelResult.error,
-          provider: modelResult.provider,
-          safeMessageKey: modelResult.safeMessageKey,
-          diagnostic: modelResult.detail,
+          error: failedModelResult.error,
+          provider: failedModelResult.provider,
+          safeMessageKey: failedModelResult.safeMessageKey,
+          diagnostic: failedModelResult.detail,
         },
       }),
     );
@@ -207,17 +215,18 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         state: "model-unavailable",
-        provider: modelResult.provider,
-        model: modelResult.model,
-        error: modelResult.error,
-        safeMessageKey: modelResult.safeMessageKey,
+        provider: failedModelResult.provider,
+        model: failedModelResult.model,
+        error: failedModelResult.error,
+        safeMessageKey: failedModelResult.safeMessageKey,
         safeMessage: "I couldn't generate the report this time. Your role details are still here. Please try again later.",
-        detail: modelResult.detail,
+        detail: failedModelResult.detail,
       },
+      { status: 503 },
     );
   }
 
-  const composition = composeReportUIPayload({
+  let composition = composeReportUIPayload({
     analysis: modelResult.analysis,
     roleDraft: validation.roleDraft,
     evidence: approvedEvidence,
@@ -225,6 +234,41 @@ export async function POST(request: Request) {
   });
 
   if (!composition.ok) {
+    const firstDiagnostic = composition.diagnostic;
+    const repairResult = await provider.generateReport({
+      roleText: parsedRequest.data.roleText,
+      language: parsedRequest.data.language,
+      task: "analysis",
+      maxOutputTokens: policy.maxOutputTokens,
+      runtimeState: JSON.stringify({
+        validation,
+        roleItems,
+        repair: {
+          previousCompositionDiagnostic: firstDiagnostic,
+          instruction: "Correct the reported inconsistency while preserving the role items and using only approved evidence IDs.",
+        },
+      }),
+      approvedEvidence: approvedEvidence.promptContext,
+    });
+
+    if (repairResult.ok) {
+      modelResult = repairResult;
+      composition = composeReportUIPayload({
+        analysis: repairResult.analysis,
+        roleDraft: validation.roleDraft,
+        evidence: approvedEvidence,
+        language: parsedRequest.data.language,
+      });
+    }
+  }
+
+  if (!composition.ok) {
+    console.error("[role-fit-report] report composition failed", {
+      traceId,
+      provider: modelResult.provider,
+      model: modelResult.model,
+      diagnostic: composition.diagnostic,
+    });
     after(() =>
       logRoleFitEvent({
         eventName: "report.failed",
@@ -253,6 +297,7 @@ export async function POST(request: Request) {
         safeMessage: "I couldn't generate the report this time. Your role details are still here. Please try again later.",
         detail: composition.diagnostic,
       },
+      { status: 503 },
     );
   }
 

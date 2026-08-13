@@ -6570,126 +6570,6 @@
   width: 100%;
   max-width: none;
   justify-items: start;
-/* Final production UI refinements approved for the named case-study sections. */
-.c4iHtmlPage .c4iMergeViz,
-.c4iMergeFrame {
-  background: var(--ds-color-canvas);
-}
-
-.c4iFlowSteps {
-  border-radius: 0;
-  background: transparent;
-  padding-inline: 0;
-}
-
-.c4iFlowStep:not(:last-child)::after {
-  height: 1.5px;
-  background: color-mix(in srgb, var(--ds-color-text-tertiary) 48%, transparent);
-}
-
-.c4iFlowStep span {
-  animation: c4i-step-breathe 6s var(--ds-ease-enter) infinite;
-  transform-origin: center;
-}
-
-.c4iFlowStep:nth-child(2) span { animation-delay: 1.5s; }
-.c4iFlowStep:nth-child(3) span { animation-delay: 3s; }
-.c4iFlowStep:nth-child(4) span { animation-delay: 4.5s; }
-
-.c4iProofRows {
-  gap: var(--ds-space-3xl);
-}
-
-.c4iProofRow {
-  gap: var(--ds-space-2xl);
-  align-items: center;
-}
-
-.c4iProofVisual {
-  height: auto;
-  aspect-ratio: 1501 / 845;
-  align-self: center;
-}
-
-@keyframes c4i-step-breathe {
-  0%, 24%, 100% {
-    box-shadow: 0 0 0 0 transparent;
-    transform: scale(1);
-  }
-
-  10% {
-    box-shadow: 0 0 0 0.45rem color-mix(in srgb, currentColor 16%, transparent);
-    transform: scale(1.18);
-  }
-}
-
-.monitoringCompactCard {
-  gap: var(--ds-space-md);
-  min-height: 0;
-  padding: var(--ds-space-lg);
-}
-
-.monitoringCardHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--ds-space-md);
-}
-
-.monitoringCardHeader .monitoringCardIcon,
-.monitoringCardHeader h3 {
-  margin: 0;
-}
-
-.monitoringCompactCard > p {
-  font-size: var(--ds-type-body-14-size);
-  line-height: var(--ds-type-body-14-line);
-}
-
-.monitoringFinding {
-  align-items: start;
-}
-
-.monitoringFinding .monitoringIcon {
-  align-self: start;
-  margin-top: 0.15rem;
-}
-
-.kmsProblemSection {
-  grid-template-columns: 1fr;
-  gap: var(--ds-space-2xl);
-}
-
-.kmsProblemSection .kmsSectionCopy {
-  max-width: 52rem;
-}
-
-.kmsProblemCards {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: stretch;
-}
-
-.kmsValidationSection .kmsFeatureInner {
-  width: min(100%, 62rem);
-  margin-inline: auto;
-  gap: var(--ds-space-2xl);
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-}
-
-.kmsGuidanceInner {
-  grid-template-columns: minmax(0, 0.95fr) minmax(20rem, 1.05fr);
-  align-items: center;
-  gap: var(--ds-space-2xl);
-}
-
-.kmsGuidanceContent {
-  display: grid;
-  gap: var(--ds-space-lg);
-}
-
-.kmsGuidanceHeader {
-  justify-items: start;
-  max-width: none;
-  margin-inline: 0;
   text-align: left;
 }
 
@@ -7176,65 +7056,6 @@
   .kmsProcessGallery {
     grid-template-columns: 1fr;
     max-width: 44rem;
-  max-width: none;
-  margin-inline: 0;
-}
-
-.kmsGuidanceVisual {
-  width: min(100%, 38rem);
-  justify-self: end;
-}
-
-@media (min-width: 48.01rem) {
-  .epdTimeline article {
-    grid-template-columns: minmax(0, 0.58fr) minmax(0, 1.42fr);
-    gap: var(--ds-space-2xl);
-  }
-
-  .epdTimeline article:nth-child(even) {
-    grid-template-columns: minmax(0, 1.42fr) minmax(0, 0.58fr);
-  }
-
-  .epdTimelineVisual {
-    min-height: clamp(18rem, 36vw, 22.5rem);
-  }
-}
-
-.epdTimelineCopy {
-  display: grid;
-  gap: var(--ds-space-sm);
-}
-
-.epdTimelineHeading {
-  display: flex;
-  align-items: center;
-  gap: var(--ds-space-md);
-}
-
-.epdTimelineHeading > span {
-  display: grid;
-  width: 2.625rem;
-  height: 2.625rem;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--surface-rose);
-  color: var(--ds-color-action-primary-hover);
-}
-
-.epdTimeline article:nth-child(even) .epdTimelineHeading > span {
-  background: var(--surface-green);
-  color: var(--ds-color-action-secondary-hover);
-}
-
-@media (max-width: 68rem) {
-  .kmsGuidanceInner,
-  .kmsValidationSection .kmsFeatureInner {
-    grid-template-columns: 1fr;
-  }
-
-  .kmsGuidanceVisual {
-    justify-self: stretch;
   }
 }
 
@@ -7276,16 +7097,6 @@
   .epdSnapshotCard:nth-child(5) {
     flex: 1 1 100%;
     border-radius: var(--radius-md);
-  .kmsProblemCards {
-    grid-template-columns: 1fr;
-  }
-
-  .c4iProofRows {
-    gap: var(--ds-space-2xl);
-  }
-
-  .c4iProofRow {
-    gap: var(--ds-space-lg);
   }
 }
 
@@ -7353,7 +7164,226 @@
   .epdSnapshotCard:nth-child(4),
   .epdSnapshotCard:nth-child(5) {
     white-space: normal;
-  .c4iFlowStep span {
+  }
+}
+
+/* Approved final UI refinements, scoped to the requested case-study sections. */
+.c4iHtmlPage .c4iMergeViz,
+.c4iHtmlPage .c4iMergeFrame {
+  background: var(--ds-color-canvas);
+}
+
+.c4iHtmlPage .c4iFlowSteps {
+  border-radius: 0;
+  background: transparent;
+  padding-inline: 0;
+}
+
+.c4iHtmlPage .c4iFlowStep:not(:last-child)::after {
+  height: 1.5px;
+  background: color-mix(in srgb, var(--ds-color-text-tertiary) 48%, transparent);
+}
+
+.c4iHtmlPage .c4iFlowStep span {
+  animation: c4i-step-breathe 6s var(--ds-ease-enter) infinite;
+  transform-origin: center;
+}
+
+.c4iHtmlPage .c4iFlowStep:nth-child(2) span {
+  animation-delay: 1.5s;
+}
+
+.c4iHtmlPage .c4iFlowStep:nth-child(3) span {
+  animation-delay: 3s;
+}
+
+.c4iHtmlPage .c4iFlowStep:nth-child(4) span {
+  animation-delay: 4.5s;
+}
+
+.c4iHtmlPage .c4iProofRows {
+  gap: var(--ds-space-3xl);
+}
+
+.c4iHtmlPage .c4iProofRow {
+  gap: var(--ds-space-2xl);
+  align-items: center;
+}
+
+.c4iHtmlPage .c4iProofVisual {
+  height: auto;
+  aspect-ratio: 1501 / 845;
+  align-self: center;
+}
+
+@keyframes c4i-step-breathe {
+  0%, 24%, 100% {
+    box-shadow: 0 0 0 0 transparent;
+    transform: scale(1);
+  }
+
+  10% {
+    box-shadow: 0 0 0 0.45rem color-mix(in srgb, currentColor 16%, transparent);
+    transform: scale(1.15);
+  }
+}
+
+.monitoringCompactCard {
+  gap: var(--ds-space-md);
+  min-height: 0;
+  padding: var(--ds-space-lg);
+}
+
+.monitoringCardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-md);
+}
+
+.monitoringCardHeader .monitoringCardIcon,
+.monitoringCardHeader h3 {
+  margin: 0;
+}
+
+.monitoringCompactCard > p {
+  font-size: var(--ds-type-body-14-size);
+  line-height: var(--ds-type-body-14-line);
+}
+
+.monitoringFinding {
+  align-items: start;
+}
+
+.monitoringFinding .monitoringIcon {
+  align-self: start;
+  margin-top: 0.15rem;
+}
+
+.kmsProblemSection {
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-2xl);
+}
+
+.kmsProblemSection .kmsSectionCopy {
+  max-width: 52rem;
+}
+
+.kmsProblemCards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.kmsValidationSection .kmsFeatureInner {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: var(--ds-space-2xl);
+  width: min(100%, 62rem);
+  margin-inline: auto;
+}
+
+.kmsGuidanceInner {
+  grid-template-columns: minmax(0, 0.95fr) minmax(20rem, 1.05fr);
+  gap: var(--ds-space-2xl);
+  align-items: center;
+}
+
+.kmsGuidanceContent {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1;
+  gap: var(--ds-space-lg);
+}
+
+.kmsGuidanceHeader {
+  justify-items: start;
+  max-width: none;
+  margin-inline: 0;
+  text-align: left;
+}
+
+.kmsGuidanceCards {
+  grid-template-columns: 1fr;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.kmsGuidanceVisual {
+  grid-column: 2;
+  grid-row: 1;
+  width: min(100%, 38rem);
+  justify-self: end;
+}
+
+.epdTimelineCopy {
+  display: grid;
+  gap: var(--ds-space-sm);
+}
+
+.epdTimelineHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-md);
+}
+
+.epdTimelineHeading > span {
+  display: grid;
+  width: 2.625rem;
+  height: 2.625rem;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--surface-rose);
+  color: var(--ds-color-action-primary-hover);
+}
+
+.epdTimeline article:nth-child(even) .epdTimelineHeading > span {
+  background: var(--surface-green);
+  color: var(--ds-color-action-secondary-hover);
+}
+
+@media (min-width: 48.01rem) {
+  .epdTimeline article {
+    grid-template-columns: minmax(0, 0.58fr) minmax(0, 1.42fr);
+    gap: var(--ds-space-2xl);
+  }
+
+  .epdTimeline article:nth-child(even) {
+    grid-template-columns: minmax(0, 1.42fr) minmax(0, 0.58fr);
+  }
+
+  .epdTimelineVisual {
+    min-height: clamp(18rem, 36vw, 22.5rem);
+  }
+}
+
+@media (max-width: 68rem) {
+  .kmsGuidanceInner,
+  .kmsValidationSection .kmsFeatureInner {
+    grid-template-columns: 1fr;
+  }
+
+  .kmsGuidanceVisual {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 48rem) {
+  .kmsProblemCards {
+    grid-template-columns: 1fr;
+  }
+
+  .c4iHtmlPage .c4iProofRows {
+    gap: var(--ds-space-2xl);
+  }
+
+  .c4iHtmlPage .c4iProofRow {
+    gap: var(--ds-space-lg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .c4iHtmlPage .c4iFlowStep span {
     animation: none;
   }
 }

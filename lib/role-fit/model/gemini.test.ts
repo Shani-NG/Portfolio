@@ -37,6 +37,13 @@ describe("Gemini chat completion guard", () => {
     );
   });
 
+  it("turns multiple suggested directions into scannable bullets", () => {
+    assert.equal(
+      completeChatAnswer("I can suggest two useful directions. If you want high-stakes systems, explore the defense work. If you want product strategy, review the monitoring case study."),
+      "I can suggest two useful directions.\n- If you want high-stakes systems, explore the defense work.\n- If you want product strategy, review the monitoring case study.",
+    );
+  });
+
   it("retries MAX_TOKENS once with a larger plain-text budget", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3-flash-preview";
@@ -134,5 +141,46 @@ describe("Gemini chat completion guard", () => {
     assert.equal(firstConfig.responseMimeType, "application/json");
     assert.equal(firstConfig.maxOutputTokens, 2500);
     assert.equal(retryConfig.maxOutputTokens, 5000);
+  });
+
+  it("repairs one schema-invalid report response before failing the request", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
+    const requests: Array<Record<string, unknown>> = [];
+    const validAnalysis = JSON.stringify({
+      fitLevel: "good",
+      fitRationale: "Approved evidence supports the role context.",
+      evidenceConfidence: "high",
+      evidenceConfidenceRationale: "The assessment uses approved project evidence.",
+      skillsCoverageLabel: "Evidence-backed coverage",
+      items: [{
+        roleItemIndex: 0,
+        displayLabel: "Complex product strategy",
+        importance: "core",
+        matchType: "direct",
+        impact: "strength",
+        evidenceConfidence: "high",
+        shortRationale: "Approved evidence shows this capability.",
+        evidenceSourceIds: ["c4i"],
+      }],
+    });
+    globalThis.fetch = async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return requests.length === 1
+        ? geminiResponse('{"fitLevel":"good"}', "STOP")
+        : geminiResponse(validAnalysis, "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(requests.length, 2);
   });
 });

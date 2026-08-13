@@ -36,6 +36,8 @@ function fieldQuestion(field: ConversationRoleField | undefined, language: "he" 
 
 export function isReportConfirmationText(value: string) {
   const normalized = value.trim().toLowerCase().replace(/[.!?…]+$/u, "").trim();
+  const explicitReportAction = /^(?:(?:please|can you|could you|let's|lets)\s+)?(?:generate(?:\s+(?:the|this))?\s+report(?:\s+again)?|create(?:\s+(?:the|this))?\s+report|try\s+again|retry(?:\s+(?:the|this))?\s*report?|run(?:\s+(?:it|the report|report))?\s+again|start(?:\s+generating)?\s+(?:the\s+)?report)$/i;
+  if (explicitReportAction.test(normalized)) return true;
   return /^(yes|yep|sure|ok|okay|go ahead|generate|continue|confirm|great|nice|sounds good|יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך)$/i.test(normalized);
 }
 

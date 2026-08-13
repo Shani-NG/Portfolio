@@ -39,7 +39,11 @@ describe("Role Fit conversation behavior", () => {
   it("accepts short confirmations with normal punctuation", () => {
     assert.equal(isReportConfirmationText("Yes!"), true);
     assert.equal(isReportConfirmationText("כן."), true);
+    assert.equal(isReportConfirmationText("Please generate the report again"), true);
+    assert.equal(isReportConfirmationText("let's try again"), true);
+    assert.equal(isReportConfirmationText("retry the report"), true);
     assert.equal(isReportConfirmationText("not yet"), false);
+    assert.equal(isReportConfirmationText("continue exploring the portfolio"), false);
   });
 
   it("requests explicit report confirmation after role completion", () => {

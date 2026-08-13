@@ -17,7 +17,7 @@ type LiveReportState = {
 
 type ErrorContext = "conversation" | "report" | "validation" | null;
 
-const reportRequestTimeoutMs = 65_000;
+const reportRequestTimeoutMs = 150_000;
 
 type ReportFailureResult = {
   state?: string;
@@ -66,6 +66,8 @@ export default function RoleFitPage() {
   const [errorContext, setErrorContext] = useState<ErrorContext>(null);
   const reportRequestInFlightRef = useRef(false);
   const chatPaneRef = useRef<HTMLDivElement>(null);
+  const chatHistoryRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
   const roleFileInputRef = useRef<HTMLInputElement>(null);
   const reportLimitReached = liveSession.completedReportCount >= 2;
@@ -348,6 +350,20 @@ export default function RoleFitPage() {
   }, [activeReport?.reportId, hasLiveReport, isNarrowLayout]);
 
   useEffect(() => {
+    const scrollBehavior: ScrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+
+    window.requestAnimationFrame(() => {
+      const chatHistory = chatHistoryRef.current;
+      if (chatHistory && chatHistory.scrollHeight > chatHistory.clientHeight) {
+        chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: scrollBehavior });
+        return;
+      }
+
+      chatEndRef.current?.scrollIntoView({ block: "end", behavior: scrollBehavior });
+    });
+  }, [liveSession.messages.length, isSending]);
+
+  useEffect(() => {
     if (!liveSplitCanvas || isNarrowLayout) return;
 
     const previousOverflow = document.body.style.overflow;
@@ -473,7 +489,7 @@ export default function RoleFitPage() {
             ref={chatPaneRef}
             tabIndex={-1}
           >
-            <div className={styles.chatHistory}>
+            <div className={styles.chatHistory} ref={chatHistoryRef}>
               {chatMessages.map((message, index) => (
                 <div className={`${styles.chatBubble} ${message.role === "user" ? styles.userBubble : styles.agentBubble}`} key={`${message.role}-${index}`}>
                   {message.content}
@@ -484,6 +500,7 @@ export default function RoleFitPage() {
                   <span aria-hidden="true" />
                 </div>
               ) : null}
+              <div aria-hidden="true" className={styles.chatEndAnchor} ref={chatEndRef} />
             </div>
 
             <div className={styles.chatBoxContainer}>

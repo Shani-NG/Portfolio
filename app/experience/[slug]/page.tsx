@@ -321,6 +321,7 @@ function MonitoringCaseStudy() {
         if ("cards" in section) {
           const isPersonalContext = section.id === "a-learning-system";
           const isDeepDiveThree = section.id === "first-week-product-value";
+          const useCompactCardHeader = isPersonalContext || isDeepDiveThree;
           return (
             <ScrollReveal mode={index % 2 === 0 ? "creative" : "overlap"} key={section.id}>
               <section className={[styles.monitoringSection, washClass].join(" ")} id={section.id}>
@@ -330,11 +331,18 @@ function MonitoringCaseStudy() {
                     <MonitoringSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
                     <div className={section.cards.length === 2 ? styles.monitoringCardGridTwo : styles.monitoringCardGridThree}>
                       {section.cards.map(([title, body, icon]) => (
-                        <article className={[styles.monitoringInfoCard, styles.monitoringCompactCard].join(" ")} key={title}>
-                          <div className={styles.monitoringCardHeader}>
-                            <span className={styles.monitoringCardIcon}><MonitoringIcon name={icon} /></span>
-                            <h3>{title}</h3>
-                          </div>
+                        <article className={[styles.monitoringInfoCard, useCompactCardHeader ? styles.monitoringCompactCard : ""].filter(Boolean).join(" ")} key={title}>
+                          {useCompactCardHeader ? (
+                            <div className={styles.monitoringCardHeader}>
+                              <span className={styles.monitoringCardIcon}><MonitoringIcon name={icon} /></span>
+                              <h3>{title}</h3>
+                            </div>
+                          ) : (
+                            <>
+                              <span className={styles.monitoringCardIcon}><MonitoringIcon name={icon} /></span>
+                              <h3>{title}</h3>
+                            </>
+                          )}
                           <p>{body}</p>
                         </article>
                       ))}
@@ -1226,7 +1234,7 @@ function KmsSectionView({ section, index }: { section: KmsSection; index: number
               </article>
             </div>
           </div>
-          <KmsVisualImage visual={kmsCaseStudy.visuals.foundation} className={styles.kmsGuidanceVisual} />
+          <KmsVisualImage visual={kmsCaseStudy.visuals.contextual} className={styles.kmsGuidanceVisual} />
         </div>
       </section>
     </ScrollReveal>

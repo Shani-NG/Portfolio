@@ -184,6 +184,16 @@ export function completeChatAnswer(answer: string): string | null {
   const completeSentences = normalized.match(/[^.!?…]+[.!?…]+/gu)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
 
   if (completeSentences.length < 1) return null;
+
+  const optionStartIndex = completeSentences.findIndex((sentence) => /^(?:If\b|You can\b|One option\b|Another option\b)/i.test(sentence));
+  const optionSentences = optionStartIndex >= 0
+    ? completeSentences.slice(optionStartIndex).filter((sentence) => /^(?:If\b|You can\b|One option\b|Another option\b)/i.test(sentence))
+    : [];
+  if (optionSentences.length >= 2) {
+    const lead = completeSentences.slice(0, optionStartIndex).join(" ");
+    return [lead, ...optionSentences.slice(0, 4).map((sentence) => `- ${sentence}`)].filter(Boolean).join("\n");
+  }
+
   return completeSentences.slice(0, 3).join(" ");
 }
 
@@ -322,75 +332,70 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         responseMimeType: "application/json",
       });
 
-      if (response.ok && candidateFinishReason(response.data) === "MAX_TOKENS") {
+      let invalidDetail = "qualitative-analysis:unknown";
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        if (!response.ok) {
+          return {
+            ok: false,
+            provider: "gemini",
+            model: response.model,
+            error: "provider-error",
+            safeMessageKey: "model.google_ai_studio_provider_error",
+            detail: response.detail,
+          };
+        }
+
+        const finishReason = candidateFinishReason(response.data);
+        const text = candidateText(response.data);
+
+        if (finishReason === "MAX_TOKENS") {
+          invalidDetail = "qualitative-analysis-finish-reason:MAX_TOKENS";
+        } else if (!text) {
+          invalidDetail = "qualitative-analysis-output:empty";
+        } else {
+          try {
+            const parsed = qualitativeReportAnalysisSchema.safeParse(extractJson(text));
+            if (parsed.success) {
+              return { ok: true, provider: "gemini", model: response.model, analysis: parsed.data satisfies QualitativeReportAnalysis };
+            }
+            invalidDetail = `qualitative-analysis-schema:${safeSchemaDiagnostic(parsed.error)}`;
+          } catch {
+            invalidDetail = "qualitative-analysis-json:invalid-json";
+          }
+        }
+
+        if (attempt === 1) {
+          return {
+            ok: false,
+            provider: "gemini",
+            model: response.model,
+            error: "invalid-output",
+            safeMessageKey: invalidDetail === "qualitative-analysis-output:empty"
+              ? "model.google_ai_studio_empty_output"
+              : "model.google_ai_studio_invalid_report_payload",
+            detail: invalidDetail,
+          };
+        }
+
         response = await generateGeminiContent({
           apiKey,
           models: getCandidateModels(model),
-          prompt: `${reportPrompt}\n\nThe previous attempt reached its token limit. Return one complete JSON object that satisfies the schema; keep each rationale concise.`,
+          prompt: `${reportPrompt}\n\nThe previous output was invalid (${invalidDetail}). Return one corrected, complete JSON object that satisfies the exact schema. Keep each rationale concise and do not add fields.`,
           maxOutputTokens: Math.max(input.maxOutputTokens * 2, 4000),
           temperature: 0,
           responseMimeType: "application/json",
         });
       }
 
-      if (!response.ok) {
-        return {
-          ok: false,
-          provider: "gemini",
-          model: response.model,
-          error: "provider-error",
-          safeMessageKey: "model.google_ai_studio_provider_error",
-          detail: response.detail,
-        };
-      }
-
-      if (candidateFinishReason(response.data) === "MAX_TOKENS") {
-        return {
-          ok: false,
-          provider: "gemini",
-          model: response.model,
-          error: "invalid-output",
-          safeMessageKey: "model.google_ai_studio_invalid_report_payload",
-          detail: "qualitative-analysis-finish-reason:MAX_TOKENS",
-        };
-      }
-
-      const text = response.data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
-
-      if (!text) {
-        return {
-          ok: false,
-          provider: "gemini",
-          model: response.model,
-          error: "invalid-output",
-          safeMessageKey: "model.google_ai_studio_empty_output",
-        };
-      }
-
-      try {
-        const parsed = qualitativeReportAnalysisSchema.safeParse(extractJson(text));
-        if (!parsed.success) {
-          return {
-            ok: false,
-            provider: "gemini",
-            model: response.model,
-            error: "invalid-output",
-            safeMessageKey: "model.google_ai_studio_invalid_report_payload",
-            detail: `qualitative-analysis-schema:${safeSchemaDiagnostic(parsed.error)}`,
-          };
-        }
-
-        return { ok: true, provider: "gemini", model: response.model, analysis: parsed.data satisfies QualitativeReportAnalysis };
-      } catch {
-        return {
-          ok: false,
-          provider: "gemini",
-          model: response.model,
-          error: "invalid-output",
-          safeMessageKey: "model.google_ai_studio_invalid_report_payload",
-          detail: "qualitative-analysis-json:invalid-json",
-        };
-      }
+      return {
+        ok: false,
+        provider: "gemini",
+        model,
+        error: "invalid-output",
+        safeMessageKey: "model.google_ai_studio_invalid_report_payload",
+        detail: invalidDetail,
+      };
 
     },
   };

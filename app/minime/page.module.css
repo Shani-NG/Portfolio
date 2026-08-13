@@ -39,9 +39,30 @@
 
 .conversationPage {
   position: fixed;
-  inset: var(--site-header-height) 0 0;
+  inset: var(--site-header-height) 8px 0 0;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  scrollbar-color: color-mix(in srgb, var(--rf-text-secondary) 38%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.conversationPage::-webkit-scrollbar {
+  width: 6px;
+}
+
+.conversationPage::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.conversationPage::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rf-text-secondary) 38%, transparent);
+}
+
+.conversationPage::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .msi {
@@ -294,6 +315,49 @@
   margin: 0 auto;
   max-width: 820px;
   width: 100%;
+  scrollbar-color: color-mix(in srgb, var(--rf-text-secondary) 38%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.chatBoxContainer textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chatBoxContainer textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chatBoxContainer textarea::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rf-text-secondary) 38%, transparent);
+}
+
+.chatBoxContainer textarea::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.conversationPage .agentViewContainer {
+  height: auto;
+  min-height: calc(100% - 24px);
+  overflow: visible;
+}
+
+.conversationPage .chatPane {
+  height: auto;
+  min-height: calc(100% - 24px);
+  overflow: visible;
+}
+
+.conversationPage .chatHistory {
+  overflow: visible;
+}
+
+.conversationPage .chatBoxContainer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 
 .chatHistory {
@@ -304,6 +368,37 @@
   margin-bottom: 24px;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-color: color-mix(in srgb, var(--rf-text-secondary) 38%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.chatHistory::-webkit-scrollbar,
+.canvasPane::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chatHistory::-webkit-scrollbar-track,
+.canvasPane::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chatHistory::-webkit-scrollbar-thumb,
+.canvasPane::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rf-text-secondary) 38%, transparent);
+}
+
+.chatHistory::-webkit-scrollbar-button,
+.canvasPane::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.chatEndAnchor {
+  width: 100%;
+  height: 1px;
+  flex: 0 0 auto;
 }
 
 .chatBubble {
@@ -355,6 +450,8 @@
   max-height: calc(100vh - var(--site-header-height) - 72px);
   overflow-y: auto;
   padding: 24px;
+  scrollbar-color: color-mix(in srgb, var(--rf-text-secondary) 38%, transparent) transparent;
+  scrollbar-width: thin;
 }
 
 .liveSplitWorkspace .canvasPane {
@@ -1717,7 +1814,7 @@
     min-height: 2.75rem;
     padding: 0 var(--ds-space-md);
     position: fixed;
-    right: max(var(--ds-space-lg), env(safe-area-inset-right));
+    right: max(var(--ds-space-xl), calc(env(safe-area-inset-right) + var(--ds-space-lg)));
     z-index: 40;
   }
 

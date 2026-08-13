@@ -23,6 +23,24 @@ describe("Role Fit runtime conversation contract", () => {
     assert.ok(guardExit > guardedRequest);
   });
 
+  it("keeps report retries on the saved role without collecting it again", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+    const behavior = await readFile(join(process.cwd(), "lib", "role-fit", "conversation", "behavior.ts"), "utf8");
+
+    assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)/);
+    assert.match(page, /await requestReport\(currentSession\)/);
+    assert.match(behavior, /generate\(\?:\\s\+\(\?:the\|this\)\)\?\\s\+report/);
+    assert.match(behavior, /try\\s\+again/);
+  });
+
+  it("automatically reveals the newest chat output", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+
+    assert.match(page, /chatHistory\.scrollTo\(\{ top: chatHistory\.scrollHeight/);
+    assert.match(page, /chatEndRef\.current\?\.scrollIntoView/);
+    assert.match(page, /prefers-reduced-motion: reduce/);
+  });
+
   it("keeps collecting role details after Generate Report is requested", async () => {
     const [page, route] = await Promise.all([
       readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8"),
