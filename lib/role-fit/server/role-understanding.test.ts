@@ -160,6 +160,17 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(shouldValidateRoleCollectionMessage({ message: "Tell me about Shani", roleCollectionActive: true }), false);
   });
 
+  it("treats a long pasted role as role input after a new analysis starts", () => {
+    const pastedRole = [
+      "Senior Product Designer",
+      "We are looking for a designer to lead discovery, align product and engineering, define flows, create prototypes, and support roadmap decisions across complex products.",
+      "The ideal candidate has strong UX strategy experience, stakeholder facilitation skills, product design background, and the ability to translate ambiguity into clear direction.",
+    ].join("\n");
+
+    assert.equal(shouldValidateRoleCollectionMessage({ message: pastedRole, roleCollectionActive: true }), true);
+    assert.equal(shouldValidateRoleCollectionMessage({ message: "Tell me more about Shani", roleCollectionActive: true }), false);
+  });
+
   it("keeps a short Hebrew title when details are added afterward", () => {
     const merged = resolveRoleTextForValidation({
       message: "Responsibilities: Lead product discovery with stakeholders\nRequirements: Strong UX strategy experience",

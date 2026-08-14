@@ -180,7 +180,7 @@ describe("Task E Lite persistence helpers", () => {
     }).success, false);
   });
 
-  test("keeps missing contact webhook as a controlled response instead of a network error", async () => {
+  test("keeps missing contact store as a controlled response instead of a network error", async () => {
     const route = await readFile(join(process.cwd(), "app", "api", "contact", "route.ts"), "utf8");
     const form = await readFile(join(process.cwd(), "app", "contact", "contact-form.tsx"), "utf8");
 

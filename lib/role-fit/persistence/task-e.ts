@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { ReportUIPayload } from "../contracts/index.ts";
+import {
+  appendContactLeadPersistenceRow,
+  appendRoleFitReportPersistenceRow,
+  isRoleFitRuntimeStoreConfigured,
+} from "../runtime/google-sheets-store.ts";
 
 const allowedSourceContexts = ["direct-contact-page", "role-fit-report-cta", "portfolio-cta", "unknown"] as const;
 const reportFitResults = ["Strong", "Good", "Partial", "Insufficient Evidence", "Out of Scope"] as const;
@@ -21,8 +26,8 @@ export type ContactLeadRequest = z.infer<typeof contactLeadRequestSchema>;
 
 type PersistenceResult =
   | { ok: true; skipped?: false }
-  | { ok: true; skipped: true; reason: "missing-webhook" | "duplicate-report" }
-  | { ok: false; reason: "missing-webhook" | "webhook-failed" | "invalid-payload" };
+  | { ok: true; skipped: true; reason: "missing-store" | "duplicate-report" }
+  | { ok: false; reason: "missing-store" | "store-failed" | "invalid-payload" };
 
 function createShortId(prefix: "R" | "L") {
   const bytes = new Uint8Array(4);
@@ -126,16 +131,6 @@ export function buildContactLeadRow(input: ContactLeadRequest) {
   };
 }
 
-async function postWebhook(webhookUrl: string, payload: unknown) {
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(4_000),
-  });
-  return response.ok;
-}
-
 function logPersistenceFailure(target: "report" | "lead", id: string, category: string) {
   console.warn("[task-e-persistence]", {
     target,
@@ -146,10 +141,9 @@ function logPersistenceFailure(target: "report" | "lead", id: string, category: 
 }
 
 export async function persistCompletedReport(report: ReportUIPayload, options: { roleFamily?: string } = {}): Promise<PersistenceResult> {
-  const webhookUrl = process.env.ROLE_FIT_REPORT_SAVE_WEBHOOK_URL;
-  if (!webhookUrl) {
-    logPersistenceFailure("report", report.reportId, "missing-webhook");
-    return { ok: true, skipped: true, reason: "missing-webhook" };
+  if (!isRoleFitRuntimeStoreConfigured()) {
+    logPersistenceFailure("report", report.reportId, "missing-store");
+    return { ok: true, skipped: true, reason: "missing-store" };
   }
 
   if (sentReportIds.has(report.reportId)) {
@@ -159,17 +153,13 @@ export async function persistCompletedReport(report: ReportUIPayload, options: {
   try {
     const row = buildReportPersistenceRow(report, options);
     sentReportIds.add(report.reportId);
-    const ok = await postWebhook(webhookUrl, {
-      payload_type: "role_fit_report_completed",
-      sheet: "role_fit_reports",
-      row,
-    });
+    const ok = await appendRoleFitReportPersistenceRow(row);
     if (ok) return { ok: true };
-    logPersistenceFailure("report", report.reportId, "webhook-failed");
-    return { ok: false, reason: "webhook-failed" };
+    logPersistenceFailure("report", report.reportId, "store-failed");
+    return { ok: false, reason: "store-failed" };
   } catch {
-    logPersistenceFailure("report", report.reportId, "webhook-failed");
-    return { ok: false, reason: "webhook-failed" };
+    logPersistenceFailure("report", report.reportId, "store-failed");
+    return { ok: false, reason: "store-failed" };
   }
 }
 
@@ -178,23 +168,18 @@ export async function persistContactLead(input: unknown): Promise<PersistenceRes
   if (!parsed.success) return { ok: false, reason: "invalid-payload" };
 
   const row = buildContactLeadRow(parsed.data);
-  const webhookUrl = process.env.CONTACT_LEAD_SAVE_WEBHOOK_URL;
-  if (!webhookUrl) {
-    logPersistenceFailure("lead", row.lead_id, "missing-webhook");
-    return { ok: false, reason: "missing-webhook" };
+  if (!isRoleFitRuntimeStoreConfigured()) {
+    logPersistenceFailure("lead", row.lead_id, "missing-store");
+    return { ok: false, reason: "missing-store" };
   }
 
   try {
-    const ok = await postWebhook(webhookUrl, {
-      payload_type: "contact_lead_created",
-      sheet: "contact_leads",
-      row,
-    });
+    const ok = await appendContactLeadPersistenceRow(row);
     if (ok) return { ok: true };
-    logPersistenceFailure("lead", row.lead_id, "webhook-failed");
-    return { ok: false, reason: "webhook-failed" };
+    logPersistenceFailure("lead", row.lead_id, "store-failed");
+    return { ok: false, reason: "store-failed" };
   } catch {
-    logPersistenceFailure("lead", row.lead_id, "webhook-failed");
-    return { ok: false, reason: "webhook-failed" };
+    logPersistenceFailure("lead", row.lead_id, "store-failed");
+    return { ok: false, reason: "store-failed" };
   }
 }

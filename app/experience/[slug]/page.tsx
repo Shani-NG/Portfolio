@@ -233,7 +233,7 @@ function MonitoringSectionHeader({
   );
 }
 
-function MonitoringCaseStudy() {
+function MonitoringCaseStudy({ showReportReturnFab = false }: { showReportReturnFab?: boolean }) {
   const currentProjectIndex = projectCards.findIndex((project) => project.href === "/experience/monitoring-product-intelligence");
   const nextProject = projectCards[(currentProjectIndex + 1) % projectCards.length];
 
@@ -509,7 +509,11 @@ function BigRedInlineImage({
   );
 }
 
-function BigRedHtmlCaseStudy() {
+function ReportReturnFab({ show }: { show: boolean }) {
+  return show ? <ContextFab href="/minime" label="Back to report" icon="arrow_back" placement="secondary" /> : null;
+}
+
+function BigRedHtmlCaseStudy({ showReportReturnFab = false }: { showReportReturnFab?: boolean }) {
   const currentProjectIndex = projectCards.findIndex((project) => project.href === "/experience/the-big-red-button");
   const nextProject = projectCards[(currentProjectIndex + 1) % projectCards.length];
 
@@ -773,6 +777,8 @@ function BigRedHtmlCaseStudy() {
         </div>
       </section>
 
+      <ReportReturnFab show={showReportReturnFab} />
+      <ReportReturnFab show={showReportReturnFab} />
       <ContextFab href={nextProject.href} label="Next Case Study" icon="arrow_forward" />
     </main>
   );
@@ -798,12 +804,12 @@ function C4iImage({
   );
 }
 
-function C4iHtmlCaseStudy() {
+function C4iHtmlCaseStudy({ showReportReturnFab = false }: { showReportReturnFab?: boolean }) {
   const currentProjectIndex = projectCards.findIndex((project) => project.href === "/experience/c4i-beyond-clarity");
   const nextProject = projectCards[(currentProjectIndex + 1) % projectCards.length];
 
   return (
-    <main className={[styles.page, styles.c4iHtmlPage].join(" ")}>
+    <main className={[styles.page, styles.c4iHtmlPage].join(" ")} data-ds-theme="dark">
       <section className={styles.c4iHtmlHero} data-ds-theme="dark" id="c4i-beyond-clarity">
         <div className={styles.c4iHeroVisual} aria-hidden="true">
           <C4iImage
@@ -1046,6 +1052,7 @@ function C4iHtmlCaseStudy() {
         </div>
       </section>
 
+      <ReportReturnFab show={showReportReturnFab} />
       <ContextFab href={nextProject.href} label="Next Case Study" icon="arrow_forward" />
     </main>
   );
@@ -1513,7 +1520,7 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
   );
 }
 
-function EpdCaseStudy() {
+function EpdCaseStudy({ showReportReturnFab = false }: { showReportReturnFab?: boolean }) {
   return (
     <main className={[styles.page, styles.epdPage].join(" ")}>
       <section className={styles.epdHero} data-ds-theme="dark" id={epdCaseStudy.heroAnchor}>
@@ -1600,23 +1607,33 @@ function EpdCaseStudy() {
         </div>
       </section>
 
+      <ReportReturnFab show={showReportReturnFab} />
       <ContextFab href="/experience/role-fit-agent" label="Next Case Study" icon="arrow_forward" />
     </main>
   );
 }
 
-export default async function CaseStudyPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function CaseStudyPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { slug } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const source = resolvedSearchParams.source;
+  const showReportReturnFab = Array.isArray(source) ? source.includes("role-fit-report") : source === "role-fit-report";
   const project = projectCards.find((item) => item.href.endsWith(`/${slug}`));
 
   if (!project) notFound();
 
   if (slug === bigRedButtonCaseStudy.slug) {
-    return <BigRedHtmlCaseStudy />;
+    return <BigRedHtmlCaseStudy showReportReturnFab={showReportReturnFab} />;
   }
 
   if (slug === "monitoring-product-intelligence") {
-    return <MonitoringCaseStudy />;
+    return <MonitoringCaseStudy showReportReturnFab={showReportReturnFab} />;
   }
 
   if (slug === kmsCaseStudy.slug) {
@@ -1665,13 +1682,14 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
           </div>
         </section>
 
+        <ReportReturnFab show={showReportReturnFab} />
         <ContextFab href="/experience/ux-from-the-heart" label="Next Case Study" icon="arrow_forward" />
       </main>
     );
   }
 
   if (slug === epdCaseStudy.slug) {
-    return <EpdCaseStudy />;
+    return <EpdCaseStudy showReportReturnFab={showReportReturnFab} />;
   }
 
   if (slug !== c4iCaseStudy.slug) {
@@ -1683,9 +1701,10 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
           <p>{project.summary}</p>
           <Link href="/experience">Back to Experience</Link>
         </section>
+        <ReportReturnFab show={showReportReturnFab} />
       </main>
     );
   }
 
-  return <C4iHtmlCaseStudy />;
+  return <C4iHtmlCaseStudy showReportReturnFab={showReportReturnFab} />;
 }

@@ -356,6 +356,7 @@ export function shouldValidateRoleCollectionMessage(input: {
   roleCollectionActive: boolean;
 }) {
   return looksLikeRoleInput(input.message)
+    || (input.roleCollectionActive && input.message.trim().length >= 240)
     || (input.roleCollectionActive && isPlausibleRoleTitle(input.message));
 }
 

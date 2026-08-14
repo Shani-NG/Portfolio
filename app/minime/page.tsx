@@ -434,6 +434,8 @@ export default function RoleFitPage() {
     setApiStatusMessage("");
     setErrorContext(null);
     setIsAgentUnavailable(false);
+    setIsReportRequestInFlight(false);
+    reportRequestInFlightRef.current = false;
     setRoleInput("");
     setActivePane("chat");
   }

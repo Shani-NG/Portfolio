@@ -11,8 +11,8 @@ type ReportItem = ReportUIPayload["requirementMapping"]["items"][number];
 type EvidenceCluster = ReportUIPayload["evidencePanel"]["clusters"][number];
 
 const fitAssets = {
-  "fit-strong": "/assets/role-fit/fit-good.png",
-  "fit-good": "/assets/role-fit/fit-strong.png",
+  "fit-strong": "/assets/role-fit/fit-strong.png",
+  "fit-good": "/assets/role-fit/fit-good.png",
   "fit-partial": "/assets/role-fit/fit-partial.png",
 } as const;
 
@@ -26,6 +26,12 @@ const matchLabels: Record<ReportItem["matchType"], string> = {
 };
 
 const requirementIcons = ["strategy", "auto_awesome", "terminal", "groups", "health_and_safety"] as const;
+
+function roleFitCaseStudyHref(href: string) {
+  const [pathAndQuery, hash = ""] = href.split("#");
+  const separator = pathAndQuery.includes("?") ? "&" : "?";
+  return `${pathAndQuery}${separator}source=role-fit-report${hash ? `#${hash}` : ""}`;
+}
 
 function coverageCounts(report: ReportUIPayload) {
   const coverage = report.skillsMatch.visualCoverage;
@@ -91,7 +97,7 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
           <Image alt="" aria-hidden="true" fill priority sizes="104px" src={fitAssets[fit.illustrationKey]} />
         </div>
       </div>
-      <h3 id="fit-summary-title">Core Matching Skills</h3>
+      <h2 id="fit-summary-title">Core Matching Skills</h2>
       <p className={styles.skillsSubtitle}>The strongest capabilities supporting this fit.</p>
       <div className={styles.skills}>
         {report.skillsMatch.items.map((skill) => (
@@ -132,7 +138,7 @@ function EvidenceLink({ cluster, isOpen }: { cluster: EvidenceCluster; isOpen: b
   }
 
   return (
-    <Link className={styles.projectLink} href={cluster.destination.href} tabIndex={isOpen ? 0 : -1}>
+    <Link className={styles.projectLink} href={roleFitCaseStudyHref(cluster.destination.href)} tabIndex={isOpen ? 0 : -1}>
       <span>View Case Study</span>
       <MaterialIcon name="arrow_forward" />
     </Link>
@@ -295,7 +301,7 @@ export function RoleFitLiveReport({
       <header className={styles.reportHeader}>
         <div className={styles.brand}>
           <div>
-            <h1>Shani Nakash-Gomel - Smart Role Fit</h1>
+            <h2 className={styles.brandTitle}>Shani Nakash-Gomel - Smart Role Fit</h2>
             <p>A concise role-fit report grounded in verified portfolio evidence.</p>
           </div>
         </div>

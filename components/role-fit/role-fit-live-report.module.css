@@ -11,7 +11,7 @@
   width: 100%;
 }
 
-.strong { --fit-color: #9f8bd8; }
+.strong { --fit-color: var(--ds-color-action-secondary-hover); }
 .good { --fit-color: var(--ds-color-action-secondary-hover); }
 .partial { --fit-color: var(--ds-color-action-primary-hover); }
 .limited { --fit-color: var(--ds-color-text-secondary); }
@@ -35,7 +35,7 @@
 
 .brand > div { min-width: 0; }
 
-.brand h1 {
+.brandTitle {
   font-family: var(--ds-font-family-display);
   font-size: var(--ds-type-heading-22-size);
   letter-spacing: 0;
@@ -183,7 +183,7 @@
   transform: scale(1.38);
 }
 
-.fitCard h3 {
+.fitCard h2 {
   font-family: var(--ds-font-family-display);
   font-size: var(--ds-type-heading-18-size);
   margin: var(--ds-space-lg) 0 0;
@@ -543,7 +543,7 @@
 @container role-fit-report (max-width: 32rem) {
   .card { padding: var(--ds-space-lg); }
   .brand { align-items: flex-start; }
-  .brand h1 { font-size: var(--ds-type-heading-18-size); }
+  .brandTitle { font-size: var(--ds-type-heading-18-size); }
   .profileCard h2 { font-size: var(--ds-type-heading-22-size); }
   .requirementTrigger { gap: var(--ds-space-sm); grid-template-columns: 2.5rem minmax(0, 1fr) 1.25rem; padding: var(--ds-space-sm); }
   .requirementIcon { height: 2.5rem; width: 2.5rem; }

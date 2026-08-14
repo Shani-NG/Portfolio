@@ -166,9 +166,6 @@ export function AgentComposer({
             <MaterialIcon name="add" />
           </ComposerButton>
           <div className={styles.submitControls}>
-            <ComposerButton aria-label="Voice input" disabled={isDisabled}>
-              <MaterialIcon name="mic" />
-            </ComposerButton>
             <ComposerButton className={styles.submitButton} aria-label="Send to Role Fit agent" disabled={isDisabled || isHintOnly || isLoading} onClick={handleSubmit}>
               <MaterialIcon name="arrow_forward" />
             </ComposerButton>

@@ -264,6 +264,7 @@ export function resetRoleFitAnalysis() {
     createdAt: session.createdAt,
     lastActivityAt: timestamp,
     expiresAt: timestamp + idleExpiryMs,
+    state: "awaiting-role-completion",
     completedReportCount: session.completedReportCount,
     activeLanguage: session.activeLanguage,
   };

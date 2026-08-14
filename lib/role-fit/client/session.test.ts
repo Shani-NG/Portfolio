@@ -60,7 +60,7 @@ describe("Role Fit report session persistence", () => {
     updateRoleFitLiveSession({ reportPayload: report, completedReportCount: 2 });
     const reset = resetRoleFitAnalysis();
 
-    assert.equal(reset.state, "initial");
+    assert.equal(reset.state, "awaiting-role-completion");
     assert.equal(reset.reportPayload, null);
     assert.equal(reset.completedReportCount, 2);
     assert.equal(reset.activeRoleText, "");

@@ -54,6 +54,30 @@ export type RoleFitReportSummary = {
   evidenceStatus?: string;
 };
 
+export type RoleFitReportPersistenceRow = {
+  report_id: string;
+  created_at: string;
+  role_title: string;
+  company: string;
+  role_family: string;
+  location_or_work_model: string;
+  fit_result: string;
+  evidence_projects_used: string;
+  contact_cta_clicked: "N" | "Y";
+  report_json_summary: string;
+};
+
+export type ContactLeadPersistenceRow = {
+  lead_id: string;
+  created_at: string;
+  name: string;
+  email: string;
+  company: string;
+  message: string;
+  report_id: string;
+  source_context: string;
+};
+
 const sheetsScope = "https://www.googleapis.com/auth/spreadsheets";
 const prohibitedMetadataKey = /(message|roletext|raw|content|prompt|transcript|email|phone|address|person|name)/i;
 let accessTokenCache: { token: string; expiresAt: number } | null = null;
@@ -146,13 +170,13 @@ function safeMetadata(metadata: SafeMetadata | undefined) {
 
 async function appendRows(sheetName: string, values: unknown[][]) {
   const config = getConfig();
-  if (!isConfigured() || !config.spreadsheetId) return;
+  if (!isConfigured() || !config.spreadsheetId) return false;
 
   const token = await getAccessToken();
-  if (!token) return;
+  if (!token) return false;
 
   const range = encodeURIComponent(`${sheetName}!A:Z`);
-  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -161,6 +185,8 @@ async function appendRows(sheetName: string, values: unknown[][]) {
     body: JSON.stringify({ values }),
     signal: AbortSignal.timeout(4_000),
   });
+
+  return response.ok;
 }
 
 export async function logRoleFitEvent(event: RoleFitRuntimeEvent) {
@@ -223,6 +249,34 @@ export async function logRoleFitReportSummary(summary: RoleFitReportSummary) {
   } catch {
     // Runtime logging is best-effort and must never affect the agent response.
   }
+}
+
+export async function appendRoleFitReportPersistenceRow(row: RoleFitReportPersistenceRow) {
+  return appendRows("role_fit_reports", [[
+    row.report_id,
+    row.created_at,
+    row.role_title,
+    row.company,
+    row.role_family,
+    row.location_or_work_model,
+    row.fit_result,
+    row.evidence_projects_used,
+    row.contact_cta_clicked,
+    row.report_json_summary,
+  ]]);
+}
+
+export async function appendContactLeadPersistenceRow(row: ContactLeadPersistenceRow) {
+  return appendRows("leads", [[
+    row.lead_id,
+    row.created_at,
+    row.name,
+    row.email,
+    row.company,
+    row.message,
+    row.report_id,
+    row.source_context,
+  ]]);
 }
 
 export function isRoleFitRuntimeStoreConfigured() {
