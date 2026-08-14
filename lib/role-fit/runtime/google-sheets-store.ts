@@ -82,11 +82,31 @@ const sheetsScope = "https://www.googleapis.com/auth/spreadsheets";
 const prohibitedMetadataKey = /(message|roletext|raw|content|prompt|transcript|email|phone|address|person|name)/i;
 let accessTokenCache: { token: string; expiresAt: number } | null = null;
 
+function normalizePrivateKey(value: string | undefined) {
+  if (!value) return undefined;
+
+  let normalized = value.trim();
+  if ((normalized.startsWith('"') && normalized.endsWith('"')) || (normalized.startsWith("'") && normalized.endsWith("'"))) {
+    try {
+      const parsed = JSON.parse(normalized) as unknown;
+      normalized = typeof parsed === "string" ? parsed : normalized.slice(1, -1);
+    } catch {
+      normalized = normalized.slice(1, -1);
+    }
+  }
+
+  return normalized.replace(/\\r/g, "").replace(/\\n/g, "\n").replace(/\r/g, "").trim();
+}
+
+function logStoreFailure(stage: string, details: Record<string, string | number> = {}) {
+  console.warn("[google-sheets-store]", { stage, ...details });
+}
+
 function getConfig() {
   return {
     spreadsheetId: process.env.GOOGLE_SHEETS_RUNTIME_SPREADSHEET_ID,
     clientEmail: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-    privateKey: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    privateKey: normalizePrivateKey(process.env.GOOGLE_SHEETS_PRIVATE_KEY),
     sessionsSheet: process.env.GOOGLE_SHEETS_RUNTIME_SESSIONS_TAB ?? "sessions",
     eventsSheet: process.env.GOOGLE_SHEETS_RUNTIME_EVENTS_TAB ?? "events",
     reportsSheet: process.env.GOOGLE_SHEETS_RUNTIME_REPORTS_TAB ?? "reports",
@@ -117,29 +137,44 @@ async function getAccessToken() {
   if (!config.clientEmail || !config.privateKey) return null;
 
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const assertion = signJwt(
-    { alg: "RS256", typ: "JWT" },
-    {
-      iss: config.clientEmail,
-      scope: sheetsScope,
-      aud: "https://oauth2.googleapis.com/token",
-      exp: nowSeconds + 3600,
-      iat: nowSeconds,
-    },
-    config.privateKey,
-  );
+  let assertion: string;
+  try {
+    assertion = signJwt(
+      { alg: "RS256", typ: "JWT" },
+      {
+        iss: config.clientEmail,
+        scope: sheetsScope,
+        aud: "https://oauth2.googleapis.com/token",
+        exp: nowSeconds + 3600,
+        iat: nowSeconds,
+      },
+      config.privateKey,
+    );
+  } catch {
+    logStoreFailure("credential-signing-failed");
+    return null;
+  }
 
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion,
-    }),
-    signal: AbortSignal.timeout(4_000),
-  });
+  let response: Response;
+  try {
+    response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion,
+      }),
+      signal: AbortSignal.timeout(4_000),
+    });
+  } catch {
+    logStoreFailure("oauth-request-failed");
+    return null;
+  }
 
-  if (!response.ok) return null;
+  if (!response.ok) {
+    logStoreFailure("oauth-rejected", { status: response.status });
+    return null;
+  }
 
   const data = (await response.json()) as { access_token?: string; expires_in?: number };
   if (!data.access_token) return null;
@@ -176,17 +211,23 @@ async function appendRows(sheetName: string, values: unknown[][]) {
   if (!token) return false;
 
   const range = encodeURIComponent(`${sheetName}!A:Z`);
-  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ values }),
-    signal: AbortSignal.timeout(4_000),
-  });
+  try {
+    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ values }),
+      signal: AbortSignal.timeout(4_000),
+    });
 
-  return response.ok;
+    if (!response.ok) logStoreFailure("append-rejected", { sheet: sheetName, status: response.status });
+    return response.ok;
+  } catch {
+    logStoreFailure("append-request-failed", { sheet: sheetName });
+    return false;
+  }
 }
 
 export async function logRoleFitEvent(event: RoleFitRuntimeEvent) {
@@ -217,8 +258,6 @@ export async function logRoleFitSessionSummary(summary: RoleFitSessionSummary) {
       summary.conversationId,
       summary.sessionId ?? "",
       summary.language,
-      summary.executiveSummary.slice(0, 240),
-      summary.intentPath,
       summary.lastMode,
       summary.lastOutcome,
       summary.roleStatus ?? "",
@@ -226,6 +265,8 @@ export async function logRoleFitSessionSummary(summary: RoleFitSessionSummary) {
       summary.companyName?.slice(0, 150) ?? "",
       summary.reportStatus ?? "",
       summary.reportId ?? "",
+      "",
+      "",
     ]]);
   } catch {
     // Runtime logging is best-effort and must never affect the agent response.
@@ -245,6 +286,8 @@ export async function logRoleFitReportSummary(summary: RoleFitReportSummary) {
       summary.fitMode ?? "",
       summary.fitLabel?.slice(0, 120) ?? "",
       summary.evidenceStatus ?? "",
+      "",
+      "",
     ]]);
   } catch {
     // Runtime logging is best-effort and must never affect the agent response.

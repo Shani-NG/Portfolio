@@ -12,7 +12,7 @@ type EvidenceCluster = ReportUIPayload["evidencePanel"]["clusters"][number];
 
 const fitAssets = {
   "fit-strong": "/assets/role-fit/fit-strong.png",
-  "fit-good": "/assets/role-fit/fit-good.png",
+  "fit-good": "/assets/role-fit/fit-strong.png",
   "fit-partial": "/assets/role-fit/fit-partial.png",
 } as const;
 
