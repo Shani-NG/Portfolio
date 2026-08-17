@@ -24,9 +24,12 @@ export const contactLeadRequestSchema = z
 
 export type ContactLeadRequest = z.infer<typeof contactLeadRequestSchema>;
 
-type PersistenceResult =
-  | { ok: true; skipped?: false }
-  | { ok: true; skipped: true; reason: "missing-store" | "duplicate-report" }
+export type ReportPersistenceResult =
+  | { ok: true; persisted: true; duplicate?: boolean }
+  | { ok: false; reason: "missing-store" | "store-failed" };
+
+type ContactPersistenceResult =
+  | { ok: true }
   | { ok: false; reason: "missing-store" | "store-failed" | "invalid-payload" };
 
 function createShortId(prefix: "R" | "L") {
@@ -140,21 +143,23 @@ function logPersistenceFailure(target: "report" | "lead", id: string, category: 
   });
 }
 
-export async function persistCompletedReport(report: ReportUIPayload, options: { roleFamily?: string } = {}): Promise<PersistenceResult> {
+export async function persistCompletedReport(report: ReportUIPayload, options: { roleFamily?: string } = {}): Promise<ReportPersistenceResult> {
   if (!isRoleFitRuntimeStoreConfigured()) {
     logPersistenceFailure("report", report.reportId, "missing-store");
-    return { ok: true, skipped: true, reason: "missing-store" };
+    return { ok: false, reason: "missing-store" };
   }
 
   if (sentReportIds.has(report.reportId)) {
-    return { ok: true, skipped: true, reason: "duplicate-report" };
+    return { ok: true, persisted: true, duplicate: true };
   }
 
   try {
     const row = buildReportPersistenceRow(report, options);
-    sentReportIds.add(report.reportId);
     const ok = await appendRoleFitReportPersistenceRow(row);
-    if (ok) return { ok: true };
+    if (ok) {
+      sentReportIds.add(report.reportId);
+      return { ok: true, persisted: true };
+    }
     logPersistenceFailure("report", report.reportId, "store-failed");
     return { ok: false, reason: "store-failed" };
   } catch {
@@ -163,7 +168,7 @@ export async function persistCompletedReport(report: ReportUIPayload, options: {
   }
 }
 
-export async function persistContactLead(input: unknown): Promise<PersistenceResult> {
+export async function persistContactLead(input: unknown): Promise<ContactPersistenceResult> {
   const parsed = contactLeadRequestSchema.safeParse(input);
   if (!parsed.success) return { ok: false, reason: "invalid-payload" };
 

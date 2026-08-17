@@ -9,6 +9,8 @@ export type RuntimeEventName =
   | "report.generation_started"
   | "report.validation_completed"
   | "report.completed"
+  | "report.no_meaningful_fit"
+  | "report.insufficient_evidence"
   | "report.failed"
   | "error.occurred";
 

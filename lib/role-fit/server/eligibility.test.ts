@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { createRoleValidationResult, canProceedToReportEligibility, evaluateReportEligibility, getMissingRequiredRoleFields } from "./eligibility.ts";
+import type { ReportUIPayload } from "../contracts/index.ts";
+import { createRoleValidationResult, canProceedToReportEligibility, evidenceStateFromComposedReport, evaluateReportEligibility, getMissingRequiredRoleFields } from "./eligibility.ts";
 
 function field<T>(originalValue: T, confirmed = true) {
   return {
@@ -121,6 +122,41 @@ describe("Role Fit validation foundation", () => {
 });
 
 describe("Role Fit eligibility foundation", () => {
+  test("maps composed insufficient and out-of-scope reports to the existing no-report eligibility inputs", () => {
+    const insufficient = {
+      overallFitVisual: {
+        mode: "insufficient",
+        label: "Insufficient evidence",
+        rationale: "Approved evidence is insufficient.",
+      },
+    } satisfies Pick<ReportUIPayload, "overallFitVisual">;
+    const outOfScope = {
+      overallFitVisual: {
+        mode: "out-of-scope",
+        label: "Outside the supported role scope",
+        rationale: "The role is outside the supported scope.",
+      },
+    } satisfies Pick<ReportUIPayload, "overallFitVisual">;
+    const completedFits = [
+      { level: "strong" as const, fitVisualValue: 82, illustrationKey: "fit-strong" as const, colorToken: "fit.strong" as const },
+      { level: "good" as const, fitVisualValue: 65, illustrationKey: "fit-good" as const, colorToken: "fit.good" as const },
+      { level: "partial" as const, fitVisualValue: 45, illustrationKey: "fit-partial" as const, colorToken: "fit.partial" as const },
+    ].map((fit) => ({
+      overallFitVisual: {
+        mode: "fit" as const,
+        ...fit,
+        label: "Completed fit",
+        rationale: "Approved evidence supports the report.",
+      },
+    } satisfies Pick<ReportUIPayload, "overallFitVisual">));
+
+    assert.equal(evidenceStateFromComposedReport(insufficient), "insufficient-evidence");
+    assert.equal(evidenceStateFromComposedReport(outOfScope), "no-meaningful-fit");
+    for (const completedFit of completedFits) {
+      assert.equal(evidenceStateFromComposedReport(completedFit), "ready");
+    }
+  });
+
   test("blocks a third completed-report request before generation", () => {
     const result = evaluateReportEligibility({
       session: {

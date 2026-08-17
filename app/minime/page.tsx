@@ -40,6 +40,12 @@ function reportFailureMessage(result: ReportFailureResult): string {
       : "The report cannot be generated until the role is complete and approved.";
   }
 
+  if (result.state === "no-report") {
+    return result.eligibility?.reason === "insufficient-evidence"
+      ? "A completed report was not generated because the available approved evidence is insufficient."
+      : "A completed report was not generated because this role is outside the supported fit scope.";
+  }
+
   return result.safeMessage ?? "I couldn't generate the report this time. Your role details are still here. Please try again later.";
 }
 
@@ -276,15 +282,17 @@ export default function RoleFitPage() {
       if (!response.ok || result.state !== "ready") {
         const message = reportFailureMessage(result);
         const missingField = result.validation?.missingFields?.[0] ?? null;
+        const isNoReport = result.state === "no-report";
         setApiStatusMessage(message);
-        setErrorContext(missingField ? "validation" : "report");
+        setErrorContext(isNoReport ? null : missingField ? "validation" : "report");
         setIsAgentUnavailable(false);
         appendLiveMessage({ role: "agent", content: message });
         syncLiveSession({
-          state: "recoverable-error",
-          pendingRoleField: missingField ?? reportSession.pendingRoleField,
-          pendingReportConfirmation: !missingField,
+          state: isNoReport ? "general-qa" : "recoverable-error",
+          pendingRoleField: isNoReport ? null : missingField ?? reportSession.pendingRoleField,
+          pendingReportConfirmation: isNoReport ? false : !missingField,
         });
+        if (isNoReport) setActivePane("chat");
         return;
       }
 
@@ -300,6 +308,10 @@ export default function RoleFitPage() {
       }
 
       const report = parsedReport.data;
+      const persisted = result.persistence === "persisted";
+      const lifecycleMessage = persisted
+        ? reportSuccessMessage(reportSession.activeLanguage)
+        : "The report is available to review, but its persistence is unavailable and it did not consume a completed-report allowance.";
       setErrorContext(null);
       setIsAgentUnavailable(false);
       setLiveReportState({
@@ -307,13 +319,16 @@ export default function RoleFitPage() {
         model: result.model,
         report,
       });
-      appendLiveMessage({ role: "agent", content: reportSuccessMessage(reportSession.activeLanguage) });
+      if (!persisted) setApiStatusMessage(lifecycleMessage);
+      appendLiveMessage({ role: "agent", content: lifecycleMessage });
       syncLiveSession({
         state: "report-ready",
         reportPayload: report,
         reportProvider: result.provider,
         reportModel: result.model,
-        completedReportCount: (reportSession.completedReportCount + 1) as 1 | 2,
+        completedReportCount: persisted
+          ? (reportSession.completedReportCount + 1) as 1 | 2
+          : reportSession.completedReportCount,
         pendingRoleField: null,
         pendingReportConfirmation: false,
         expandedEvidenceItemIds: report.requirementMapping.defaultSelectedItemId

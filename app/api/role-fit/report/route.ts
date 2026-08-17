@@ -6,7 +6,7 @@ import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
 import { persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
-import { evaluateReportEligibility } from "@/lib/role-fit/server/eligibility";
+import { evaluateReportEligibility, evidenceStateFromComposedReport } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
 
 const requestSchema = z
@@ -311,14 +311,64 @@ export async function POST(request: Request) {
     approval: {
       approved: parsedRequest.data.approved,
     },
-    evidenceState: "ready",
+    evidenceState: evidenceStateFromComposedReport(report),
     report,
   });
+  const reportId = report.reportId;
+  const title = validation.roleDraft.title?.originalValue ?? "";
+  const roleFamily = inferRoleFamily(title);
+
+  if (eligibility.state === "no-report") {
+    after(async () => {
+      const eventName = eligibility.reason === "insufficient-evidence"
+        ? "report.insufficient_evidence"
+        : "report.no_meaningful_fit";
+      await Promise.all([
+        logRoleFitEvent({
+          eventName,
+          conversationId,
+          sessionId,
+          reportId,
+          traceId,
+          mode: "fit-analysis",
+          outcome: "success",
+          durationMs: Date.now() - startedAt,
+          metadata: {
+            provider: modelResult.provider,
+            model: modelResult.model,
+            fitMode: report.overallFitVisual.mode,
+            evidenceConfidence: report.evidenceConfidence.level,
+          },
+        }),
+        logRoleFitSessionSummary({
+          conversationId,
+          sessionId,
+          language: parsedRequest.data.language,
+          executiveSummary: "Validated role input produced a no-report outcome and was not persisted as a completed report.",
+          intentPath: "role-fit",
+          lastMode: "fit-analysis",
+          lastOutcome: "success",
+          roleStatus: validation.parseStatus,
+          roleFamily,
+          companyName: validation.roleDraft.company?.originalValue,
+          reportStatus: "no-report",
+        }),
+      ]);
+    });
+
+    return NextResponse.json({
+      state: "no-report",
+      provider: modelResult.provider,
+      model: modelResult.model,
+      eligibility,
+    });
+  }
+
+  const persistence = await persistCompletedReport(report, { roleFamily });
 
   after(async () => {
-    const reportId = report.reportId;
-    const title = validation.roleDraft.title?.originalValue ?? "";
-    const tasks: Promise<unknown>[] = [
+    const persistenceState = persistence.ok ? "persisted" : "degraded";
+    await Promise.all([
       logRoleFitEvent({
         eventName: "report.completed",
         conversationId,
@@ -326,13 +376,15 @@ export async function POST(request: Request) {
         reportId,
         traceId,
         mode: "fit-analysis",
-        outcome: eligibility.state === "ready" ? "success" : "failure",
+        outcome: persistence.ok ? "success" : "partial",
         durationMs: Date.now() - startedAt,
         metadata: {
           provider: modelResult.provider,
           model: modelResult.model,
           fitMode: report.overallFitVisual.mode,
           evidenceConfidence: report.evidenceConfidence.level,
+          persistenceState,
+          ...(persistence.ok ? {} : { persistenceReason: persistence.reason }),
         },
       }),
       logRoleFitReportSummary({
@@ -349,23 +401,19 @@ export async function POST(request: Request) {
         conversationId,
         sessionId,
         language: parsedRequest.data.language,
-        executiveSummary: "Validated report request completed and a report summary was stored.",
+        executiveSummary: persistence.ok
+          ? "Validated report request completed and a report summary was stored."
+          : "Validated report request completed, but report persistence was unavailable.",
         intentPath: "role-fit",
         lastMode: "fit-analysis",
-        lastOutcome: eligibility.state === "ready" ? "success" : "failure",
+        lastOutcome: persistence.ok ? "success" : "partial",
         roleStatus: validation.parseStatus,
-        roleFamily: inferRoleFamily(title),
+        roleFamily,
         companyName: validation.roleDraft.company?.originalValue,
-        reportStatus: eligibility.state === "ready" ? "ready" : "failed",
+        reportStatus: persistence.ok ? "ready" : "persistence-degraded",
         reportId,
       }),
-    ];
-
-    if (eligibility.state === "ready") {
-      tasks.push(persistCompletedReport(report, { roleFamily: inferRoleFamily(title) }));
-    }
-
-    await Promise.all(tasks);
+    ]);
   });
 
   return NextResponse.json({
@@ -374,5 +422,6 @@ export async function POST(request: Request) {
     model: modelResult.model,
     eligibility,
     report,
+    persistence: persistence.ok ? "persisted" : "degraded",
   });
 }

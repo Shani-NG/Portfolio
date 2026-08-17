@@ -10,6 +10,7 @@ import {
   createLeadId,
   createReportId,
   formatSheetDate,
+  persistCompletedReport,
 } from "./task-e.ts";
 
 function reportFixture(): ReportUIPayload {
@@ -178,6 +179,36 @@ describe("Task E Lite persistence helpers", () => {
       report_id: "TOO-LONG",
       source_context: "free-text-source",
     }).success, false);
+  });
+
+  test("does not classify a missing report store as durable persistence", async () => {
+    const previous = {
+      spreadsheetId: process.env.GOOGLE_SHEETS_RUNTIME_SPREADSHEET_ID,
+      clientEmail: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+      privateKey: process.env.GOOGLE_SHEETS_PRIVATE_KEY,
+    };
+    delete process.env.GOOGLE_SHEETS_RUNTIME_SPREADSHEET_ID;
+    delete process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
+    delete process.env.GOOGLE_SHEETS_PRIVATE_KEY;
+
+    try {
+      const result = await persistCompletedReport(reportFixture());
+      assert.deepEqual(result, { ok: false, reason: "missing-store" });
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
+  test("marks the in-process report dedupe only after a successful store write", async () => {
+    const source = await readFile(join(process.cwd(), "lib", "role-fit", "persistence", "task-e.ts"), "utf8");
+    const writeIndex = source.indexOf("const ok = await appendRoleFitReportPersistenceRow(row);");
+    const markIndex = source.indexOf("sentReportIds.add(report.reportId);");
+
+    assert.ok(writeIndex >= 0);
+    assert.ok(markIndex > writeIndex);
   });
 
   test("keeps missing contact store as a controlled response instead of a network error", async () => {
