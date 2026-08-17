@@ -100,8 +100,31 @@ function normalizePrivateKey(value: string | undefined) {
   return normalized.replace(/\\r/g, "").replace(/\\n/g, "\n").replace(/\r/g, "").trim();
 }
 
-function logStoreFailure(stage: string, details: Record<string, string | number> = {}) {
-  console.warn("[google-sheets-store]", { stage, ...details });
+type SheetsDiagnosticContext = {
+  target: "runtime-event" | "runtime-session" | "runtime-report-summary" | "report" | "lead";
+  operation: "append-event" | "append-session" | "append-report-summary" | "append-report" | "append-lead";
+  sessionId?: string;
+  reportId?: string;
+  correlationId?: string;
+};
+
+function logStoreDiagnostic(
+  context: SheetsDiagnosticContext,
+  stage: "config" | "auth" | "append",
+  result: "success" | "failure" | "partial",
+  details: Record<string, string | number> = {},
+) {
+  console[result === "success" ? "info" : "warn"]("[rolefit-persistence]", {
+    provider: "google-sheets",
+    target: context.target,
+    operation: context.operation,
+    stage,
+    result,
+    ...(context.sessionId ? { sessionId: context.sessionId } : {}),
+    ...(context.reportId ? { reportId: context.reportId } : {}),
+    ...(context.correlationId ? { correlationId: context.correlationId } : {}),
+    ...details,
+  });
 }
 
 function getConfig() {
@@ -130,7 +153,7 @@ function signJwt(header: object, payload: object, privateKey: string) {
   return `${unsigned}.${base64Url(signature)}`;
 }
 
-async function getAccessToken() {
+async function getAccessToken(context: SheetsDiagnosticContext) {
   if (accessTokenCache && accessTokenCache.expiresAt > Date.now() + 60_000) {
     return accessTokenCache.token;
   }
@@ -153,7 +176,7 @@ async function getAccessToken() {
       config.privateKey,
     );
   } catch {
-    logStoreFailure("credential-signing-failed");
+    logStoreDiagnostic(context, "auth", "failure", { errorCategory: "credential-signing" });
     return null;
   }
 
@@ -169,17 +192,20 @@ async function getAccessToken() {
       signal: AbortSignal.timeout(4_000),
     });
   } catch {
-    logStoreFailure("oauth-request-failed");
+    logStoreDiagnostic(context, "auth", "failure", { errorCategory: "network" });
     return null;
   }
 
   if (!response.ok) {
-    logStoreFailure("oauth-rejected", { status: response.status });
+    logStoreDiagnostic(context, "auth", "failure", { errorCategory: "api-rejected", httpStatus: response.status });
     return null;
   }
 
   const data = (await response.json()) as { access_token?: string; expires_in?: number };
-  if (!data.access_token) return null;
+  if (!data.access_token) {
+    logStoreDiagnostic(context, "auth", "failure", { errorCategory: "invalid-response" });
+    return null;
+  }
 
   accessTokenCache = {
     token: data.access_token,
@@ -205,11 +231,14 @@ function safeMetadata(metadata: SafeMetadata | undefined) {
   return JSON.stringify(Object.fromEntries(entries)).slice(0, 1000);
 }
 
-async function appendRows(sheetName: string, values: unknown[][]) {
+async function appendRows(sheetName: string, values: unknown[][], context: SheetsDiagnosticContext) {
   const config = getConfig();
-  if (!isConfigured() || !config.spreadsheetId) return false;
+  if (!isConfigured() || !config.spreadsheetId) {
+    logStoreDiagnostic(context, "config", "failure", { errorCategory: "missing-config" });
+    return false;
+  }
 
-  const token = await getAccessToken();
+  const token = await getAccessToken(context);
   if (!token) return false;
 
   const range = encodeURIComponent(`${sheetName}!A:Z`);
@@ -224,10 +253,14 @@ async function appendRows(sheetName: string, values: unknown[][]) {
       signal: AbortSignal.timeout(4_000),
     });
 
-    if (!response.ok) logStoreFailure("append-rejected", { sheet: sheetName, status: response.status });
-    return response.ok;
+    if (!response.ok) {
+      logStoreDiagnostic(context, "append", "failure", { errorCategory: "api-rejected", sheet: sheetName, httpStatus: response.status });
+      return false;
+    }
+    logStoreDiagnostic(context, "append", "success", { sheet: sheetName, httpStatus: response.status });
+    return true;
   } catch {
-    logStoreFailure("append-request-failed", { sheet: sheetName });
+    logStoreDiagnostic(context, "append", "failure", { errorCategory: "network", sheet: sheetName });
     return false;
   }
 }
@@ -246,7 +279,13 @@ export async function logRoleFitEvent(event: RoleFitRuntimeEvent) {
       event.traceId ?? "",
       event.durationMs ?? "",
       safeMetadata(event.metadata),
-    ]]);
+    ]], {
+      target: "runtime-event",
+      operation: "append-event",
+      sessionId: event.sessionId,
+      reportId: event.reportId,
+      correlationId: event.traceId,
+    });
   } catch {
     // Runtime logging is best-effort and must never affect the agent response.
   }
@@ -269,7 +308,13 @@ export async function logRoleFitSessionSummary(summary: RoleFitSessionSummary) {
       summary.reportId ?? "",
       "",
       "",
-    ]]);
+    ]], {
+      target: "runtime-session",
+      operation: "append-session",
+      sessionId: summary.sessionId,
+      reportId: summary.reportId,
+      correlationId: summary.conversationId,
+    });
   } catch {
     // Runtime logging is best-effort and must never affect the agent response.
   }
@@ -290,7 +335,13 @@ export async function logRoleFitReportSummary(summary: RoleFitReportSummary) {
       summary.evidenceStatus ?? "",
       "",
       "",
-    ]]);
+    ]], {
+      target: "runtime-report-summary",
+      operation: "append-report-summary",
+      sessionId: summary.sessionId,
+      reportId: summary.reportId,
+      correlationId: summary.conversationId,
+    });
   } catch {
     // Runtime logging is best-effort and must never affect the agent response.
   }
@@ -308,7 +359,12 @@ export async function appendRoleFitReportPersistenceRow(row: RoleFitReportPersis
     row.evidence_projects_used,
     row.contact_cta_clicked,
     row.report_json_summary,
-  ]]);
+  ]], {
+    target: "report",
+    operation: "append-report",
+    reportId: row.report_id,
+    correlationId: row.report_id,
+  });
 }
 
 export async function appendContactLeadPersistenceRow(row: ContactLeadPersistenceRow) {
@@ -321,7 +377,12 @@ export async function appendContactLeadPersistenceRow(row: ContactLeadPersistenc
     row.message,
     row.report_id,
     row.source_context,
-  ]]);
+  ]], {
+    target: "lead",
+    operation: "append-lead",
+    reportId: row.report_id || undefined,
+    correlationId: row.lead_id,
+  });
 }
 
 export function isRoleFitRuntimeStoreConfigured() {
