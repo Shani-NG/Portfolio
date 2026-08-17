@@ -2,7 +2,7 @@ import { reportUIPayloadSchema, type ReportUIPayload, type RoleValidationResult 
 import { resolveApprovedEvidenceDestination } from "../knowledge/evidence-destinations.ts";
 import type { ApprovedEvidenceBundle } from "../knowledge/load-approved-evidence.ts";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
-import { createReportId } from "../persistence/task-e.ts";
+import { createReportId } from "../identifiers.ts";
 
 type RoleDraft = RoleValidationResult["roleDraft"];
 type AnalysisItem = QualitativeReportAnalysis["items"][number];
@@ -201,6 +201,7 @@ export function composeReportUIPayload(input: {
   roleDraft: RoleDraft;
   evidence: ApprovedEvidenceBundle;
   language: "he" | "en" | "mixed";
+  reportId?: string;
 }): CompositionResult {
   const roleItems = getRoleAnalysisItems(input.roleDraft);
   const sourceById = new Map(input.evidence.sources.map((source) => [source.id, source]));
@@ -311,7 +312,7 @@ export function composeReportUIPayload(input: {
   const totalRequirements = reportItems.length;
   const language = input.language === "he" ? "he" : "en";
   const fitLevel = analysis.fitLevel;
-  const reportId = createReportId();
+  const reportId = input.reportId ?? createReportId();
   const overallFitVisual = fitLevel === "insufficient" || fitLevel === "out-of-scope"
     ? {
         mode: fitLevel,

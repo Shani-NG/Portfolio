@@ -192,8 +192,8 @@ describe("Task E Lite persistence helpers", () => {
     delete process.env.GOOGLE_SHEETS_PRIVATE_KEY;
 
     try {
-      const result = await persistCompletedReport(reportFixture());
-      assert.deepEqual(result, { ok: false, reason: "missing-store" });
+      const result = await persistCompletedReport(reportFixture(), { sessionId: "session_test_missing_store" });
+      assert.deepEqual(result, { ok: false, reason: "missing-config" });
     } finally {
       for (const [key, value] of Object.entries(previous)) {
         if (value === undefined) delete process.env[key];
@@ -202,13 +202,12 @@ describe("Task E Lite persistence helpers", () => {
     }
   });
 
-  test("marks the in-process report dedupe only after a successful store write", async () => {
+  test("uses Supabase report_id idempotency instead of a process-local sent-report set", async () => {
     const source = await readFile(join(process.cwd(), "lib", "role-fit", "persistence", "task-e.ts"), "utf8");
-    const writeIndex = source.indexOf("const ok = await appendRoleFitReportPersistenceRow(row);");
-    const markIndex = source.indexOf("sentReportIds.add(report.reportId);");
 
-    assert.ok(writeIndex >= 0);
-    assert.ok(markIndex > writeIndex);
+    assert.match(source, /persistRoleFitCompletedReport/);
+    assert.doesNotMatch(source, /sentReportIds/);
+    assert.doesNotMatch(source, /appendRoleFitReportPersistenceRow/);
   });
 
   test("keeps missing contact store as a controlled response instead of a network error", async () => {

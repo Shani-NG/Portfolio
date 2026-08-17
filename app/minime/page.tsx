@@ -5,6 +5,7 @@ import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
 import { isReportConfirmationText, reportLimitAnswer, resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
+import { createReportId } from "@/lib/role-fit/identifiers";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import styles from "./page.module.css";
@@ -250,10 +251,11 @@ export default function RoleFitPage() {
     setApiStatusMessage("");
     setErrorContext(null);
     setLiveReportState(null);
+    const reportId = reportSession.pendingReportId ?? createReportId();
     reportRequestInFlightRef.current = true;
     setIsReportRequestInFlight(true);
     setActivePane("report");
-    syncLiveSession({ state: "generating-report" });
+    syncLiveSession({ state: "generating-report", pendingReportId: reportId });
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), reportRequestTimeoutMs);
 
@@ -269,6 +271,7 @@ export default function RoleFitPage() {
           completedReportCount: reportSession.completedReportCount,
           conversationId: reportSession.conversationId,
           sessionId: reportSession.sessionId,
+          reportId,
           language: "en",
         }),
         signal: controller.signal,
@@ -290,6 +293,7 @@ export default function RoleFitPage() {
         syncLiveSession({
           state: isNoReport ? "general-qa" : "recoverable-error",
           pendingRoleField: isNoReport ? null : missingField ?? reportSession.pendingRoleField,
+          pendingReportId: isNoReport ? null : reportId,
           pendingReportConfirmation: isNoReport ? false : !missingField,
         });
         if (isNoReport) setActivePane("chat");
@@ -326,9 +330,12 @@ export default function RoleFitPage() {
         reportPayload: report,
         reportProvider: result.provider,
         reportModel: result.model,
-        completedReportCount: persisted
-          ? (reportSession.completedReportCount + 1) as 1 | 2
-          : reportSession.completedReportCount,
+        completedReportCount: typeof result.completedReportCount === "number"
+          ? result.completedReportCount as 0 | 1 | 2
+          : persisted
+            ? (reportSession.completedReportCount + 1) as 1 | 2
+            : reportSession.completedReportCount,
+        pendingReportId: persisted ? null : reportId,
         pendingRoleField: null,
         pendingReportConfirmation: false,
         expandedEvidenceItemIds: report.requirementMapping.defaultSelectedItemId

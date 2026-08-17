@@ -38,6 +38,7 @@ export type RoleFitLiveSession = {
   reportProvider: string;
   reportModel: string;
   completedReportCount: 0 | 1 | 2;
+  pendingReportId: string | null;
   pendingReportConfirmation: boolean;
   expandedEvidenceItemIds: string[] | null;
 };
@@ -81,6 +82,7 @@ function createSession(): RoleFitLiveSession {
     reportProvider: "",
     reportModel: "",
     completedReportCount: 0,
+    pendingReportId: null,
     pendingReportConfirmation: false,
     expandedEvidenceItemIds: null,
   };
@@ -99,6 +101,7 @@ type PersistedRoleFitSession = {
   reportProvider: string;
   reportModel: string;
   completedReportCount: 0 | 1 | 2;
+  pendingReportId: string | null;
   expandedEvidenceItemIds: string[] | null;
 };
 
@@ -120,6 +123,7 @@ export function serializeRoleFitSession(session: RoleFitLiveSession): PersistedR
     reportProvider: session.reportProvider,
     reportModel: session.reportModel,
     completedReportCount: session.completedReportCount,
+    pendingReportId: session.pendingReportId,
     expandedEvidenceItemIds: session.expandedEvidenceItemIds,
   };
 }
@@ -179,6 +183,7 @@ function readPersistedSession(): RoleFitLiveSession | null {
       reportProvider: typeof value.reportProvider === "string" ? value.reportProvider : "",
       reportModel: typeof value.reportModel === "string" ? value.reportModel : "",
       completedReportCount: value.completedReportCount as 0 | 1 | 2,
+      pendingReportId: typeof value.pendingReportId === "string" ? value.pendingReportId : null,
       expandedEvidenceItemIds: Array.isArray(value.expandedEvidenceItemIds)
         ? value.expandedEvidenceItemIds.filter((itemId): itemId is string => typeof itemId === "string")
         : null,

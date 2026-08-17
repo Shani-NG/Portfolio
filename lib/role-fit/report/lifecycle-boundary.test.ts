@@ -19,11 +19,14 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.doesNotMatch(noReportBranch, /persistCompletedReport/);
   });
 
-  test("counts only a durably persisted completed report and keeps a degraded report visible", async () => {
+  test("uses server-authoritative count and keeps a degraded report visible without consuming client allowance", async () => {
     const page = await readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8");
+    const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
 
+    assert.match(route, /getCompletedReportCount\(sessionId\)/);
+    assert.doesNotMatch(route, /parsedRequest\.data\.completedReportCount >= policy\.maxReportsPerSession/);
     assert.match(page, /const persisted = result\.persistence === "persisted"/);
-    assert.match(page, /completedReportCount: persisted/);
+    assert.match(page, /typeof result\.completedReportCount === "number"/);
     assert.match(page, /: reportSession\.completedReportCount,/);
     assert.match(page, /The report is available to review, but its persistence is unavailable/);
   });
@@ -34,5 +37,6 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(page, /const isNoReport = result\.state === "no-report"/);
     assert.match(page, /state: isNoReport \? "general-qa" : "recoverable-error"/);
     assert.match(page, /pendingReportConfirmation: isNoReport \? false : !missingField/);
+    assert.match(page, /pendingReportId: isNoReport \? null : reportId/);
   });
 });

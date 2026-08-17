@@ -4,18 +4,26 @@ import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { logRoleFitEvent, logRoleFitReportSummary, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
-import { persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
+import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
 import { evaluateReportEligibility, evidenceStateFromComposedReport } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
+
+function toSessionCompletedReportCount(value: number): 0 | 1 | 2 {
+  if (value >= 2) return 2;
+  if (value === 1) return 1;
+  return 0;
+}
 
 const requestSchema = z
   .object({
     roleText: z.string(),
     approved: z.boolean(),
+    // Retained for client display compatibility only; Supabase is authoritative for eligibility.
     completedReportCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(0),
     conversationId: z.string().optional(),
-    sessionId: z.string().optional(),
+    sessionId: z.string().trim().min(1).max(160),
+    reportId: z.string().regex(/^R[A-Z0-9]{4}$/),
     language: z.enum(["he", "en", "mixed"]).default("en"),
   })
   .strict();
@@ -65,11 +73,36 @@ export async function POST(request: Request) {
     );
   }
 
-  if (parsedRequest.data.completedReportCount >= policy.maxReportsPerSession) {
+  const persistedCount = await getCompletedReportCount(sessionId);
+  if (!persistedCount.ok) {
+    after(() =>
+      logRoleFitEvent({
+        eventName: "report.failed",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "partial",
+        metadata: { reason: "authoritative-count-unavailable" },
+      }),
+    );
+
+    return NextResponse.json(
+      {
+        state: "persistence-unavailable",
+        safeMessage: "I couldn't verify the report allowance right now. Your role details are still here. Please try again later.",
+      },
+      { status: 503 },
+    );
+  }
+  const completedReportCount = persistedCount.completedReportCount;
+  const sessionCompletedReportCount = toSessionCompletedReportCount(completedReportCount);
+
+  if (completedReportCount >= policy.maxReportsPerSession) {
     const eligibility = evaluateReportEligibility({
       session: {
         status: "active",
-        completedReportCount: parsedRequest.data.completedReportCount,
+        completedReportCount: sessionCompletedReportCount,
       },
       approval: {
         approved: parsedRequest.data.approved,
@@ -87,20 +120,20 @@ export async function POST(request: Request) {
         mode: "fit-analysis",
         outcome: "blocked",
         metadata: {
-          completedReportCount: parsedRequest.data.completedReportCount,
+          completedReportCount,
           maxReportsPerSession: policy.maxReportsPerSession,
         },
       }),
     );
 
-    return NextResponse.json({ state: "blocked", eligibility }, { status: 429 });
+    return NextResponse.json({ state: "blocked", eligibility, completedReportCount }, { status: 429 });
   }
 
   if (!parsedRequest.data.approved) {
     const eligibility = evaluateReportEligibility({
       session: {
         status: "active",
-        completedReportCount: parsedRequest.data.completedReportCount,
+        completedReportCount: sessionCompletedReportCount,
       },
       approval: {
         approved: parsedRequest.data.approved,
@@ -167,7 +200,7 @@ export async function POST(request: Request) {
       mode: "fit-analysis",
       outcome: "success",
       metadata: {
-        completedReportCount: parsedRequest.data.completedReportCount,
+        completedReportCount,
         language: parsedRequest.data.language,
       },
     }),
@@ -231,6 +264,7 @@ export async function POST(request: Request) {
     roleDraft: validation.roleDraft,
     evidence: approvedEvidence,
     language: parsedRequest.data.language,
+    reportId: parsedRequest.data.reportId,
   });
 
   if (!composition.ok) {
@@ -258,6 +292,7 @@ export async function POST(request: Request) {
         roleDraft: validation.roleDraft,
         evidence: approvedEvidence,
         language: parsedRequest.data.language,
+        reportId: parsedRequest.data.reportId,
       });
     }
   }
@@ -306,7 +341,7 @@ export async function POST(request: Request) {
   const eligibility = evaluateReportEligibility({
     session: {
       status: "active",
-      completedReportCount: parsedRequest.data.completedReportCount,
+      completedReportCount: sessionCompletedReportCount,
     },
     approval: {
       approved: parsedRequest.data.approved,
@@ -361,10 +396,40 @@ export async function POST(request: Request) {
       provider: modelResult.provider,
       model: modelResult.model,
       eligibility,
+      completedReportCount,
     });
   }
 
-  const persistence = await persistCompletedReport(report, { roleFamily });
+  const persistence = await persistCompletedReport(report, { roleFamily, sessionId });
+
+  if (!persistence.ok && persistence.reason === "limit-reached") {
+    const limitEligibility = evaluateReportEligibility({
+      session: {
+        status: "active",
+        completedReportCount: toSessionCompletedReportCount(persistence.completedReportCount ?? policy.maxReportsPerSession),
+      },
+      approval: { approved: parsedRequest.data.approved },
+      evidenceState: "ready",
+    });
+    after(() =>
+      logRoleFitEvent({
+        eventName: "report.limit_blocked",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "blocked",
+        metadata: {
+          completedReportCount: persistence.completedReportCount ?? policy.maxReportsPerSession,
+          maxReportsPerSession: policy.maxReportsPerSession,
+        },
+      }),
+    );
+    return NextResponse.json(
+      { state: "blocked", eligibility: limitEligibility, completedReportCount: persistence.completedReportCount ?? policy.maxReportsPerSession },
+      { status: 429 },
+    );
+  }
 
   after(async () => {
     const persistenceState = persistence.ok ? "persisted" : "degraded";
@@ -423,5 +488,6 @@ export async function POST(request: Request) {
     eligibility,
     report,
     persistence: persistence.ok ? "persisted" : "degraded",
+    completedReportCount: persistence.ok ? persistence.completedReportCount : completedReportCount,
   });
 }
