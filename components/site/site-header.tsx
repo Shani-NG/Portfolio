@@ -23,7 +23,6 @@ export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [activeHash, setActiveHash] = useState("");
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
     setMenuOpen(false);
@@ -76,20 +75,9 @@ export function SiteHeader() {
   }, [projectsOpen]);
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem("portfolio-theme");
-    const resolvedTheme = storedTheme === "light" || storedTheme === "dark" ? storedTheme : "dark";
-
-    setTheme(resolvedTheme);
-    document.documentElement.dataset.dsTheme = resolvedTheme;
+    window.localStorage.removeItem("portfolio-theme");
+    document.documentElement.dataset.dsTheme = "dark";
   }, []);
-
-  function toggleTheme() {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-
-    setTheme(nextTheme);
-    document.documentElement.dataset.dsTheme = nextTheme;
-    window.localStorage.setItem("portfolio-theme", nextTheme);
-  }
 
   const isRoleFitActive = pathname.startsWith("/minime");
   const isExperienceActive = pathname.startsWith("/experience");
@@ -171,9 +159,6 @@ export function SiteHeader() {
           <Link className={`${styles.navLink} ${isContactActive ? styles.active : ""}`} href={navigationItems.contact.href} onClick={closeMenu}>
             {navigationItems.contact.label}
           </Link>
-          <button className={styles.themeToggle} onClick={toggleTheme} type="button" aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
-            <MaterialIcon name={theme === "dark" ? "light_mode" : "dark_mode"} />
-          </button>
         </nav>
       </div>
     </header>
