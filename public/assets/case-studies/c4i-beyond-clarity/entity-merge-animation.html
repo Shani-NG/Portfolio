@@ -7,7 +7,7 @@
   html, body {
     margin: 0;
     height: 100%;
-    background: transparent;
+    background: #111319;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -19,7 +19,7 @@
     height: auto;
     max-height: 100%;
     aspect-ratio: 1;
-    background: transparent;
+    background: #111319;
   }
 </style>
 </head>
@@ -33,7 +33,10 @@ const cx = W / 2, cy = H / 2;
 
 function syncSectionBackground() {
   const section = window.frameElement?.closest('section');
-  const background = section ? window.parent.getComputedStyle(section).backgroundColor : 'transparent';
+  const sectionBackground = section ? window.parent.getComputedStyle(section).backgroundColor : '';
+  const background = sectionBackground && sectionBackground !== 'transparent' && sectionBackground !== 'rgba(0, 0, 0, 0)'
+    ? sectionBackground
+    : '#111319';
   document.documentElement.style.backgroundColor = background;
   document.body.style.backgroundColor = background;
 }
