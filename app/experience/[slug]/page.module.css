@@ -3320,8 +3320,8 @@
 
 .compareCard p {
   color: var(--ds-color-text-primary);
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .compareCard h4 {
@@ -3346,8 +3346,8 @@
 
 .compareCard p {
   color: var(--ds-color-text-primary);
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .shutdownCard,
@@ -3539,8 +3539,8 @@
   position: relative;
   z-index: 1;
   margin-bottom: 10px;
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 .objectiveCard p {
@@ -3663,8 +3663,8 @@
 
 .controlToggleText p {
   color: var(--text-secondary);
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .solutionRow.reverse .solutionVisual {
@@ -3821,8 +3821,8 @@
 
 .recoveryItem h4 {
   margin-bottom: 4px;
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 .recoveryItem p {
@@ -3879,8 +3879,8 @@
 
 .toolBody p {
   color: var(--text-secondary);
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .toolCard:hover {
@@ -4132,8 +4132,8 @@
 .shiftSignal p {
   grid-column: 2;
   color: var(--text-secondary);
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .shiftOutcome {
@@ -4179,8 +4179,8 @@
   max-width: 22rem;
   margin-top: var(--ds-space-sm);
   color: var(--text-secondary);
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .shiftPulse {
@@ -7495,8 +7495,13 @@
 }
 
 .c4iHtmlPage .c4iIconCard p {
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.c4iHtmlPage .c4iProofCopy p {
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
 }
 
 .c4iHtmlPage .c4iMergeViz,
