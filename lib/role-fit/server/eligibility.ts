@@ -1,4 +1,4 @@
-import type { EligibilityResult, RoleValidationResult, SessionRecord } from "../contracts/index.ts";
+import type { EligibilityResult, ReportUIPayload, RoleValidationResult, SessionRecord } from "../contracts/index.ts";
 import { eligibilityResultSchema, roleDraftSchema, roleFieldSchema, roleValidationResultSchema } from "../contracts/index.ts";
 import { z } from "zod";
 
@@ -26,6 +26,12 @@ type ReportEligibilityInput = {
   evidenceState: "ready" | "insufficient-evidence" | "no-meaningful-fit";
   report?: unknown;
 };
+
+export function evidenceStateFromComposedReport(report: Pick<ReportUIPayload, "overallFitVisual">): ReportEligibilityInput["evidenceState"] {
+  if (report.overallFitVisual.mode === "insufficient") return "insufficient-evidence";
+  if (report.overallFitVisual.mode === "out-of-scope") return "no-meaningful-fit";
+  return "ready";
+}
 
 const requiredFields: RequiredRoleField[] = ["title", "responsibilities", "requirements"];
 const textRoleFieldSchema = roleFieldSchema(z.string());

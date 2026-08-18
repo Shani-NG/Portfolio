@@ -39,6 +39,7 @@ describe("Role Fit report session persistence", () => {
       state: "report-ready",
       reportPayload: report,
       completedReportCount: 1,
+      pendingReportId: "R9K2Q",
       activeRoleText: "RAW_JOB_DESCRIPTION_MARKER",
       activeRoleTitle: "Secret title marker",
       activeRoleCompany: "Secret company marker",
@@ -51,6 +52,7 @@ describe("Role Fit report session persistence", () => {
 
     assert.match(serialized, /report_1/);
     assert.equal(JSON.parse(serialized).completedReportCount, 1);
+    assert.equal(JSON.parse(serialized).pendingReportId, "R9K2Q");
     assert.equal(JSON.parse(serialized).state, "report-ready");
     assert.deepEqual(JSON.parse(serialized).expandedEvidenceItemIds, ["requirement_2", "requirement_4"]);
     assert.doesNotMatch(serialized, /RAW_JOB_DESCRIPTION_MARKER|DRAFT_MARKER|MESSAGE_MARKER|Secret title marker|Secret company marker/);

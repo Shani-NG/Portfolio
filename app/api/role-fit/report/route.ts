@@ -1,21 +1,29 @@
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
-import { logRoleFitEvent, logRoleFitReportSummary, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
+import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
-import { persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
+import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
-import { evaluateReportEligibility } from "@/lib/role-fit/server/eligibility";
+import { evaluateReportEligibility, evidenceStateFromComposedReport } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
+
+function toSessionCompletedReportCount(value: number): 0 | 1 | 2 {
+  if (value >= 2) return 2;
+  if (value === 1) return 1;
+  return 0;
+}
 
 const requestSchema = z
   .object({
     roleText: z.string(),
     approved: z.boolean(),
+    // Retained for client display compatibility only; Supabase is authoritative for eligibility.
     completedReportCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(0),
     conversationId: z.string().optional(),
-    sessionId: z.string().optional(),
+    sessionId: z.string().trim().min(1).max(160),
+    reportId: z.string().regex(/^R[A-Z0-9]{4}$/),
     language: z.enum(["he", "en", "mixed"]).default("en"),
   })
   .strict();
@@ -65,11 +73,36 @@ export async function POST(request: Request) {
     );
   }
 
-  if (parsedRequest.data.completedReportCount >= policy.maxReportsPerSession) {
+  const persistedCount = await getCompletedReportCount(sessionId);
+  if (!persistedCount.ok) {
+    after(() =>
+      logRoleFitEvent({
+        eventName: "report.failed",
+        conversationId,
+        sessionId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "partial",
+        metadata: { reason: "authoritative-count-unavailable" },
+      }),
+    );
+
+    return NextResponse.json(
+      {
+        state: "persistence-unavailable",
+        safeMessage: "I couldn't verify the report allowance right now. Your role details are still here. Please try again later.",
+      },
+      { status: 503 },
+    );
+  }
+  const completedReportCount = persistedCount.completedReportCount;
+  const sessionCompletedReportCount = toSessionCompletedReportCount(completedReportCount);
+
+  if (completedReportCount >= policy.maxReportsPerSession) {
     const eligibility = evaluateReportEligibility({
       session: {
         status: "active",
-        completedReportCount: parsedRequest.data.completedReportCount,
+        completedReportCount: sessionCompletedReportCount,
       },
       approval: {
         approved: parsedRequest.data.approved,
@@ -87,20 +120,20 @@ export async function POST(request: Request) {
         mode: "fit-analysis",
         outcome: "blocked",
         metadata: {
-          completedReportCount: parsedRequest.data.completedReportCount,
+          completedReportCount,
           maxReportsPerSession: policy.maxReportsPerSession,
         },
       }),
     );
 
-    return NextResponse.json({ state: "blocked", eligibility }, { status: 429 });
+    return NextResponse.json({ state: "blocked", eligibility, completedReportCount }, { status: 429 });
   }
 
   if (!parsedRequest.data.approved) {
     const eligibility = evaluateReportEligibility({
       session: {
         status: "active",
-        completedReportCount: parsedRequest.data.completedReportCount,
+        completedReportCount: sessionCompletedReportCount,
       },
       approval: {
         approved: parsedRequest.data.approved,
@@ -167,7 +200,7 @@ export async function POST(request: Request) {
       mode: "fit-analysis",
       outcome: "success",
       metadata: {
-        completedReportCount: parsedRequest.data.completedReportCount,
+        completedReportCount,
         language: parsedRequest.data.language,
       },
     }),
@@ -231,6 +264,7 @@ export async function POST(request: Request) {
     roleDraft: validation.roleDraft,
     evidence: approvedEvidence,
     language: parsedRequest.data.language,
+    reportId: parsedRequest.data.reportId,
   });
 
   if (!composition.ok) {
@@ -258,6 +292,7 @@ export async function POST(request: Request) {
         roleDraft: validation.roleDraft,
         evidence: approvedEvidence,
         language: parsedRequest.data.language,
+        reportId: parsedRequest.data.reportId,
       });
     }
   }
@@ -306,27 +341,30 @@ export async function POST(request: Request) {
   const eligibility = evaluateReportEligibility({
     session: {
       status: "active",
-      completedReportCount: parsedRequest.data.completedReportCount,
+      completedReportCount: sessionCompletedReportCount,
     },
     approval: {
       approved: parsedRequest.data.approved,
     },
-    evidenceState: "ready",
+    evidenceState: evidenceStateFromComposedReport(report),
     report,
   });
+  const reportId = report.reportId;
+  const title = validation.roleDraft.title?.originalValue ?? "";
+  const roleFamily = inferRoleFamily(title);
 
-  after(async () => {
-    const reportId = report.reportId;
-    const title = validation.roleDraft.title?.originalValue ?? "";
-    const tasks: Promise<unknown>[] = [
-      logRoleFitEvent({
-        eventName: "report.completed",
+  if (eligibility.state === "no-report") {
+    after(() => {
+      const eventName = eligibility.reason === "insufficient-evidence"
+        ? "report.insufficient_evidence"
+        : "report.no_meaningful_fit";
+      return logRoleFitEvent({
+        eventName,
         conversationId,
         sessionId,
-        reportId,
         traceId,
         mode: "fit-analysis",
-        outcome: eligibility.state === "ready" ? "success" : "failure",
+        outcome: "success",
         durationMs: Date.now() - startedAt,
         metadata: {
           provider: modelResult.provider,
@@ -334,38 +372,69 @@ export async function POST(request: Request) {
           fitMode: report.overallFitVisual.mode,
           evidenceConfidence: report.evidenceConfidence.level,
         },
-      }),
-      logRoleFitReportSummary({
+      });
+    });
+
+    return NextResponse.json({
+      state: "no-report",
+      provider: modelResult.provider,
+      model: modelResult.model,
+      eligibility,
+      completedReportCount,
+    });
+  }
+
+  const persistence = await persistCompletedReport(report, { roleFamily, sessionId });
+
+  if (!persistence.ok && persistence.reason === "limit-reached") {
+    const limitEligibility = evaluateReportEligibility({
+      session: {
+        status: "active",
+        completedReportCount: toSessionCompletedReportCount(persistence.completedReportCount ?? policy.maxReportsPerSession),
+      },
+      approval: { approved: parsedRequest.data.approved },
+      evidenceState: "ready",
+    });
+    after(() =>
+      logRoleFitEvent({
+        eventName: "report.limit_blocked",
         conversationId,
         sessionId,
-        reportId,
+        traceId,
+        mode: "fit-analysis",
+        outcome: "blocked",
+        metadata: {
+          completedReportCount: persistence.completedReportCount ?? policy.maxReportsPerSession,
+          maxReportsPerSession: policy.maxReportsPerSession,
+        },
+      }),
+    );
+    return NextResponse.json(
+      { state: "blocked", eligibility: limitEligibility, completedReportCount: persistence.completedReportCount ?? policy.maxReportsPerSession },
+      { status: 429 },
+    );
+  }
+
+  after(() => {
+    const persistenceState = persistence.ok ? "persisted" : "degraded";
+    return logRoleFitEvent({
+      eventName: "report.completed",
+      conversationId,
+      sessionId,
+      reportId,
+      traceId,
+      mode: "fit-analysis",
+      outcome: persistence.ok ? "success" : "partial",
+      durationMs: Date.now() - startedAt,
+      metadata: {
         provider: modelResult.provider,
         model: modelResult.model,
         fitMode: report.overallFitVisual.mode,
-        fitLabel: report.overallFitVisual.label,
-        evidenceStatus: report.evidenceConfidence.level,
-      }),
-      logRoleFitSessionSummary({
-        conversationId,
-        sessionId,
-        language: parsedRequest.data.language,
-        executiveSummary: "Validated report request completed and a report summary was stored.",
-        intentPath: "role-fit",
-        lastMode: "fit-analysis",
-        lastOutcome: eligibility.state === "ready" ? "success" : "failure",
-        roleStatus: validation.parseStatus,
-        roleFamily: inferRoleFamily(title),
-        companyName: validation.roleDraft.company?.originalValue,
-        reportStatus: eligibility.state === "ready" ? "ready" : "failed",
-        reportId,
-      }),
-    ];
-
-    if (eligibility.state === "ready") {
-      tasks.push(persistCompletedReport(report, { roleFamily: inferRoleFamily(title) }));
-    }
-
-    await Promise.all(tasks);
+        evidenceConfidence: report.evidenceConfidence.level,
+        persistenceState,
+        ...(persistence.ok ? {} : { persistenceReason: persistence.reason }),
+      },
+    });
   });
 
   return NextResponse.json({
@@ -374,5 +443,7 @@ export async function POST(request: Request) {
     model: modelResult.model,
     eligibility,
     report,
+    persistence: persistence.ok ? "persisted" : "degraded",
+    completedReportCount: persistence.ok ? persistence.completedReportCount : completedReportCount,
   });
 }

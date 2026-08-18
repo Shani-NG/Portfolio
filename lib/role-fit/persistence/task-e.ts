@@ -1,15 +1,14 @@
 import { z } from "zod";
 import type { ReportUIPayload } from "../contracts/index.ts";
+import { createLeadId, createReportId } from "../identifiers.ts";
+import { persistContactLeadToSupabase } from "../runtime/supabase-runtime-store.ts";
 import {
-  appendContactLeadPersistenceRow,
-  appendRoleFitReportPersistenceRow,
-  isRoleFitRuntimeStoreConfigured,
-} from "../runtime/google-sheets-store.ts";
+  getPersistedRoleFitCompletedReportCount,
+  persistRoleFitCompletedReport,
+} from "./supabase-report-store.ts";
 
 const allowedSourceContexts = ["direct-contact-page", "role-fit-report-cta", "portfolio-cta", "unknown"] as const;
 const reportFitResults = ["Strong", "Good", "Partial", "Insufficient Evidence", "Out of Scope"] as const;
-const idAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const sentReportIds = new Set<string>();
 
 export const contactLeadRequestSchema = z
   .object({
@@ -24,27 +23,17 @@ export const contactLeadRequestSchema = z
 
 export type ContactLeadRequest = z.infer<typeof contactLeadRequestSchema>;
 
-type PersistenceResult =
-  | { ok: true; skipped?: false }
-  | { ok: true; skipped: true; reason: "missing-store" | "duplicate-report" }
-  | { ok: false; reason: "missing-store" | "store-failed" | "invalid-payload" };
+export type ReportPersistenceResult =
+  | { ok: true; persisted: true; duplicate?: boolean; completedReportCount: number }
+  | { ok: false; reason: "missing-config" | "request-failed" | "invalid-response" | "invalid-payload" | "limit-reached"; completedReportCount?: number };
 
-function createShortId(prefix: "R" | "L") {
-  const bytes = new Uint8Array(4);
-  crypto.getRandomValues(bytes);
-  const suffix = Array.from(bytes, (byte) => idAlphabet[byte % idAlphabet.length]).join("");
-  return `${prefix}${suffix}`;
-}
+type ContactPersistenceResult =
+  | { ok: true }
+  | { ok: false; reason: "missing-config" | "request-failed" | "invalid-response" | "invalid-payload" };
 
-export function createReportId() {
-  return createShortId("R");
-}
+export { createLeadId, createReportId } from "../identifiers.ts";
 
-export function createLeadId() {
-  return createShortId("L");
-}
-
-export function formatSheetDate(date = new Date()) {
+export function formatPersistenceDate(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Jerusalem",
     day: "2-digit",
@@ -80,7 +69,7 @@ function shortItemLabel(item: ReportUIPayload["requirementMapping"]["items"][num
 }
 
 export function buildReportPersistenceRow(report: ReportUIPayload, options: { roleFamily?: string } = {}) {
-  const createdAt = formatSheetDate();
+  const createdAt = formatPersistenceDate();
   const projects = evidenceProjects(report);
   const family = options.roleFamily ?? "";
   const summary = {
@@ -121,7 +110,7 @@ export function buildContactLeadRow(input: ContactLeadRequest) {
   const leadId = createLeadId();
   return {
     lead_id: leadId,
-    created_at: formatSheetDate(),
+    created_at: formatPersistenceDate(),
     name: input.name,
     email: input.email,
     company: input.company ?? "",
@@ -136,50 +125,71 @@ function logPersistenceFailure(target: "report" | "lead", id: string, category: 
     target,
     id,
     category,
-    timestamp: formatSheetDate(),
+    timestamp: formatPersistenceDate(),
   });
 }
 
-export async function persistCompletedReport(report: ReportUIPayload, options: { roleFamily?: string } = {}): Promise<PersistenceResult> {
-  if (!isRoleFitRuntimeStoreConfigured()) {
-    logPersistenceFailure("report", report.reportId, "missing-store");
-    return { ok: true, skipped: true, reason: "missing-store" };
-  }
-
-  if (sentReportIds.has(report.reportId)) {
-    return { ok: true, skipped: true, reason: "duplicate-report" };
-  }
-
-  try {
-    const row = buildReportPersistenceRow(report, options);
-    sentReportIds.add(report.reportId);
-    const ok = await appendRoleFitReportPersistenceRow(row);
-    if (ok) return { ok: true };
-    logPersistenceFailure("report", report.reportId, "store-failed");
-    return { ok: false, reason: "store-failed" };
-  } catch {
-    logPersistenceFailure("report", report.reportId, "store-failed");
-    return { ok: false, reason: "store-failed" };
-  }
+export async function getCompletedReportCount(sessionId: string) {
+  return getPersistedRoleFitCompletedReportCount(sessionId);
 }
 
-export async function persistContactLead(input: unknown): Promise<PersistenceResult> {
+export async function persistCompletedReport(
+  report: ReportUIPayload,
+  options: { roleFamily?: string; sessionId: string },
+): Promise<ReportPersistenceResult> {
+  const row = buildReportPersistenceRow(report, options);
+  const reportJson = JSON.parse(row.report_json_summary) as unknown;
+  if (typeof reportJson !== "object" || reportJson === null || Array.isArray(reportJson)) {
+    logPersistenceFailure("report", report.reportId, "invalid-payload");
+    return { ok: false, reason: "invalid-payload" };
+  }
+
+  const persistence = await persistRoleFitCompletedReport({
+    reportId: report.reportId,
+    sessionId: options.sessionId,
+    roleTitle: row.role_title,
+    companyName: row.company,
+    roleFamily: row.role_family,
+    locationOrWorkModel: row.location_or_work_model,
+    fitLabel: row.fit_result as "Strong" | "Good" | "Partial",
+    schemaVersion: report.schemaVersion,
+    evidenceProjectsUsed: evidenceProjects(report),
+    contactCtaClicked: false,
+    reportJson: reportJson as Record<string, unknown>,
+  });
+
+  if (!persistence.ok) {
+    logPersistenceFailure("report", report.reportId, persistence.reason);
+    return persistence;
+  }
+
+  return {
+    ok: true,
+    persisted: true,
+    ...(persistence.outcome === "duplicate" ? { duplicate: true } : {}),
+    completedReportCount: persistence.completedReportCount,
+  };
+}
+
+export async function persistContactLead(input: unknown): Promise<ContactPersistenceResult> {
   const parsed = contactLeadRequestSchema.safeParse(input);
   if (!parsed.success) return { ok: false, reason: "invalid-payload" };
 
   const row = buildContactLeadRow(parsed.data);
-  if (!isRoleFitRuntimeStoreConfigured()) {
-    logPersistenceFailure("lead", row.lead_id, "missing-store");
-    return { ok: false, reason: "missing-store" };
+  const persistence = await persistContactLeadToSupabase({
+    leadId: row.lead_id,
+    name: row.name,
+    email: row.email,
+    companyName: row.company,
+    message: row.message,
+    sourceContext: row.source_context,
+    reportId: row.report_id || undefined,
+  });
+
+  if (!persistence.ok) {
+    logPersistenceFailure("lead", row.lead_id, persistence.reason);
+    return persistence;
   }
 
-  try {
-    const ok = await appendContactLeadPersistenceRow(row);
-    if (ok) return { ok: true };
-    logPersistenceFailure("lead", row.lead_id, "store-failed");
-    return { ok: false, reason: "store-failed" };
-  } catch {
-    logPersistenceFailure("lead", row.lead_id, "store-failed");
-    return { ok: false, reason: "store-failed" };
-  }
+  return { ok: true };
 }
