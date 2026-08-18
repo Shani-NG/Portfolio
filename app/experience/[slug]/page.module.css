@@ -3002,7 +3002,7 @@
 .bigRedHtmlHero h1 {
   margin-bottom: 16px;
   font-size: var(--ds-type-display-64-size);
-  line-height: var(--ds-type-display-64-line);
+  line-height: var(--ds-type-page-title-line);
 }
 
 .bigRedHtmlHero p {
