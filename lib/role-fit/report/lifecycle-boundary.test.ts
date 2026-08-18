@@ -17,6 +17,7 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.ok(persistenceStart > noReportStart);
     assert.match(noReportBranch, /state: "no-report"/);
     assert.doesNotMatch(noReportBranch, /persistCompletedReport/);
+    assert.doesNotMatch(noReportBranch, /reportId,\s*\n\s*traceId,/);
   });
 
   test("uses server-authoritative count and keeps a degraded report visible without consuming client allowance", async () => {

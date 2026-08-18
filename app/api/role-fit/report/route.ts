@@ -362,7 +362,6 @@ export async function POST(request: Request) {
         eventName,
         conversationId,
         sessionId,
-        reportId,
         traceId,
         mode: "fit-analysis",
         outcome: "success",
