@@ -15,7 +15,7 @@ import {
   reportLimitAnswer,
   roleSubmissionSetupAnswer,
 } from "@/lib/role-fit/conversation/behavior";
-import { logRoleFitEvent, logRoleFitSessionSummary } from "@/lib/role-fit/runtime/google-sheets-store";
+import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import {
   applyRoleCorrection,
@@ -200,35 +200,20 @@ export async function POST(request: Request) {
     if (validation.parseStatus === "valid-complete") {
       const title = validation.roleDraft.title?.originalValue ?? "";
       const companyName = validation.roleDraft.company?.originalValue;
-      after(async () => {
-        await Promise.all([
-          logRoleFitEvent({
-            eventName: "role.classified",
-            conversationId,
-            sessionId,
-            traceId,
-            mode: "role-understanding",
-            outcome: "success",
-            metadata: {
-              parseStatus: validation.parseStatus,
-              repeatedInput: parsedRequest.data.repeatedInput,
-            },
-          }),
-          logRoleFitSessionSummary({
-            conversationId,
-            sessionId,
-            language: parsedRequest.data.language,
-            executiveSummary: "Role input is complete and awaiting explicit report confirmation.",
-            intentPath: "role-fit",
-            lastMode: "role-understanding",
-            lastOutcome: "success",
-            roleStatus: validation.parseStatus,
-            roleFamily: inferRoleFamily(title),
-            companyName,
-            reportStatus: "awaiting-confirmation",
-          }),
-        ]);
-      });
+      after(() =>
+        logRoleFitEvent({
+          eventName: "role.classified",
+          conversationId,
+          sessionId,
+          correlationId: traceId,
+          mode: "role-understanding",
+          outcome: "success",
+          metadata: {
+            parseStatus: validation.parseStatus,
+            repeatedInput: parsedRequest.data.repeatedInput,
+          },
+        }),
+      );
 
       return NextResponse.json({
         state: "awaiting-report-confirmation",
@@ -247,36 +232,21 @@ export async function POST(request: Request) {
     }
 
     const missingField = validation.missingFields[0];
-    after(async () => {
-      await Promise.all([
-        logRoleFitEvent({
-          eventName: "role.clarification_requested",
-          conversationId,
-          sessionId,
-          traceId,
-          mode: "role-understanding",
-          outcome: "partial",
-          metadata: {
-            parseStatus: validation.parseStatus,
-            missingField,
-            repeatedInput: parsedRequest.data.repeatedInput,
-          },
-        }),
-        logRoleFitSessionSummary({
-          conversationId,
-          sessionId,
-          language: parsedRequest.data.language,
-          executiveSummary: "Role input is incomplete; one focused clarification was requested.",
-          intentPath: "role-fit",
-          lastMode: "role-understanding",
-          lastOutcome: "partial",
-          roleStatus: validation.parseStatus,
-          roleFamily: inferRoleFamily(validation.roleDraft.title?.originalValue ?? ""),
-          companyName: validation.roleDraft.company?.originalValue,
-          reportStatus: "not-ready",
-        }),
-      ]);
-    });
+    after(() =>
+      logRoleFitEvent({
+        eventName: "role.clarification_requested",
+        conversationId,
+        sessionId,
+        correlationId: traceId,
+        mode: "role-understanding",
+        outcome: "partial",
+        metadata: {
+          parseStatus: validation.parseStatus,
+          missingField,
+          repeatedInput: parsedRequest.data.repeatedInput,
+        },
+      }),
+    );
 
     const clarificationExhausted = parsedRequest.data.clarificationAttempts + 1 >= maxRoleClarificationAttempts;
 
@@ -339,20 +309,6 @@ export async function POST(request: Request) {
       }
     );
   }
-
-  after(() =>
-    logRoleFitSessionSummary({
-      conversationId,
-      sessionId,
-      language: parsedRequest.data.language,
-      executiveSummary: "Portfolio question answered without storing conversation text.",
-      intentPath: "portfolio-qa",
-      lastMode: "portfolio-qa",
-      lastOutcome: "success",
-      roleStatus: "not-active",
-      reportStatus: "not-requested",
-    }),
-  );
 
   return NextResponse.json({
     state: "general-qa",

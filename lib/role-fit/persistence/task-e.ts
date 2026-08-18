@@ -1,10 +1,7 @@
 import { z } from "zod";
 import type { ReportUIPayload } from "../contracts/index.ts";
 import { createLeadId, createReportId } from "../identifiers.ts";
-import {
-  appendContactLeadPersistenceRow,
-  isRoleFitRuntimeStoreConfigured,
-} from "../runtime/google-sheets-store.ts";
+import { persistContactLeadToSupabase } from "../runtime/supabase-runtime-store.ts";
 import {
   getPersistedRoleFitCompletedReportCount,
   persistRoleFitCompletedReport,
@@ -32,11 +29,11 @@ export type ReportPersistenceResult =
 
 type ContactPersistenceResult =
   | { ok: true }
-  | { ok: false; reason: "missing-store" | "store-failed" | "invalid-payload" };
+  | { ok: false; reason: "missing-config" | "request-failed" | "invalid-response" | "invalid-payload" };
 
 export { createLeadId, createReportId } from "../identifiers.ts";
 
-export function formatSheetDate(date = new Date()) {
+export function formatPersistenceDate(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Jerusalem",
     day: "2-digit",
@@ -72,7 +69,7 @@ function shortItemLabel(item: ReportUIPayload["requirementMapping"]["items"][num
 }
 
 export function buildReportPersistenceRow(report: ReportUIPayload, options: { roleFamily?: string } = {}) {
-  const createdAt = formatSheetDate();
+  const createdAt = formatPersistenceDate();
   const projects = evidenceProjects(report);
   const family = options.roleFamily ?? "";
   const summary = {
@@ -113,7 +110,7 @@ export function buildContactLeadRow(input: ContactLeadRequest) {
   const leadId = createLeadId();
   return {
     lead_id: leadId,
-    created_at: formatSheetDate(),
+    created_at: formatPersistenceDate(),
     name: input.name,
     email: input.email,
     company: input.company ?? "",
@@ -128,7 +125,7 @@ function logPersistenceFailure(target: "report" | "lead", id: string, category: 
     target,
     id,
     category,
-    timestamp: formatSheetDate(),
+    timestamp: formatPersistenceDate(),
   });
 }
 
@@ -179,18 +176,20 @@ export async function persistContactLead(input: unknown): Promise<ContactPersist
   if (!parsed.success) return { ok: false, reason: "invalid-payload" };
 
   const row = buildContactLeadRow(parsed.data);
-  if (!isRoleFitRuntimeStoreConfigured()) {
-    logPersistenceFailure("lead", row.lead_id, "missing-store");
-    return { ok: false, reason: "missing-store" };
+  const persistence = await persistContactLeadToSupabase({
+    leadId: row.lead_id,
+    name: row.name,
+    email: row.email,
+    companyName: row.company,
+    message: row.message,
+    sourceContext: row.source_context,
+    reportId: row.report_id || undefined,
+  });
+
+  if (!persistence.ok) {
+    logPersistenceFailure("lead", row.lead_id, persistence.reason);
+    return persistence;
   }
 
-  try {
-    const ok = await appendContactLeadPersistenceRow(row);
-    if (ok) return { ok: true };
-    logPersistenceFailure("lead", row.lead_id, "store-failed");
-    return { ok: false, reason: "store-failed" };
-  } catch {
-    logPersistenceFailure("lead", row.lead_id, "store-failed");
-    return { ok: false, reason: "store-failed" };
-  }
+  return { ok: true };
 }

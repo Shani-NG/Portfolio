@@ -9,7 +9,7 @@ import {
   contactLeadRequestSchema,
   createLeadId,
   createReportId,
-  formatSheetDate,
+  formatPersistenceDate,
   persistCompletedReport,
 } from "./task-e.ts";
 
@@ -140,7 +140,7 @@ describe("Task E Lite persistence helpers", () => {
     assert.match(createLeadId(), /^L[A-Z0-9]{4}$/);
     assert.equal(createReportId().length, 5);
     assert.equal(createLeadId().length, 5);
-    assert.equal(formatSheetDate(new Date("2026-08-11T11:36:00.000Z")), "11.08.26 14:36");
+    assert.equal(formatPersistenceDate(new Date("2026-08-11T11:36:00.000Z")), "11.08.26 14:36");
   });
 
   test("validates and builds the approved contact lead fields", () => {
@@ -181,24 +181,22 @@ describe("Task E Lite persistence helpers", () => {
     }).success, false);
   });
 
-  test("does not classify a missing report store as durable persistence", async () => {
+  test("does not classify missing Supabase configuration as durable report persistence", async () => {
     const previous = {
-      spreadsheetId: process.env.GOOGLE_SHEETS_RUNTIME_SPREADSHEET_ID,
-      clientEmail: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-      privateKey: process.env.GOOGLE_SHEETS_PRIVATE_KEY,
+      url: process.env.SUPABASE_URL,
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     };
-    delete process.env.GOOGLE_SHEETS_RUNTIME_SPREADSHEET_ID;
-    delete process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
-    delete process.env.GOOGLE_SHEETS_PRIVATE_KEY;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     try {
       const result = await persistCompletedReport(reportFixture(), { sessionId: "session_test_missing_store" });
       assert.deepEqual(result, { ok: false, reason: "missing-config" });
     } finally {
-      for (const [key, value] of Object.entries(previous)) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      }
+      if (previous.url === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = previous.url;
+      if (previous.serviceRoleKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      else process.env.SUPABASE_SERVICE_ROLE_KEY = previous.serviceRoleKey;
     }
   });
 
@@ -207,10 +205,10 @@ describe("Task E Lite persistence helpers", () => {
 
     assert.match(source, /persistRoleFitCompletedReport/);
     assert.doesNotMatch(source, /sentReportIds/);
-    assert.doesNotMatch(source, /appendRoleFitReportPersistenceRow/);
+    assert.match(source, /persistContactLeadToSupabase/);
   });
 
-  test("keeps missing contact store as a controlled response instead of a network error", async () => {
+  test("keeps Contact persistence failure as a controlled response instead of a network error", async () => {
     const route = await readFile(join(process.cwd(), "app", "api", "contact", "route.ts"), "utf8");
     const form = await readFile(join(process.cwd(), "app", "contact", "contact-form.tsx"), "utf8");
 
