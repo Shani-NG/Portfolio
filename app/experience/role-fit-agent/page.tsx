@@ -411,83 +411,83 @@ export default function RoleFitAgentCaseStudyPage() {
 
         <svg
           className={styles.connectors}
-          viewBox="0 0 1160 736"
+          viewBox="0 0 1160 1089.28"
           preserveAspectRatio="none"
           aria-hidden="true"
         >
 <path
   className={styles.agentConnector}
-  d="M580 135 L580 153"
+  d="M580 199.8 L580 226.44"
 />
 
 <path
   className={styles.appConnector}
-  d="M395 205 L468 205"
+  d="M395 303.4 L468 303.4"
 />
 
 <path
   className={styles.appConnector}
-  d="M690 205 L812 205"
+  d="M690 303.4 L812 303.4"
 />
 
 <path
   className={styles.agentConnector}
-  d="M580 257 L580 290 L255 290 L255 313"
+  d="M580 380.36 L580 429.2 L255 429.2 L255 463.24"
 />
 
 <path
   className={styles.evidenceConnector}
-  d="M580 257 L580 290 L464 290 L464 313"
+  d="M580 380.36 L580 429.2 L464 429.2 L464 463.24"
 />
 
 <path
   className={styles.agentConnector}
-  d="M580 257 L580 290 L742 290 L742 313"
+  d="M580 380.36 L580 429.2 L742 429.2 L742 463.24"
 />
 
 <path
   className={styles.appConnector}
-  d="M860 365 L874 365"
+  d="M860 540.2 L874 540.2"
 />
 
 <path
   className={styles.agentConnector}
-  d="M255 417 L255 470 L505 470 L505 500"
+  d="M255 617.16 L255 695.6 L505 695.6 L505 740"
 />
 
 <path
   className={styles.evidenceConnector}
-  d="M464 417 L464 470 L540 470 L540 500"
+  d="M464 617.16 L464 695.6 L540 695.6 L540 740"
 />
 
 <path
   className={styles.agentConnector}
-  d="M742 417 L742 470 L655 470 L655 500"
+  d="M742 617.16 L742 695.6 L655 695.6 L655 740"
 />
 
 <path
   className={styles.appConnector}
-  d="M992 417 L992 470 L690 470 L690 500"
+  d="M992 617.16 L992 695.6 L690 695.6 L690 740"
 />
 
 <path
   className={styles.agentConnector}
-  d="M505 630 L505 646 L255 646 L255 653"
+  d="M505 932.4 L505 956.08 L255 956.08 L255 966.44"
 />
 
 <path
   className={styles.evidenceConnector}
-  d="M540 630 L540 646 L464 646 L464 653"
+  d="M540 932.4 L540 956.08 L464 956.08 L464 966.44"
 />
 
 <path
   className={styles.appConnector}
-  d="M620 630 L620 646 L742 646 L742 653"
+  d="M620 932.4 L620 956.08 L742 956.08 L742 966.44"
 />
 
 <path
   className={styles.appConnector}
-  d="M655 630 L655 646 L992 646 L992 653"
+  d="M655 932.4 L655 956.08 L992 956.08 L992 966.44"
 />
 
         </svg>
@@ -602,20 +602,6 @@ export default function RoleFitAgentCaseStudyPage() {
 </article>      </div>
     </div>
 
-    <div className={styles.diagramLegend} aria-label="Diagram legend">
-      <span>
-        <i className={styles.agentLegend} />
-        Agent flow
-      </span>
-      <span>
-        <i className={styles.evidenceLegend} />
-        Evidence flow
-      </span>
-      <span>
-        <i className={styles.appLegend} />
-        Application flow
-      </span>
-    </div>
 
     <p className={styles.diagramNote}>
       <strong>

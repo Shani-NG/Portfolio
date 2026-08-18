@@ -66,6 +66,15 @@ const buttonExamples = [
   { variant: "tertiary", tone: "text", label: "Tertiary" },
 ] as const;
 
+const projectIconNames = [
+  "account_tree", "add", "analytics", "architecture", "arrow_forward", "auto_awesome",
+  "bolt", "build_circle", "check_circle", "conversion_path", "dashboard", "description",
+  "gpp_maybe", "groups", "handshake", "hub", "insights", "lightbulb", "lock",
+  "map", "monitoring", "psychology", "radar", "route", "school", "search", "send",
+  "settings_input_component", "shield", "strategy", "travel_explore", "tune", "verified",
+  "visibility", "visibility_off", "widgets",
+] as const;
+
 const typeScale = [
   ["hero", "var(--ds-type-hero-size)", "var(--ds-type-hero-line)", "var(--ds-type-weight-semibold)"],
   ["page-title", "var(--ds-type-page-title-size)", "var(--ds-type-page-title-line)", "var(--ds-type-weight-semibold)"],
@@ -374,20 +383,19 @@ export default function DesignSystemPage() {
         </div>
       </section>
 
-      <section className={styles.darkPreview} data-ds-theme="dark" aria-labelledby="dark-title" id="dark-mode">
+      <section className={styles.section} aria-labelledby="icons-title" id="icons">
         <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>11 Dark mode check</p>
-          <h2 id="dark-title">Same roles, different theme</h2>
-          <p>
-            This proves the system can change theme centrally without rewriting
-            component styles.
-          </p>
+          <p className={styles.eyebrow}>11 Icons</p>
+          <h2 id="icons-title">ICONS</h2>
+          <p>Material Icons currently used across the portfolio, presented as one shared visual vocabulary.</p>
         </div>
-        <div className={styles.darkActions}>
-          <div className={styles.componentExample}><Button>Primary</Button><span className={styles.componentLabel}>Button / primary / filled / dark</span></div>
-          <div className={styles.componentExample}><Button variant="secondary">Secondary</Button><span className={styles.componentLabel}>Button / secondary / filled / dark</span></div>
-          <div className={styles.componentExample}><Button variant="secondary" tone="outlined">Secondary</Button><span className={styles.componentLabel}>Button / secondary / outlined / dark</span></div>
-          <div className={styles.componentExample}><Button variant="tertiary" tone="text">Tertiary</Button><span className={styles.componentLabel}>Button / tertiary / text / dark</span></div>
+        <div className={styles.iconGrid} aria-label="Material icons used in the portfolio">
+          {projectIconNames.map((name) => (
+            <div className={styles.iconSample} key={name}>
+              <MaterialIcon name={name} />
+              <span>{name}</span>
+            </div>
+          ))}
         </div>
       </section>
     </main>

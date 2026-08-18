@@ -115,7 +115,7 @@ function draw(now) {
 
     // halo
     const grad = ctx.createRadialGradient(cx, cy, rad * 0.4, cx, cy, rad * 3.2);
-    grad.addColorStop(0, `rgba(255,255,255,${0.35 * mergeGlow})`);
+    grad.addColorStop(0, `rgba(23,24,29,${0.35 * mergeGlow})`);
     grad.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -125,7 +125,7 @@ function draw(now) {
     // fill
     ctx.beginPath();
     ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${0.92 * mergeGlow})`;
+    ctx.fillStyle = `rgba(23,24,29,${0.92 * mergeGlow})`;
     ctx.fill();
 
     // outline

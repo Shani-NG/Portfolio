@@ -3,6 +3,7 @@
 import { type FormEvent, useId, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import styles from "./page.module.css";
 
 type FieldName = "name" | "company" | "message" | "email";
@@ -296,7 +297,7 @@ export function ContactForm() {
           tone="outlined"
           disabled={(hasErrors && submitAttempted) || submitStatus === "submitting"}
         >
-          {submitStatus === "submitting" ? "Sending..." : "Send Info"}
+          {submitStatus === "submitting" ? "Sending..." : <><MaterialIcon name="send" />Send Details</>}
         </Button>
       </div>
 

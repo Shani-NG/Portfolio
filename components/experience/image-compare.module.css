@@ -65,9 +65,9 @@
   align-items: center;
   gap: 0.4rem;
   min-height: 2rem;
-  border: 1px solid color-mix(in srgb, white 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ds-color-action-primary-hover) 38%, transparent);
   border-radius: 999px;
-  background: rgba(12, 16, 23, 0.76);
+  background: color-mix(in srgb, var(--ds-color-action-primary-hover) 28%, rgba(12, 16, 23, 0.9));
   backdrop-filter: blur(0.75rem);
   color: rgba(255, 255, 255, 0.94);
   font-size: 0.75rem;
@@ -83,6 +83,11 @@
   border-radius: 999px;
   background: var(--ds-color-action-primary-hover);
   content: "";
+}
+
+.labelAfter {
+  border-color: color-mix(in srgb, var(--ds-color-action-secondary-hover) 42%, transparent);
+  background: color-mix(in srgb, var(--ds-color-action-secondary-hover) 26%, rgba(12, 16, 23, 0.9));
 }
 
 .labelAfter::before {

@@ -522,7 +522,7 @@ function BigRedHtmlCaseStudy({ showReportReturnFab = false }: { showReportReturn
       <section className={styles.bigRedHtmlHero} data-ds-theme="dark" id={bigRedButtonCaseStudy.heroAnchor}>
         <div className={styles.bigRedHtmlWrap}>
           <Eyebrow as="div" className={styles.bigRedHtmlEyebrow}>Monitor Module</Eyebrow>
-          <h1>The Big RED BUTTON</h1>
+          <h1>The Big Red Button</h1>
           <p>Reducing critical downtime through targeted recovery.</p>
         </div>
         <div className={styles.bigRedHeroVisual}>
@@ -1376,6 +1376,8 @@ function EpdTimelineVisual({ index }: { index: number }) {
   );
 }
 
+const epdSnapshotIcons = ["strategy", "monitor_heart", "groups", "tune", "rocket_launch"] as const;
+
 type EpdSection = (typeof epdCaseStudy.sections)[number];
 
 function EpdSectionView({ section, index }: { section: EpdSection; index: number }) {
@@ -1566,7 +1568,7 @@ function EpdCaseStudy({ showReportReturnFab = false }: { showReportReturnFab?: b
             <dl className={styles.epdSnapshot}>
               {epdCaseStudy.snapshot.map(([term, value], snapshotIndex) => (
                 <div className={styles.epdSnapshotCard} key={term}>
-                  <span>{String(snapshotIndex + 1).padStart(2, "0")}</span>
+                  <span><EpdIcon name={epdSnapshotIcons[snapshotIndex]} /></span>
                   <dt>{term}</dt>
                   <dd>{value}</dd>
                 </div>
