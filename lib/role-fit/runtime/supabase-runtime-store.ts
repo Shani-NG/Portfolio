@@ -99,7 +99,7 @@ function safeMetadata(metadata: SafeMetadata | undefined) {
   if (!metadata) return {};
   const allowedKeys = new Set([
     "provider", "model", "parseStatus", "repeatedInput", "missingField", "completedReportCount",
-    "maxReportsPerSession", "language", "safeMessageKey", "fitMode", "evidenceConfidence",
+    "maxReportsPerSession", "language", "fitMode", "evidenceConfidence",
     "persistenceState", "persistenceReason",
   ]);
   return Object.fromEntries(
