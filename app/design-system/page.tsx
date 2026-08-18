@@ -67,12 +67,16 @@ const buttonExamples = [
 ] as const;
 
 const projectIconNames = [
-  "account_tree", "add", "analytics", "architecture", "arrow_forward", "auto_awesome",
-  "bolt", "build_circle", "check_circle", "conversion_path", "dashboard", "description",
-  "gpp_maybe", "groups", "handshake", "hub", "insights", "lightbulb", "lock",
-  "map", "monitoring", "psychology", "radar", "route", "school", "search", "send",
-  "settings_input_component", "shield", "strategy", "travel_explore", "tune", "verified",
-  "visibility", "visibility_off", "widgets",
+  "account_tree", "add", "add_circle", "alt_route", "analytics", "architecture",
+  "arrow_back", "arrow_forward", "auto_awesome", "bolt", "build_circle", "cancel",
+  "center_focus_strong", "check_circle", "chevron_left", "chevron_right", "commit",
+  "compare_arrows", "content_paste", "conversion_path", "deployed_code", "description",
+  "directions_boat", "emoji_objects", "favorite", "gpp_maybe", "groups", "handshake",
+  "healing", "health_and_safety", "hub", "info", "insights", "layers", "lightbulb",
+  "loop", "mail", "map", "monitor_heart", "person_outline", "play_circle", "restart_alt",
+  "rocket_launch", "route", "schedule", "search_off", "send", "settings_input_component",
+  "shield_with_heart", "strategy", "sync_alt", "target", "terminal", "touch_app",
+  "travel_explore", "trending_up", "tune", "upload_file", "verified", "visibility",
 ] as const;
 
 const typeScale = [

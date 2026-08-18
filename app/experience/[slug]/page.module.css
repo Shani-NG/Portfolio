@@ -6103,7 +6103,7 @@
 .epdPrinciple {
   grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
   gap: clamp(3.5rem, 8vw, 7rem);
-  align-items: start;
+  align-items: center;
 }
 
 .epdTimeline {
