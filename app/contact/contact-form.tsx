@@ -297,7 +297,12 @@ export function ContactForm() {
           tone="outlined"
           disabled={(hasErrors && submitAttempted) || submitStatus === "submitting"}
         >
-          {submitStatus === "submitting" ? "Sending..." : <><MaterialIcon name="send" />Send Details</>}
+          {submitStatus === "submitting" ? "Sending..." : (
+            <span className={styles.submitLabel}>
+              <MaterialIcon name="send" />
+              <span>Send Details</span>
+            </span>
+          )}
         </Button>
       </div>
 

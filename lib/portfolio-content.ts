@@ -42,7 +42,7 @@ export const expertiseAreas = [
 export const projectCards = [
   {
     category: "MONITOR MODULE",
-    title: "The Big RED BUTTON",
+    title: "The Big Red Button",
     href: "/experience/the-big-red-button",
     summary: "Reducing critical downtime through targeted recovery",
     image: "/assets/project-big-red-button.png",

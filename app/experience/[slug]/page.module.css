@@ -3006,11 +3006,11 @@
 }
 
 .bigRedHtmlHero p {
-  max-width: 520px;
+  max-width: 44rem;
   margin: 0 auto clamp(2.5rem, 5vw, 4rem);
   color: var(--ds-color-text-on-dark-body);
   font-size: var(--ds-type-body-large-size);
-  line-height: var(--ds-type-body-large-line);
+  line-height: 1.38;
 }
 
 .bigRedHeroVisual {
@@ -3683,7 +3683,7 @@
 }
 
 .solutionDesc {
-  margin-bottom: var(--ds-space-2xl);
+  margin-bottom: var(--ds-space-3xl);
   color: var(--text-secondary);
   font-size: var(--ds-type-heading-18-size);
   line-height: var(--ds-type-heading-18-line);
@@ -4043,7 +4043,7 @@
   position: relative;
   display: grid;
   place-items: center;
-  margin-top: var(--ds-space-3xl);
+  margin-top: clamp(5rem, 9vw, 8rem);
 }
 
 .shiftReflection::before {
@@ -7460,4 +7460,47 @@
   .c4iHtmlPage .c4iFlowStep span {
     animation: none;
   }
+}
+
+/* C4I: final visual requirements, intentionally last to win the case-study cascade. */
+.c4iHtmlPage .c4iHeroVisual::after {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--surface-dark-band) 66%, transparent), color-mix(in srgb, var(--surface-dark-band) 14%, transparent) 58%, color-mix(in srgb, var(--surface-dark-band) 38%, transparent)),
+    linear-gradient(0deg, color-mix(in srgb, var(--surface-dark-band) 82%, transparent), transparent 58%);
+}
+
+.c4iHtmlPage .c4iHeroVisual .c4iMediaFrame img {
+  filter: saturate(1.1) contrast(1.08) brightness(1.02);
+}
+
+.c4iHtmlPage .c4iSectionHead h2 {
+  font-size: var(--ds-case-section-title-size);
+  line-height: var(--ds-case-section-title-line);
+}
+
+.c4iHtmlPage .c4iSectionHead p {
+  font-size: var(--ds-type-body-large-size);
+  line-height: var(--ds-type-body-large-line);
+}
+
+.c4iHtmlPage .c4iMergeViz,
+.c4iHtmlPage .c4iMergeFrame {
+  background: var(--surface-dark-band);
+}
+
+.c4iHtmlPage .c4iIconCard > span {
+  box-shadow: 0 0 1.1rem color-mix(in srgb, currentColor 28%, transparent);
+}
+
+.c4iHtmlPage .c4iFlowStep span {
+  width: 1.0625rem;
+  box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--flow-color) 26%, transparent), 0 0 1.25rem color-mix(in srgb, var(--flow-color) 38%, transparent);
+}
+
+.c4iHtmlPage .c4iProofRows {
+  gap: clamp(5rem, 10vw, 9rem);
+}
+
+.c4iHtmlPage .c4iProofRow {
+  gap: clamp(3rem, 8vw, 7rem);
 }
