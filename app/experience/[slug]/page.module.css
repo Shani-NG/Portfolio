@@ -3099,8 +3099,8 @@
 
 .snapshotParagraph {
   color: var(--text-secondary);
-  font-size: 15px;
-  line-height: 1.8;
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
 }
 
 .snapshotParagraph + .snapshotParagraph {
@@ -3539,12 +3539,15 @@
   position: relative;
   z-index: 1;
   margin-bottom: 10px;
-  font-size: 16.5px;
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
 }
 
 .objectiveCard p {
   position: relative;
   z-index: 1;
+  font-size: var(--ds-type-body-14-size);
+  line-height: var(--ds-type-body-14-line);
 }
 
 .objectiveCard:hover {
@@ -3660,8 +3663,8 @@
 
 .controlToggleText p {
   color: var(--text-secondary);
-  font-size: var(--ds-type-heading-18-size);
-  line-height: var(--ds-type-heading-18-line);
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
 }
 
 .solutionRow.reverse .solutionVisual {
@@ -3818,7 +3821,13 @@
 
 .recoveryItem h4 {
   margin-bottom: 4px;
-  font-size: 15px;
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
+}
+
+.recoveryItem p {
+  font-size: var(--ds-type-body-14-size);
+  line-height: var(--ds-type-body-14-line);
 }
 
 .toolCard {
@@ -3859,7 +3868,8 @@
   align-items: center;
   margin-bottom: 8px;
   color: var(--text-primary);
-  font-size: 13.5px;
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
 }
 
 .toolBody h4 .bigRedMsi {
@@ -3869,7 +3879,8 @@
 
 .toolBody p {
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
 }
 
 .toolCard:hover {
@@ -3996,8 +4007,8 @@
 .changedCell {
   gap: 12px;
   align-items: flex-start;
-  font-size: 14.5px;
-  line-height: 1.6;
+  font-size: var(--ds-type-body-14-size);
+  line-height: var(--ds-type-body-14-line);
 }
 
 .changedCell .bigRedMsi {
@@ -4121,8 +4132,8 @@
 .shiftSignal p {
   grid-column: 2;
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
 }
 
 .shiftOutcome {
@@ -4168,8 +4179,8 @@
   max-width: 22rem;
   margin-top: var(--ds-space-sm);
   color: var(--text-secondary);
-  font-size: var(--ds-type-body-14-size);
-  line-height: var(--ds-type-body-14-line);
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
 }
 
 .shiftPulse {
@@ -7479,8 +7490,13 @@
 }
 
 .c4iHtmlPage .c4iSectionHead p {
-  font-size: var(--ds-type-body-large-size);
-  line-height: var(--ds-type-body-large-line);
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+.c4iHtmlPage .c4iIconCard p {
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
 }
 
 .c4iHtmlPage .c4iMergeViz,
