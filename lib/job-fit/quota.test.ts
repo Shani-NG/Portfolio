@@ -38,6 +38,8 @@ test("Central Job-Fit requires an explicit bounded daily quota", () => {
   assert.equal(getJobEvaluatorDailyLimit(), undefined);
   process.env.JOB_EVALUATOR_DAILY_LIMIT = "101";
   assert.equal(getJobEvaluatorDailyLimit(), undefined);
+  process.env.JOB_EVALUATOR_DAILY_LIMIT = "4";
+  assert.equal(getJobEvaluatorDailyLimit(), undefined);
   process.env.JOB_EVALUATOR_DAILY_LIMIT = "5";
   assert.equal(getJobEvaluatorDailyLimit(), 5);
 });

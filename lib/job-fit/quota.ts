@@ -13,7 +13,7 @@ function getConfig() {
 
 export function getJobEvaluatorDailyLimit() {
   const raw = Number(process.env.JOB_EVALUATOR_DAILY_LIMIT);
-  return Number.isInteger(raw) && raw > 0 && raw <= 100 ? raw : undefined;
+  return raw === 5 ? raw : undefined;
 }
 
 async function callJobEvaluatorRpc(functionName: string, body: Record<string, unknown>) {
