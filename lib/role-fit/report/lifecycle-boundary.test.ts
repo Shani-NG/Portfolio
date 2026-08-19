@@ -32,6 +32,20 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(page, /The report is available to review, but its persistence is unavailable/);
   });
 
+  test("keeps the two-report public lifecycle independent from internal Job Automation quota", async () => {
+    const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
+    const policy = await readFile(join(projectRoot, "lib", "role-fit", "runtime", "policy.ts"), "utf8");
+    const eligibility = await readFile(join(projectRoot, "lib", "role-fit", "server", "eligibility.ts"), "utf8");
+
+    assert.match(route, /getRoleFitPolicy\(\)/);
+    assert.match(route, /getCompletedReportCount\(sessionId\)/);
+    assert.match(route, /completedReportCount >= policy\.maxReportsPerSession/);
+    assert.match(route, /persistCompletedReport\(/);
+    assert.doesNotMatch(route, /job-fit\/quota|JOB_EVALUATOR_DAILY_LIMIT|reserveJobEvaluatorSlot/);
+    assert.match(policy, /readNumber\("ROLE_FIT_MAX_REPORTS_PER_SESSION", 2\)/);
+    assert.match(eligibility, /completedReportCount >= 2/);
+  });
+
   test("treats no-report as a non-error lifecycle result without a completed-report increment", async () => {
     const page = await readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8");
 
