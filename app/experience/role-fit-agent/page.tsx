@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ContextFab } from "@/components/site/context-fab";
+import { RoleFitArchitectureConnectors } from "@/components/experience/role-fit-architecture-connectors";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import styles from "./page.module.css";
 
@@ -409,91 +410,16 @@ export default function RoleFitAgentCaseStudyPage() {
           System Services
         </span>
 
-        <svg
+        <RoleFitArchitectureConnectors
           className={styles.connectors}
-          viewBox="0 0 1160 1089.28"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-<path
-  className={styles.agentConnector}
-  d="M580 199.8 L580 226.44"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M395 303.4 L468 303.4"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M690 303.4 L812 303.4"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M580 380.36 L580 429.2 L255 429.2 L255 463.24"
-/>
-
-<path
-  className={styles.evidenceConnector}
-  d="M580 380.36 L580 429.2 L464 429.2 L464 463.24"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M580 380.36 L580 429.2 L742 429.2 L742 463.24"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M860 540.2 L874 540.2"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M255 617.16 L255 695.6 L505 695.6 L505 740"
-/>
-
-<path
-  className={styles.evidenceConnector}
-  d="M464 617.16 L464 695.6 L540 695.6 L540 740"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M742 617.16 L742 695.6 L655 695.6 L655 740"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M992 617.16 L992 695.6 L690 695.6 L690 740"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M505 932.4 L505 956.08 L255 956.08 L255 966.44"
-/>
-
-<path
-  className={styles.evidenceConnector}
-  d="M540 932.4 L540 956.08 L464 956.08 L464 966.44"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M620 932.4 L620 956.08 L742 956.08 L742 966.44"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M655 932.4 L655 956.08 L992 956.08 L992 966.44"
-/>
-
-        </svg>
+          agentClassName={styles.agentConnector}
+          evidenceClassName={styles.evidenceConnector}
+          appClassName={styles.appConnector}
+        />
 
         <article
   className={`${styles.diagramNode} ${styles.visitorNode} ${styles.pinkNode}`}
+  data-architecture-node="visitor"
   data-tooltip="External Actor — Explore · Submit role · Review · Follow up"
   tabIndex={0}
 >
@@ -502,6 +428,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
        <article
   className={`${styles.diagramNode} ${styles.uiNode} ${styles.neutralNode}`}
+  data-architecture-node="ui"
   data-tooltip="Frontend — Chat · Report · Evidence links · Contact CTA"
   tabIndex={0}
 >
@@ -510,6 +437,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
         <article
   className={`${styles.diagramNode} ${styles.agentNode} ${styles.pinkNode}`}
+  data-architecture-node="agent"
   data-tooltip="Conversation Router — Intent routing · Active context · Continuity"
   tabIndex={0}
 >
@@ -518,6 +446,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
        <article
   className={`${styles.diagramNode} ${styles.sessionNode} ${styles.neutralNode}`}
+  data-architecture-node="session"
   data-tooltip="Application State — Report count · Retries · Confirmation · Timeout"
   tabIndex={0}
 >
@@ -525,6 +454,7 @@ export default function RoleFitAgentCaseStudyPage() {
 </article>
 <article
   className={`${styles.diagramNode} ${styles.roleNode} ${styles.pinkNode}`}
+  data-architecture-node="role"
   data-tooltip="Task Mode 01 — Validate · Extract · Structure"
   tabIndex={0}
 >
@@ -533,6 +463,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
    <article
   className={`${styles.diagramNode} ${styles.fitNode} ${styles.greenNode}`}
+  data-architecture-node="fit"
   data-tooltip="Task Mode 02 — Retrieve · Match · Classify"
   tabIndex={0}
 >
@@ -541,6 +472,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.followNode} ${styles.pinkNode}`}
+  data-architecture-node="follow"
   data-tooltip="Task Mode 03 — Explain · Clarify · Link evidence"
   tabIndex={0}
 >
@@ -549,13 +481,14 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.reportNode} ${styles.neutralNode}`}
+  data-architecture-node="report"
   data-tooltip="Structured Output — Validated JSON"
   tabIndex={0}
 >
   <h3>Report Composer</h3>
 </article>
 
-<article className={`${styles.diagramNode} ${styles.orchestratorNode}`}>
+<article className={`${styles.diagramNode} ${styles.orchestratorNode}`} data-architecture-node="orchestrator">
   <span>Application Authority</span>
   <h3>Deterministic Orchestration Layer</h3>
 
@@ -571,6 +504,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.knowledgeNode} ${styles.pinkNode}`}
+  data-architecture-node="knowledge"
   data-tooltip="RAG Sources — CV · Profile · Case studies · Evidence index"
   tabIndex={0}
 >
@@ -579,6 +513,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.retrievalNode} ${styles.greenNode}`}
+  data-architecture-node="retrieval"
   data-tooltip="Evidence Service — Semantic match · Source priority"
   tabIndex={0}
 >
@@ -587,6 +522,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.storageNode} ${styles.neutralNode}`}
+  data-architecture-node="storage"
   data-tooltip="Storage — Reports · Leads · Session metadata"
   tabIndex={0}
 >
@@ -595,6 +531,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.loggingNode} ${styles.neutralNode}`}
+  data-architecture-node="logging"
   data-tooltip="Observability — Events · Failures · Human review"
   tabIndex={0}
 >
@@ -664,7 +601,7 @@ export default function RoleFitAgentCaseStudyPage() {
           </p>
 
           <h2 id="mvp-scope-title" className={styles.sectionTitle}>
-            A complete product story—without over-engineering the first
+            A complete product story without over-engineering the first
             implementation.
           </h2>
 

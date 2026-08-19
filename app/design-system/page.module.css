@@ -1,7 +1,7 @@
 .page {
   min-height: 100vh;
-  width: min(100%, var(--ds-layout-content-max));
-  margin-inline: auto;
+  width: 100%;
+  margin: 0;
   background:
     linear-gradient(140deg, rgba(216, 166, 180, 0.18), transparent 36rem),
     linear-gradient(320deg, rgba(184, 203, 196, 0.2), transparent 34rem),
@@ -9,14 +9,14 @@
   color: var(--ds-color-text-primary);
   font-family: var(--ds-font-family-primary);
   overflow-x: clip;
-  padding: clamp(1.25rem, 4vw, 4rem) var(--ds-grid-gutter);
+  padding: clamp(1.25rem, 4vw, 4rem) 0;
   isolation: isolate;
 }
 
 .hero,
 .section,
 .darkPreview {
-  width: min(100%, 72rem);
+  width: min(calc(100% - (var(--ds-grid-gutter) * 2)), 72rem);
   margin: 0 auto;
 }
 
@@ -568,21 +568,20 @@
 
 .iconGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(4rem, 1fr));
   gap: var(--ds-space-sm);
 }
 
 .iconSample {
   display: grid;
-  min-height: 6rem;
+  min-height: 0;
+  aspect-ratio: 1;
   place-items: center;
-  gap: var(--ds-space-xs);
   border: var(--ds-border-width) solid var(--ds-color-border-subtle);
   border-radius: var(--ds-radius-md);
   background: var(--ds-color-surface-raised);
   color: var(--ds-color-text-primary);
   padding: var(--ds-space-sm);
-  text-align: center;
 }
 
 .iconSample :global(.material-symbols-outlined) {
@@ -590,13 +589,6 @@
   font-size: 1.5rem;
 }
 
-.iconSample span {
-  color: var(--ds-color-text-secondary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.6875rem;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
 
 .darkPreview {
   display: grid;

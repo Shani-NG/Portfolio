@@ -395,9 +395,8 @@ export default function DesignSystemPage() {
         </div>
         <div className={styles.iconGrid} aria-label="Material icons used in the portfolio">
           {projectIconNames.map((name) => (
-            <div className={styles.iconSample} key={name}>
+            <div className={styles.iconSample} key={name} aria-label={name}>
               <MaterialIcon name={name} />
-              <span>{name}</span>
             </div>
           ))}
         </div>
