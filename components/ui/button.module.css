@@ -71,18 +71,19 @@
 }
 
 .primary.outlined {
-  border-color: color-mix(in srgb, var(--ds-color-action-primary) 72%, transparent);
+  border-color: color-mix(in srgb, var(--ds-color-pink-100) 72%, transparent);
   background: transparent;
-  color: var(--ds-color-action-primary-hover);
+  color: var(--ds-color-pink-100);
 }
 
 .primary.outlined:hover:not(:disabled) {
-  border-color: var(--ds-color-action-primary-hover);
-  background: color-mix(in srgb, var(--ds-color-action-primary) 14%, transparent);
+  border-color: var(--ds-color-action-secondary);
+  background: color-mix(in srgb, var(--ds-color-action-secondary) 14%, transparent);
+  color: var(--ds-color-action-secondary-hover);
 }
 
 :global([data-ds-theme="dark"]) .primary.outlined:hover:not(:disabled) {
-  color: var(--ds-color-action-primary-hover-text);
+  color: var(--ds-color-action-secondary-hover);
 }
 
 .primary.text {

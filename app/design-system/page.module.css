@@ -1,7 +1,7 @@
 .page {
   min-height: 100vh;
-  width: min(100%, var(--ds-layout-content-max));
-  margin-inline: auto;
+  width: 100%;
+  margin: 0;
   background:
     linear-gradient(140deg, rgba(216, 166, 180, 0.18), transparent 36rem),
     linear-gradient(320deg, rgba(184, 203, 196, 0.2), transparent 34rem),
@@ -9,13 +9,14 @@
   color: var(--ds-color-text-primary);
   font-family: var(--ds-font-family-primary);
   overflow-x: clip;
-  padding: clamp(1.25rem, 4vw, 4rem) var(--ds-grid-gutter);
+  padding: clamp(1.25rem, 4vw, 4rem) 0;
+  isolation: isolate;
 }
 
 .hero,
 .section,
 .darkPreview {
-  width: min(100%, 72rem);
+  width: min(calc(100% - (var(--ds-grid-gutter) * 2)), 72rem);
   margin: 0 auto;
 }
 
@@ -25,9 +26,33 @@
 }
 
 .hero {
+  position: relative;
   display: grid;
+  isolation: isolate;
   gap: var(--ds-space-md);
-  padding: clamp(3rem, 9vw, 6rem) 0 var(--ds-space-3xl);
+  overflow: hidden;
+  border: var(--ds-border-width) solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-radius-lg);
+  padding: clamp(3rem, 9vw, 6rem) clamp(1.5rem, 5vw, 4rem);
+}
+
+.hero::before {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background: center / cover no-repeat url("/assets/project-design-system.png");
+  content: "";
+  opacity: 0.34;
+}
+
+.hero::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--ds-color-canvas) 94%, transparent), color-mix(in srgb, var(--ds-color-canvas) 66%, transparent)),
+    linear-gradient(180deg, color-mix(in srgb, var(--ds-color-canvas) 18%, transparent), var(--ds-color-canvas));
+  content: "";
 }
 
 .hero h1 {
@@ -335,7 +360,17 @@
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
-  gap: var(--ds-space-sm);
+  gap: var(--ds-space-lg);
+}
+
+.buttonPanel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  align-items: start;
+}
+
+.buttonPanel .componentExample {
+  min-height: 4.5rem;
 }
 
 .componentExample {
@@ -363,6 +398,7 @@
   border-radius: var(--ds-radius-lg);
   background: var(--ds-color-surface);
   box-shadow: var(--ds-shadow-soft);
+  row-gap: var(--ds-space-2xl);
 }
 
 .chipGroup {
@@ -383,8 +419,8 @@
 }
 
 .eyebrowPanel {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr;
   align-content: flex-start;
   gap: var(--ds-space-lg);
   border: var(--ds-border-width) solid var(--ds-color-border-subtle);
@@ -530,6 +566,30 @@
   to { opacity: 1; }
 }
 
+.iconGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4rem, 1fr));
+  gap: var(--ds-space-sm);
+}
+
+.iconSample {
+  display: grid;
+  min-height: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  border: var(--ds-border-width) solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-color-surface-raised);
+  color: var(--ds-color-text-primary);
+  padding: var(--ds-space-sm);
+}
+
+.iconSample :global(.material-symbols-outlined) {
+  color: var(--ds-color-action-primary-hover);
+  font-size: 1.5rem;
+}
+
+
 .darkPreview {
   display: grid;
   grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
@@ -563,6 +623,7 @@
   .shadowGrid,
   .motionGrid,
   .scrollDemoGrid {
+
     grid-template-columns: 1fr;
   }
 

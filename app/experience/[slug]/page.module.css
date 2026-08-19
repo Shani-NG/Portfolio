@@ -22,8 +22,8 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--surface-dark-band) 82%, transparent), color-mix(in srgb, var(--surface-dark-band) 32%, transparent) 58%, color-mix(in srgb, var(--surface-dark-band) 62%, transparent)),
-    linear-gradient(0deg, var(--surface-dark-band), transparent 58%);
+    linear-gradient(90deg, color-mix(in srgb, var(--surface-dark-band) 70%, transparent), color-mix(in srgb, var(--surface-dark-band) 18%, transparent) 58%, color-mix(in srgb, var(--surface-dark-band) 46%, transparent)),
+    linear-gradient(0deg, color-mix(in srgb, var(--surface-dark-band) 88%, transparent), transparent 58%);
   content: "";
 }
 
@@ -37,7 +37,7 @@
 .c4iHeroVisual .c4iMediaFrame img {
   object-fit: cover;
   object-position: center;
-  filter: saturate(1.1) contrast(1.08) brightness(0.84);
+  filter: saturate(1.1) contrast(1.08) brightness(0.96);
 }
 
 .c4iHtmlHero .c4iHtmlWrap {
@@ -234,13 +234,13 @@
 
 .c4iProofRows {
   display: grid;
-  gap: clamp(4rem, 9vw, 8rem);
+  gap: clamp(5rem, 11vw, 9rem);
 }
 
 .c4iProofRow {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-  gap: clamp(2rem, 7vw, 6rem);
+  gap: clamp(2.5rem, 8vw, 6.5rem);
   align-items: center;
 }
 
@@ -1404,6 +1404,17 @@
   color: var(--ds-color-action-secondary-hover);
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .c4iIconCard > span {
+    animation: c4i-icon-breathe 3.6s var(--ds-ease-standard) infinite alternate;
+  }
+}
+
+@keyframes c4i-icon-breathe {
+  from { box-shadow: 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
+  to { box-shadow: 0 0 1.1rem color-mix(in srgb, currentColor 32%, transparent); }
+}
+
 .c4iAlignCard h3,
 .c4iIconCard h3,
 .c4iLineCard h3,
@@ -1843,22 +1854,39 @@
 }
 
 .c4iFlowStep span {
-  width: 0.85rem;
+  width: 1.0625rem;
   aspect-ratio: 1;
   border-radius: 999px;
   background: #e0675a;
+  box-shadow: 0 0 0 0.4rem color-mix(in srgb, currentColor 0%, transparent);
+  animation: c4i-flow-pulse 2.8s var(--ds-ease-standard) infinite;
+}
+
+.c4iFlowStep:nth-child(1) span {
+  --flow-color: #e0675a;
 }
 
 .c4iFlowStep:nth-child(2) span {
+  --flow-color: #d9a64e;
   background: #d9a64e;
+  animation-delay: 0.35s;
 }
 
 .c4iFlowStep:nth-child(3) span {
+  --flow-color: #6d94f2;
   background: #6d94f2;
+  animation-delay: 0.7s;
 }
 
 .c4iFlowStep:nth-child(4) span {
+  --flow-color: var(--green-500);
   background: var(--green-500);
+  animation-delay: 1.05s;
+}
+
+@keyframes c4i-flow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0.4rem color-mix(in srgb, var(--flow-color) 0%, transparent); }
+  50% { box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--flow-color) 26%, transparent), 0 0 1.25rem color-mix(in srgb, var(--flow-color) 38%, transparent); }
 }
 
 .c4iCommandPanel {
@@ -2300,9 +2328,9 @@
   position: relative;
   display: grid;
   min-height: calc(86svh - var(--site-header-height));
-  align-content: center;
+  align-content: start;
   justify-items: center;
-  gap: clamp(2.5rem, 5vw, 4rem);
+  gap: clamp(3.25rem, 6vw, 5rem);
   overflow: hidden;
   isolation: isolate;
   background: var(--kms-dark);
@@ -2334,7 +2362,7 @@
 }
 
 .kmsEyebrow {
-  margin: 0 0 var(--ds-space-sm);
+  margin: 0 0 var(--ds-space-lg);
   color: var(--kms-muted);
   font-size: var(--ds-type-label-13-size);
   font-weight: var(--ds-type-weight-semibold);
@@ -2353,9 +2381,9 @@
   background: linear-gradient(90deg, var(--kms-accent), #8b8cf7);
   background-clip: text;
   color: transparent;
-  font-size: var(--ds-type-display-64-size);
+  font-size: var(--ds-type-display-48-size);
   font-weight: var(--ds-type-weight-semibold);
-  line-height: var(--ds-type-display-line);
+  line-height: var(--ds-type-display-48-line);
   letter-spacing: 0;
 }
 
@@ -2448,6 +2476,20 @@
   box-shadow: 0 0.75rem 1.5rem rgba(15, 23, 42, 0.035);
   padding: clamp(1rem, 2vw, 1.4rem);
   text-align: left;
+  transition: border-color var(--ds-duration-fast) var(--ds-ease-standard), box-shadow var(--ds-duration-fast) var(--ds-ease-standard), transform var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kmsSnapshotGrid > div:hover {
+    border-color: color-mix(in srgb, var(--kms-accent) 56%, var(--kms-border));
+    box-shadow: 0 1.1rem 2rem color-mix(in srgb, var(--kms-accent) 15%, transparent);
+    transform: translateY(-0.16rem);
+  }
+
+  .kmsSnapshotGrid > div:nth-child(2):hover {
+    border-color: color-mix(in srgb, var(--kms-blue) 62%, var(--kms-border));
+    box-shadow: 0 1.1rem 2rem color-mix(in srgb, var(--kms-blue) 17%, transparent);
+  }
 }
 
 .kmsSnapshotIcon {
@@ -2510,6 +2552,7 @@
 
 .kmsSectionCopy h2 {
   max-width: 18ch;
+  text-wrap: balance;
 }
 
 .kmsBody {
@@ -2611,7 +2654,9 @@
 .kmsPhoneVisual {
   width: min(100%, 32rem);
   justify-self: start;
+  border: 0;
   background: transparent;
+  box-shadow: none;
 }
 
 .kmsSoftCallout {
@@ -2663,16 +2708,27 @@
 
 .kmsProcessNotes {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ds-space-lg);
-  margin-top: var(--ds-space-lg);
+  gap: var(--ds-space-md);
+  margin: var(--ds-space-lg) 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.kmsProcessNotes p {
+.kmsProcessNotes li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--ds-space-sm);
+  align-items: start;
   margin: 0;
   color: var(--kms-muted);
   font-size: var(--ds-type-body-14-size);
   line-height: 1.6;
+}
+
+.kmsProcessNotes :global(.material-symbols-outlined) {
+  margin-top: 0.1em;
+  color: var(--kms-accent);
+  font-size: 1.125rem;
 }
 
 .kmsProcessVisual {
@@ -2957,15 +3013,15 @@
 .bigRedHtmlHero h1 {
   margin-bottom: 16px;
   font-size: var(--ds-type-display-64-size);
-  line-height: var(--ds-type-display-64-line);
+  line-height: var(--ds-type-page-title-line);
 }
 
 .bigRedHtmlHero p {
-  max-width: 520px;
+  max-width: 44rem;
   margin: 0 auto clamp(2.5rem, 5vw, 4rem);
   color: var(--ds-color-text-on-dark-body);
-  font-size: var(--ds-type-heading-18-size);
-  line-height: var(--ds-type-heading-18-line);
+  font-size: var(--ds-type-body-large-size);
+  line-height: 1.38;
 }
 
 .bigRedHeroVisual {
@@ -3054,8 +3110,8 @@
 
 .snapshotParagraph {
   color: var(--text-secondary);
-  font-size: 15px;
-  line-height: 1.8;
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
 }
 
 .snapshotParagraph + .snapshotParagraph {
@@ -3275,8 +3331,8 @@
 
 .compareCard p {
   color: var(--ds-color-text-primary);
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .compareCard h4 {
@@ -3301,8 +3357,8 @@
 
 .compareCard p {
   color: var(--ds-color-text-primary);
-  font-size: var(--ds-type-body-16-size);
-  line-height: var(--ds-type-body-16-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .shutdownCard,
@@ -3494,12 +3550,15 @@
   position: relative;
   z-index: 1;
   margin-bottom: 10px;
-  font-size: 16.5px;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 .objectiveCard p {
   position: relative;
   z-index: 1;
+  font-size: var(--ds-type-body-14-size);
+  line-height: var(--ds-type-body-14-line);
 }
 
 .objectiveCard:hover {
@@ -3615,8 +3674,8 @@
 
 .controlToggleText p {
   color: var(--text-secondary);
-  font-size: var(--ds-type-heading-18-size);
-  line-height: var(--ds-type-heading-18-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .solutionRow.reverse .solutionVisual {
@@ -3638,7 +3697,7 @@
 }
 
 .solutionDesc {
-  margin-bottom: clamp(2.75rem, 5vw, 4rem);
+  margin-bottom: var(--ds-space-3xl);
   color: var(--text-secondary);
   font-size: var(--ds-type-heading-18-size);
   line-height: var(--ds-type-heading-18-line);
@@ -3773,7 +3832,13 @@
 
 .recoveryItem h4 {
   margin-bottom: 4px;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.recoveryItem p {
+  font-size: var(--ds-type-body-14-size);
+  line-height: var(--ds-type-body-14-line);
 }
 
 .toolCard {
@@ -3814,7 +3879,8 @@
   align-items: center;
   margin-bottom: 8px;
   color: var(--text-primary);
-  font-size: 13.5px;
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
 }
 
 .toolBody h4 .bigRedMsi {
@@ -3824,7 +3890,8 @@
 
 .toolBody p {
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .toolCard:hover {
@@ -3951,8 +4018,8 @@
 .changedCell {
   gap: 12px;
   align-items: flex-start;
-  font-size: 14.5px;
-  line-height: 1.6;
+  font-size: var(--ds-type-body-14-size);
+  line-height: var(--ds-type-body-14-line);
 }
 
 .changedCell .bigRedMsi {
@@ -3998,7 +4065,7 @@
   position: relative;
   display: grid;
   place-items: center;
-  margin-top: 64px;
+  margin-top: clamp(5rem, 9vw, 8rem);
 }
 
 .shiftReflection::before {
@@ -4076,7 +4143,7 @@
 .shiftSignal p {
   grid-column: 2;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.6;
 }
 
@@ -4123,8 +4190,8 @@
   max-width: 22rem;
   margin-top: var(--ds-space-sm);
   color: var(--text-secondary);
-  font-size: var(--ds-type-body-14-size);
-  line-height: var(--ds-type-body-14-line);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .shiftPulse {
@@ -5140,7 +5207,7 @@
 .monitoringHeroBg {
   position: absolute;
   inset: 0;
-  opacity: 0.44;
+  opacity: 0.62;
 }
 
 .monitoringHeroBg :global(img) {
@@ -5244,7 +5311,7 @@
   position: relative;
   min-height: calc(100svh - var(--site-header-height));
   overflow: hidden;
-  padding-block: var(--ds-case-section-padding);
+  padding-block: clamp(4rem, 8vw, 6rem);
   scroll-margin-top: calc(var(--site-header-height) + 1rem);
 }
 
@@ -5286,11 +5353,12 @@
 
 .monitoringSectionHead {
   display: grid;
+  gap: var(--ds-space-sm);
   max-width: 46rem;
 }
 
 .monitoringSectionHead h2 {
-  margin: 0 0 var(--ds-space-type-heading-to-subheading);
+  margin: 0;
   color: var(--ds-color-text-primary);
   font-size: var(--ds-case-section-title-size);
   font-weight: var(--ds-type-weight-semibold);
@@ -5410,10 +5478,15 @@
   width: 2.8rem;
   height: 2.8rem;
   place-items: center;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ds-color-action-primary) 12%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ds-color-action-primary) 14%, transparent);
   color: var(--ds-color-action-primary-hover);
   margin-bottom: var(--ds-space-lg);
+}
+
+.monitoringInfoCard:nth-child(even) .monitoringCardIcon {
+  background: color-mix(in srgb, var(--ds-color-action-secondary) 16%, transparent);
+  color: var(--ds-color-action-secondary-hover);
 }
 
 .monitoringInfoCard h3,
@@ -5667,7 +5740,7 @@
   align-self: end;
   justify-self: center;
   max-width: 42rem;
-  padding-bottom: clamp(4rem, 10vw, 7rem);
+  padding-bottom: clamp(3rem, 8vw, 5.5rem);
   text-align: center;
 }
 
@@ -5812,19 +5885,18 @@
 }
 
 .epdSnapshotCard > span {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.125rem;
-  min-height: 1.625rem;
-  border-radius: 999px;
+  display: inline-grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-rose) 66%, white);
+  color: var(--ds-color-action-primary-hover);
+}
+
+.epdSnapshotCard:nth-child(even) > span {
   background: color-mix(in srgb, var(--surface-green) 72%, white);
   color: var(--ds-color-action-secondary-hover);
-  font-size: 0.6875rem;
-  font-weight: var(--ds-type-weight-semibold);
-  letter-spacing: 0.08em;
-  padding: 0.1rem 0.55rem;
 }
 
 .epdSnapshot dt,
@@ -6051,12 +6123,14 @@
 }
 
 .epdPrinciple {
-  align-items: start;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  gap: clamp(3.5rem, 8vw, 7rem);
+  align-items: center;
 }
 
 .epdTimeline {
   display: grid;
-  margin-top: var(--ds-case-header-to-content);
+  margin-top: clamp(3rem, 6vw, 5rem);
 }
 
 .epdTimeline article {
@@ -6871,7 +6945,7 @@
 
 .kmsHero {
   min-height: calc(100svh - var(--site-header-height));
-  align-content: end;
+  align-content: start;
   padding-bottom: clamp(3rem, 8vw, 5rem);
 }
 
@@ -7408,4 +7482,182 @@
   .c4iHtmlPage .c4iFlowStep span {
     animation: none;
   }
+}
+
+/* C4I: final visual requirements, intentionally last to win the case-study cascade. */
+.c4iHtmlPage .c4iHeroVisual::after {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--surface-dark-band) 66%, transparent), color-mix(in srgb, var(--surface-dark-band) 14%, transparent) 58%, color-mix(in srgb, var(--surface-dark-band) 38%, transparent)),
+    linear-gradient(0deg, color-mix(in srgb, var(--surface-dark-band) 82%, transparent), transparent 58%);
+}
+
+.c4iHtmlPage .c4iHeroVisual .c4iMediaFrame img {
+  filter: saturate(1.1) contrast(1.08) brightness(1.02);
+}
+
+.c4iHtmlPage .c4iSectionHead h2 {
+  font-size: var(--ds-case-section-title-size);
+  line-height: var(--ds-case-section-title-line);
+}
+
+.c4iHtmlPage .c4iSectionHead p {
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+.c4iHtmlPage .c4iIconCard p {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.c4iHtmlPage .c4iProofCopy p {
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+.c4iHtmlPage .c4iMergeViz,
+.c4iHtmlPage .c4iMergeFrame {
+  background: var(--surface-dark-band);
+}
+
+.c4iHtmlPage .c4iIconCard > span {
+  box-shadow: 0 0 1.1rem color-mix(in srgb, currentColor 28%, transparent);
+}
+
+.c4iHtmlPage .c4iFlowStep span {
+  width: 1.0625rem;
+  box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--flow-color) 26%, transparent), 0 0 1.25rem color-mix(in srgb, var(--flow-color) 38%, transparent);
+}
+
+.c4iHtmlPage .c4iProofRows {
+  gap: clamp(5rem, 10vw, 9rem);
+}
+
+.c4iHtmlPage .c4iProofRow {
+  gap: clamp(3rem, 8vw, 7rem);
+}
+
+/* UI closure: C4I interaction and rhythm refinements, deliberately scoped. */
+@media (min-width: 48.01rem) {
+  .c4iHtmlPage .c4iFusionCard {
+    align-items: center;
+  }
+
+  .c4iHtmlPage .c4iMergeViz {
+    width: min(100%, 24rem);
+    min-height: 0;
+    aspect-ratio: 1;
+    justify-self: end;
+  }
+
+  .c4iHtmlPage .c4iMergeFrame {
+    min-height: 0;
+    height: 100%;
+    aspect-ratio: 1;
+  }
+}
+
+.c4iHtmlPage .c4iIconCard {
+  position: relative;
+  isolation: isolate;
+}
+
+.c4iHtmlPage .c4iIconCard > span {
+  box-shadow: none;
+  transition: transform var(--ds-duration-fast) var(--ds-ease-standard), box-shadow var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .c4iHtmlPage .c4iIconCard:hover {
+    border-color: var(--ds-color-border-strong);
+    box-shadow: var(--ds-shadow-raised);
+    transform: translateY(-0.2rem);
+  }
+
+  .c4iHtmlPage .c4iIconCard:hover > span {
+    animation: c4i-card-icon-pulse 900ms var(--ds-ease-enter) both;
+    box-shadow: 0 0 1.1rem color-mix(in srgb, currentColor 34%, transparent);
+  }
+}
+
+@keyframes c4i-card-icon-pulse {
+  0% { transform: scale(1); }
+  42% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.c4iHtmlPage .c4iFlowStep span {
+  position: relative;
+  z-index: 0;
+  box-shadow: none;
+}
+
+.c4iHtmlPage .c4iFlowStep span::after {
+  position: absolute;
+  z-index: -1;
+  inset: -0.55rem;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--flow-color) 34%, transparent);
+  content: "";
+  opacity: 0;
+  animation: c4i-step-halo 6s var(--ds-ease-enter) infinite;
+}
+
+.c4iHtmlPage .c4iFlowStep:nth-child(2) span::after { animation-delay: 1.5s; }
+.c4iHtmlPage .c4iFlowStep:nth-child(3) span::after { animation-delay: 3s; }
+.c4iHtmlPage .c4iFlowStep:nth-child(4) span::after { animation-delay: 4.5s; }
+
+@keyframes c4i-step-halo {
+  0%, 24%, 100% {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+
+  10% {
+    opacity: 0.68;
+    transform: scale(1.45);
+  }
+}
+
+.c4iHtmlPage .c4iProofRows {
+  gap: 0;
+}
+
+.c4iHtmlPage .c4iProofRow:not(:last-child) {
+  margin-bottom: clamp(5rem, 10vw, 9rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .c4iHtmlPage .c4iIconCard:hover > span,
+  .c4iHtmlPage .c4iFlowStep span::after {
+    animation: none;
+  }
+}
+
+/* UI closure: apply Monitoring rhythm only to the six requested EPD sections. */
+.epdMonitoringRhythm {
+  max-width: 46rem;
+  gap: var(--ds-space-sm);
+}
+
+.epdMonitoringRhythm > p {
+  margin: 0;
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+.epdOverview .epdOverviewBody {
+  gap: var(--ds-space-sm);
+}
+
+.epdOverview .epdOverviewBody p {
+  margin: 0;
+  font-size: var(--ds-type-heading-18-size);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+.epdTimelineCopy > p {
+  margin-left: calc(2.625rem + var(--ds-space-md));
+  font-size: 16px;
+  line-height: 1.55;
 }

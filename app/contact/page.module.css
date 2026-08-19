@@ -176,6 +176,12 @@
   font-size: 1.125rem;
 }
 
+.submitLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .statusMessage {
   margin-top: var(--ds-space-md);
   font-size: var(--ds-type-body-14-size);

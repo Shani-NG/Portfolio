@@ -522,7 +522,7 @@ function BigRedHtmlCaseStudy({ showReportReturnFab = false }: { showReportReturn
       <section className={styles.bigRedHtmlHero} data-ds-theme="dark" id={bigRedButtonCaseStudy.heroAnchor}>
         <div className={styles.bigRedHtmlWrap}>
           <Eyebrow as="div" className={styles.bigRedHtmlEyebrow}>Monitor Module</Eyebrow>
-          <h1>The Big RED BUTTON</h1>
+          <h1>The Big Red Button</h1>
           <p>Reducing critical downtime through targeted recovery.</p>
         </div>
         <div className={styles.bigRedHeroVisual}>
@@ -1164,11 +1164,14 @@ function KmsSectionView({ section, index }: { section: KmsSection; index: number
             <h2>{section.title}</h2>
             <p className={styles.kmsBody}>{section.body}</p>
             {"points" in section ? (
-              <div className={styles.kmsProcessNotes}>
+              <ul className={styles.kmsProcessNotes}>
                 {section.points.map((point) => (
-                  <p key={typeof point === "string" ? point : point[0]}>{typeof point === "string" ? point : point[0]}</p>
+                  <li key={typeof point === "string" ? point : point[0]}>
+                    <MaterialIcon name="check_circle" />
+                    <span>{typeof point === "string" ? point : point[0]}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : null}
           </div>
           <KmsProcessGallery items={[
@@ -1259,17 +1262,19 @@ function EpdSectionHeader({
   title,
   body,
   highlightPhrases = [],
+  className,
 }: {
   icon: string;
   label: string;
   title: string;
   body?: string | readonly string[];
   highlightPhrases?: readonly string[];
+  className?: string;
 }) {
   const bodyItems = Array.isArray(body) ? body : body ? [body] : [];
 
   return (
-    <div className={styles.epdSectionHeader}>
+    <div className={[styles.epdSectionHeader, className].filter(Boolean).join(" ")}>
       <Eyebrow as="div" className={styles.epdEyebrow} icon={<EpdIcon name={icon} />}>{label}</Eyebrow>
       <h2>{title}</h2>
       {bodyItems.map((paragraph) => (
@@ -1376,6 +1381,8 @@ function EpdTimelineVisual({ index }: { index: number }) {
   );
 }
 
+const epdSnapshotIcons = ["strategy", "monitor_heart", "groups", "tune", "rocket_launch"] as const;
+
 type EpdSection = (typeof epdCaseStudy.sections)[number];
 
 function EpdSectionView({ section, index }: { section: EpdSection; index: number }) {
@@ -1384,7 +1391,7 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
       <ScrollReveal mode="creative">
         <section className={[styles.epdSection, styles.epdWashGreen].join(" ")} id={section.id}>
           <div className={[styles.epdWrap, styles.epdSplit].join(" ")}>
-            <EpdSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+            <EpdSectionHeader className={styles.epdMonitoringRhythm} icon={section.icon} label={section.label} title={section.title} body={section.body} />
             <div className={styles.epdRoleList}>
               {section.roles.map(([, title, body], roleIndex) => (
                 <article key={title}>
@@ -1421,7 +1428,7 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
               sizes="(max-width: 48rem) 100vw, 42vw"
             />
             <div>
-              <EpdSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+              <EpdSectionHeader className={styles.epdMonitoringRhythm} icon={section.icon} label={section.label} title={section.title} body={section.body} />
               <ul className={styles.epdCheckList}>
                 {section.points.map((point) => <li key={point}><EpdIcon name="check_circle" />{point}</li>)}
               </ul>
@@ -1458,6 +1465,7 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
         <section className={[styles.epdSection, styles.epdWashGreen].join(" ")} id={section.id}>
           <div className={styles.epdWrap}>
             <EpdSectionHeader
+              className={styles.epdMonitoringRhythm}
               icon={section.icon}
               label={section.label}
               title={section.title}
@@ -1486,7 +1494,7 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
       <ScrollReveal mode="overlap">
         <section className={styles.epdSection} id={section.id}>
           <div className={[styles.epdWrap, styles.epdPrinciple].join(" ")}>
-            <EpdSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+            <EpdSectionHeader className={styles.epdMonitoringRhythm} icon={section.icon} label={section.label} title={section.title} body={section.body} />
             <EpdHeartVisual />
           </div>
         </section>
@@ -1498,7 +1506,7 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
     <ScrollReveal mode={index % 2 === 0 ? "creative" : "overlap"}>
       <section className={[styles.epdSection, styles.epdWashGreen].join(" ")} id={section.id}>
         <div className={styles.epdWrap}>
-          <EpdSectionHeader icon={section.icon} label={section.label} title={section.title} body={section.body} />
+          <EpdSectionHeader className={styles.epdMonitoringRhythm} icon={section.icon} label={section.label} title={section.title} body={section.body} />
           <div className={styles.epdTimeline}>
             {section.timeline.map(([icon, title, body], timelineIndex) => (
               <article key={title}>
@@ -1548,6 +1556,7 @@ function EpdCaseStudy({ showReportReturnFab = false }: { showReportReturnFab?: b
           <div className={styles.epdWrap}>
             <div className={styles.epdOverview}>
               <EpdSectionHeader
+                className={styles.epdMonitoringRhythm}
                 icon={epdCaseStudy.overview.icon}
                 label={epdCaseStudy.overview.label}
                 title={epdCaseStudy.overview.title}
@@ -1566,7 +1575,7 @@ function EpdCaseStudy({ showReportReturnFab = false }: { showReportReturnFab?: b
             <dl className={styles.epdSnapshot}>
               {epdCaseStudy.snapshot.map(([term, value], snapshotIndex) => (
                 <div className={styles.epdSnapshotCard} key={term}>
-                  <span>{String(snapshotIndex + 1).padStart(2, "0")}</span>
+                  <span><EpdIcon name={epdSnapshotIcons[snapshotIndex]} /></span>
                   <dt>{term}</dt>
                   <dd>{value}</dd>
                 </div>

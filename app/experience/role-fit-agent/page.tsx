@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ContextFab } from "@/components/site/context-fab";
+import { RoleFitArchitectureConnectors } from "@/components/experience/role-fit-architecture-connectors";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import styles from "./page.module.css";
 
@@ -409,91 +410,16 @@ export default function RoleFitAgentCaseStudyPage() {
           System Services
         </span>
 
-        <svg
+        <RoleFitArchitectureConnectors
           className={styles.connectors}
-          viewBox="0 0 1160 736"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-<path
-  className={styles.agentConnector}
-  d="M580 135 L580 153"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M395 205 L468 205"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M690 205 L812 205"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M580 257 L580 290 L255 290 L255 313"
-/>
-
-<path
-  className={styles.evidenceConnector}
-  d="M580 257 L580 290 L464 290 L464 313"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M580 257 L580 290 L742 290 L742 313"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M860 365 L874 365"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M255 417 L255 470 L505 470 L505 500"
-/>
-
-<path
-  className={styles.evidenceConnector}
-  d="M464 417 L464 470 L540 470 L540 500"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M742 417 L742 470 L655 470 L655 500"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M992 417 L992 470 L690 470 L690 500"
-/>
-
-<path
-  className={styles.agentConnector}
-  d="M505 630 L505 646 L255 646 L255 653"
-/>
-
-<path
-  className={styles.evidenceConnector}
-  d="M540 630 L540 646 L464 646 L464 653"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M620 630 L620 646 L742 646 L742 653"
-/>
-
-<path
-  className={styles.appConnector}
-  d="M655 630 L655 646 L992 646 L992 653"
-/>
-
-        </svg>
+          agentClassName={styles.agentConnector}
+          evidenceClassName={styles.evidenceConnector}
+          appClassName={styles.appConnector}
+        />
 
         <article
   className={`${styles.diagramNode} ${styles.visitorNode} ${styles.pinkNode}`}
+  data-architecture-node="visitor"
   data-tooltip="External Actor — Explore · Submit role · Review · Follow up"
   tabIndex={0}
 >
@@ -502,6 +428,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
        <article
   className={`${styles.diagramNode} ${styles.uiNode} ${styles.neutralNode}`}
+  data-architecture-node="ui"
   data-tooltip="Frontend — Chat · Report · Evidence links · Contact CTA"
   tabIndex={0}
 >
@@ -510,6 +437,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
         <article
   className={`${styles.diagramNode} ${styles.agentNode} ${styles.pinkNode}`}
+  data-architecture-node="agent"
   data-tooltip="Conversation Router — Intent routing · Active context · Continuity"
   tabIndex={0}
 >
@@ -518,6 +446,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
        <article
   className={`${styles.diagramNode} ${styles.sessionNode} ${styles.neutralNode}`}
+  data-architecture-node="session"
   data-tooltip="Application State — Report count · Retries · Confirmation · Timeout"
   tabIndex={0}
 >
@@ -525,6 +454,7 @@ export default function RoleFitAgentCaseStudyPage() {
 </article>
 <article
   className={`${styles.diagramNode} ${styles.roleNode} ${styles.pinkNode}`}
+  data-architecture-node="role"
   data-tooltip="Task Mode 01 — Validate · Extract · Structure"
   tabIndex={0}
 >
@@ -533,6 +463,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
    <article
   className={`${styles.diagramNode} ${styles.fitNode} ${styles.greenNode}`}
+  data-architecture-node="fit"
   data-tooltip="Task Mode 02 — Retrieve · Match · Classify"
   tabIndex={0}
 >
@@ -541,6 +472,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.followNode} ${styles.pinkNode}`}
+  data-architecture-node="follow"
   data-tooltip="Task Mode 03 — Explain · Clarify · Link evidence"
   tabIndex={0}
 >
@@ -549,13 +481,14 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.reportNode} ${styles.neutralNode}`}
+  data-architecture-node="report"
   data-tooltip="Structured Output — Validated JSON"
   tabIndex={0}
 >
   <h3>Report Composer</h3>
 </article>
 
-<article className={`${styles.diagramNode} ${styles.orchestratorNode}`}>
+<article className={`${styles.diagramNode} ${styles.orchestratorNode}`} data-architecture-node="orchestrator">
   <span>Application Authority</span>
   <h3>Deterministic Orchestration Layer</h3>
 
@@ -571,6 +504,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.knowledgeNode} ${styles.pinkNode}`}
+  data-architecture-node="knowledge"
   data-tooltip="RAG Sources — CV · Profile · Case studies · Evidence index"
   tabIndex={0}
 >
@@ -579,6 +513,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.retrievalNode} ${styles.greenNode}`}
+  data-architecture-node="retrieval"
   data-tooltip="Evidence Service — Semantic match · Source priority"
   tabIndex={0}
 >
@@ -587,6 +522,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.storageNode} ${styles.neutralNode}`}
+  data-architecture-node="storage"
   data-tooltip="Storage — Reports · Leads · Session metadata"
   tabIndex={0}
 >
@@ -595,6 +531,7 @@ export default function RoleFitAgentCaseStudyPage() {
 
 <article
   className={`${styles.diagramNode} ${styles.loggingNode} ${styles.neutralNode}`}
+  data-architecture-node="logging"
   data-tooltip="Observability — Events · Failures · Human review"
   tabIndex={0}
 >
@@ -602,20 +539,6 @@ export default function RoleFitAgentCaseStudyPage() {
 </article>      </div>
     </div>
 
-    <div className={styles.diagramLegend} aria-label="Diagram legend">
-      <span>
-        <i className={styles.agentLegend} />
-        Agent flow
-      </span>
-      <span>
-        <i className={styles.evidenceLegend} />
-        Evidence flow
-      </span>
-      <span>
-        <i className={styles.appLegend} />
-        Application flow
-      </span>
-    </div>
 
     <p className={styles.diagramNote}>
       <strong>
@@ -678,7 +601,7 @@ export default function RoleFitAgentCaseStudyPage() {
           </p>
 
           <h2 id="mvp-scope-title" className={styles.sectionTitle}>
-            A complete product story—without over-engineering the first
+            A complete product story without over-engineering the first
             implementation.
           </h2>
 

@@ -11,7 +11,7 @@ export default function ContactPage() {
         </h1>
 
         <p className={styles.copy}>
-          Tell me about your <strong>open role</strong>
+          Let&apos;s see what we can <strong>build together</strong>
         </p>
 
         <Suspense fallback={null}>

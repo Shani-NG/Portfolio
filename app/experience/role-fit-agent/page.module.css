@@ -321,12 +321,13 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--ds-space-sm);
+  padding-left: calc(2.5rem + var(--ds-space-md));
   color: var(--ds-color-text-secondary);
   line-height: 1.6;
 }
 
 .check :global(.material-symbols-rounded) {
-  color: var(--ds-color-success);
+  color: var(--ds-color-action-secondary);
   font-size: 1.2rem;
 }
 
@@ -822,7 +823,7 @@
   position: relative;
   width: 72.5rem;
   min-width: 72.5rem;
-  height: 48.75rem;
+  height: 72.15rem;
   margin-inline: auto;
   border: 1px solid var(--ds-color-border-subtle);
   border-radius: var(--ds-radius-lg);
@@ -852,23 +853,23 @@
 }
 
 .layerExperience {
-  top: 1.2rem;
+  top: 1.78rem;
 }
 
 .layerConversation {
-  top: 8.8rem;
+  top: 13.02rem;
 }
 
 .layerModes {
-  top: 18.8rem;
+  top: 27.82rem;
 }
 
 .layerRuntime {
-  top: 31rem;
+  top: 45.88rem;
 }
 
 .layerServices {
-  top: 41.2rem;
+  top: 60.98rem;
 }
 
 .connectors {
@@ -968,55 +969,55 @@
 }
 
 .visitorNode {
-  top: 3rem;
+  top: 4.44rem;
   left: 28rem;
   width: 16.5rem;
 }
 
 .uiNode {
-  top: 9rem;
+  top: 13.32rem;
   left: 9rem;
   width: 15rem;
 }
 
 .agentNode {
-  top: 9rem;
+  top: 13.32rem;
   left: 29rem;
   width: 15rem;
 }
 
 .sessionNode {
-  top: 9rem;
+  top: 13.32rem;
   left: 50rem;
   width: 15rem;
 }
 
 .roleNode {
-  top: 20rem;
+  top: 29.6rem;
   left: 4rem;
   width: 15rem;
 }
 
 .fitNode {
-  top: 20rem;
+  top: 29.6rem;
   left: 21.5rem;
   width: 15rem;
 }
 
 .followNode {
-  top: 20rem;
+  top: 29.6rem;
   left: 39rem;
   width: 15rem;
 }
 
 .reportNode {
-  top: 20rem;
+  top: 29.6rem;
   left: 56rem;
   width: 12rem;
 }
 
 .orchestratorNode {
-  top: 31.25rem;
+  top: 46.25rem;
   left: 16rem;
   width: 40.5rem;
   padding: 1.2rem 1.4rem;
@@ -1060,25 +1061,25 @@
 }
 
 .knowledgeNode {
-  top: 41.8rem;
+  top: 61.86rem;
   left: 4rem;
   width: 15rem;
 }
 
 .retrievalNode {
-  top: 41.8rem;
+  top: 61.86rem;
   left: 21.5rem;
   width: 15rem;
 }
 
 .storageNode {
-  top: 41.8rem;
+  top: 61.86rem;
   left: 39rem;
   width: 15rem;
 }
 
 .loggingNode {
-  top: 41.8rem;
+  top: 61.86rem;
   left: 56rem;
   width: 12rem;
 }
@@ -1120,10 +1121,18 @@
   max-width: 58rem;
   margin: clamp(2rem, 5vw, 3.5rem) 0 0;
   padding: clamp(1.25rem, 3vw, 1.75rem);
-  border-left: 3px solid var(--ds-color-success);
+  border: 1px solid color-mix(in srgb, var(--ds-color-success) 34%, var(--ds-color-border-subtle));
+  border-radius: var(--ds-radius-md);
   color: var(--ds-color-text-secondary);
   background: var(--ds-color-surface-raised);
-  line-height: 1.7;
+  font-size: var(--ds-type-body-16-size);
+  line-height: var(--ds-type-body-16-line);
+  transition: transform var(--ds-duration-fast) var(--ds-ease-standard), box-shadow var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.diagramNote:hover {
+  box-shadow: var(--ds-shadow-raised);
+  transform: translateY(-0.15rem);
 }
 
 .diagramNote strong {
@@ -1229,7 +1238,7 @@
   .diagramInner {
   width: 100%;
   min-width: 0;
-  height: 46rem;
+  height: 69rem;
   overflow: visible;
   border: 0;
   background: transparent;
@@ -1247,23 +1256,23 @@
 }
 
   .layerExperience {
-  top: 6.25rem;
+  top: 7rem;
 }
 
 .layerConversation {
-  top: 12.25rem;
+  top: 16.1rem;
 }
 
 .layerModes {
-  top: 23.25rem;
+  top: 32.45rem;
 }
 
 .layerRuntime {
-  top: 36rem;
+  top: 50.3rem;
 }
 
 .layerServices {
-  top: 45.05rem;
+  top: 64.7rem;
 }
 
   .connectors {
