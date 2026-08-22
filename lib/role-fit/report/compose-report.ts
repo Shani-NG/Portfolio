@@ -182,6 +182,55 @@ function selectDisplayedEvidenceSourceIds(
   return caseStudyIds.slice(0, 5);
 }
 
+function caseStudyKey(
+  sourceId: string,
+  sourceById: Map<string, ApprovedEvidenceBundle["sources"][number]>,
+) {
+  const source = sourceById.get(sourceId);
+  if (source?.sourceType !== "case-study") return null;
+  return source.project?.id ?? source.project?.slug ?? source.id;
+}
+
+function applyCaseStudyDiversityPreference(
+  sourceIds: string[],
+  sourceById: Map<string, ApprovedEvidenceBundle["sources"][number]>,
+  recentCaseStudyKeys: string[],
+) {
+  const remaining = [...sourceIds];
+  const ordered: string[] = [];
+
+  while (remaining.length > 0) {
+    const leadingKey = caseStudyKey(remaining[0]!, sourceById);
+    const wouldCreateThirdConsecutiveCaseStudy = Boolean(
+      leadingKey
+      && recentCaseStudyKeys.length === 2
+      && recentCaseStudyKeys[0] === leadingKey
+      && recentCaseStudyKeys[1] === leadingKey,
+    );
+    const alternativeIndex = wouldCreateThirdConsecutiveCaseStudy
+      ? remaining.findIndex((sourceId) => {
+          const candidateKey = caseStudyKey(sourceId, sourceById);
+          return candidateKey !== null && candidateKey !== leadingKey;
+        })
+      : -1;
+    const [sourceId] = remaining.splice(alternativeIndex >= 0 ? alternativeIndex : 0, 1);
+
+    if (!sourceId) continue;
+    ordered.push(sourceId);
+
+    const selectedKey = caseStudyKey(sourceId, sourceById);
+    if (!selectedKey) {
+      recentCaseStudyKeys.length = 0;
+      continue;
+    }
+
+    recentCaseStudyKeys.push(selectedKey);
+    if (recentCaseStudyKeys.length > 2) recentCaseStudyKeys.shift();
+  }
+
+  return ordered;
+}
+
 export function deriveTopStrengths(items: ReportItem[]) {
   return dedupeReportItems(
     items.filter((item) => positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.clusterIds.length > 0),
@@ -205,6 +254,7 @@ export function composeReportUIPayload(input: {
 }): CompositionResult {
   const roleItems = getRoleAnalysisItems(input.roleDraft);
   const sourceById = new Map(input.evidence.sources.map((source) => [source.id, source]));
+  const recentCaseStudyKeys: string[] = [];
   const seenIndexes = new Set<number>();
 
   if (input.analysis.items.length === 0 || input.analysis.items.length > 5) {
@@ -233,7 +283,11 @@ export function composeReportUIPayload(input: {
     if (requiresEvidence && approvedEvidenceSourceIds.length === 0) {
       return { ok: false, diagnostic: "evidence:positive-item-without-source" };
     }
-    const evidenceSourceIds = selectDisplayedEvidenceSourceIds(approvedEvidenceSourceIds, sourceById);
+    const evidenceSourceIds = applyCaseStudyDiversityPreference(
+      selectDisplayedEvidenceSourceIds(approvedEvidenceSourceIds, sourceById),
+      sourceById,
+      recentCaseStudyKeys,
+    );
 
     const displayLabel = normalizeItemText(analysisItem.displayLabel, roleItem.originalText, 64);
     const rawRationale = semanticRationale(analysisItem, input.language);

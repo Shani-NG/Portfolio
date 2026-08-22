@@ -378,6 +378,7 @@ function MonitoringCaseStudy({ showReportReturnFab = false }: { showReportReturn
         </div>
       </section>
 
+      <ReportReturnFab show={showReportReturnFab} />
       <ContextFab href={nextProject.href} label="Next Case Study" icon="arrow_forward" />
     </main>
   );

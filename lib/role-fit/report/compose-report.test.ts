@@ -29,6 +29,19 @@ const evidence: ApprovedEvidenceBundle = {
   ],
 };
 
+const diversityEvidence: ApprovedEvidenceBundle = {
+  promptContext: "Approved case-study evidence for diversity sequencing tests.",
+  sources: [
+    { id: "c4i:section-1", label: "C4I evidence", content: "Approved C4I evidence one.", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "c4i", slug: "c4i-beyond-clarity", title: "C4I - Beyond Clarity", anchorId: "before-ux-organizational-alignment" } },
+    { id: "c4i:section-2", label: "C4I evidence", content: "Approved C4I evidence two.", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "c4i", slug: "c4i-beyond-clarity", title: "C4I - Beyond Clarity", anchorId: "four-pillars-one-shared-logic" } },
+    { id: "c4i:section-3", label: "C4I evidence", content: "Approved C4I evidence three.", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "c4i", slug: "c4i-beyond-clarity", title: "C4I - Beyond Clarity", anchorId: "designed-for-threat-response" } },
+    { id: "monitoring:section-1", label: "Monitoring evidence", content: "Approved Monitoring evidence one.", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "monitoring", slug: "monitoring-product-intelligence", title: "Monitoring and Product Intelligence", anchorId: "from-field-noise-to-product-judgment" } },
+    { id: "monitoring:section-2", label: "Monitoring evidence", content: "Approved Monitoring evidence two.", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "monitoring", slug: "monitoring-product-intelligence", title: "Monitoring and Product Intelligence", anchorId: "a-learning-system" } },
+    { id: "monitoring:section-3", label: "Monitoring evidence", content: "Approved Monitoring evidence three.", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "monitoring", slug: "monitoring-product-intelligence", title: "Monitoring and Product Intelligence", anchorId: "scenario-mapping" } },
+    { id: "epd:section-1", label: "EPD evidence", content: "Approved EPD evidence.", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "epd", slug: "ux-from-the-heart", title: "UX from the Heart", anchorId: "project-overview" } },
+  ],
+};
+
 function roleDraft() {
   return validateRoleText({
     conversationId: "conv_test",
@@ -316,6 +329,99 @@ describe("Task C evidence and report integrity", () => {
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i", "epd", "howtool", "monitoring", "cv"]);
+  });
+
+  it("Diversity A inserts an approved alternative before a third consecutive case study", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        items: [
+          item(0, "direct", "strength", ["c4i:section-1"]),
+          item(1, "direct", "strength", ["c4i:section-2"]),
+          item(2, "direct", "strength", ["c4i:section-3", "monitoring:section-1"]),
+        ],
+      }),
+      roleDraft: roleDraft(),
+      evidence: diversityEvidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(
+      result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds),
+      ["c4i:section-1", "c4i:section-2", "monitoring:section-1", "c4i:section-3"],
+    );
+  });
+
+  it("Diversity B keeps three supported evidence cards from one case study when no alternative exists", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        items: [
+          item(0, "direct", "strength", ["c4i:section-1"]),
+          item(1, "direct", "strength", ["c4i:section-2"]),
+          item(2, "direct", "strength", ["c4i:section-3"]),
+        ],
+      }),
+      roleDraft: roleDraft(),
+      evidence: diversityEvidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(
+      result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds),
+      ["c4i:section-1", "c4i:section-2", "c4i:section-3"],
+    );
+  });
+
+  it("Diversity C treats different anchors from one case study as the same project", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        items: [
+          item(0, "direct", "strength", ["monitoring:section-1"]),
+          item(1, "direct", "strength", ["monitoring:section-2"]),
+          item(2, "direct", "strength", ["monitoring:section-3", "epd:section-1"]),
+        ],
+      }),
+      roleDraft: roleDraft(),
+      evidence: diversityEvidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(
+      result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds),
+      ["monitoring:section-1", "monitoring:section-2", "epd:section-1", "monitoring:section-3"],
+    );
+  });
+
+  it("Diversity D changes evidence order without changing the qualitative fit or requirement taxonomy", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        fitLevel: "partial",
+        items: [
+          item(0, "direct", "strength", ["c4i:section-1"]),
+          item(1, "partial", "gap", ["c4i:section-2"]),
+          item(2, "direct", "strength", ["c4i:section-3", "monitoring:section-1"]),
+        ],
+      }),
+      roleDraft: roleDraft(),
+      evidence: diversityEvidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.overallFitVisual.mode, "fit");
+    if (result.report.overallFitVisual.mode === "fit") assert.equal(result.report.overallFitVisual.level, "partial");
+    assert.deepEqual(result.report.requirementMapping.items.map((entry) => entry.matchType), ["direct", "partial", "direct"]);
+    assert.equal(result.report.keyGaps.items[0]?.matchType, "partial");
+    assert.deepEqual(
+      result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds),
+      ["c4i:section-1", "c4i:section-2", "monitoring:section-1", "c4i:section-3"],
+    );
   });
 
   it("C15 never turns raw JD text into an approved evidence source", async () => {

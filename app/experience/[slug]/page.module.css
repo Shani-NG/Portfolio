@@ -7916,6 +7916,10 @@
     grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
   }
 
+  .c4iHtmlPage .c4iThreatCard {
+    display: none;
+  }
+
   .c4iHtmlPage .c4iFlowSteps {
     gap: 0;
   }
