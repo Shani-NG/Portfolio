@@ -7941,7 +7941,9 @@
   .epdPage #two-users-operating-one-system,
   .epdPage #prepare-the-system-before-pressure,
   .epdPage #flexible-procedure-model {
-    margin-top: var(--ds-space-xl);
+    /* Padding lives inside the section, so it cannot collapse through a reveal wrapper. */
+    margin-top: 0;
+    padding-top: calc(var(--ds-case-section-padding) + var(--ds-space-xl));
   }
 
   .epdTimelineCopy > p {

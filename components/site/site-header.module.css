@@ -179,6 +179,11 @@
 }
 
 @media (max-width: 48rem) {
+  .header {
+    /* The opened mobile navigation must cover floating page controls. */
+    z-index: 50;
+  }
+
   .inner {
     width: min(calc(100% - (2 * var(--ds-grid-gutter))), 38rem);
     min-height: 4rem;
