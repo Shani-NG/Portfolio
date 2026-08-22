@@ -255,19 +255,23 @@
 @media (max-width: 48rem) {
   .gallery {
     --gallery-stage-padding: var(--ds-grid-gutter);
-    --gallery-card-width: min(68vw, 18rem);
-    --gallery-card-shift: min(44vw, 11.25rem);
+    --gallery-card-width: min(62vw, 16rem);
+    --gallery-card-shift: min(40vw, 10rem);
     gap: var(--space-5);
     width: 100%;
   }
 
   .stage {
-    min-height: 24.25rem;
+    min-height: 27rem;
   }
 
   .projectCard {
-    grid-template-rows: minmax(8rem, 32%) 1fr;
-    height: 22.75rem;
+    grid-template-rows: minmax(9rem, 36%) 1fr;
+    height: 25.5rem;
+  }
+
+  .imageFrame img {
+    object-position: center;
   }
 
   .cardBody {

@@ -1435,7 +1435,7 @@ function EpdSectionView({ section, index }: { section: EpdSection; index: number
             </div>
           </div>
           <div className={[styles.epdWrap, styles.epdSetupSecondary].join(" ")}>
-            <p className={styles.epdSetupCaption}>Intuitive configuration wizard facilitated the workflow</p>
+            <h3 className={styles.epdSetupCaption}>Intuitive configuration wizard facilitated the workflow</h3>
             <EpdMediaFrame
               src={`${epdReferenceBase}/setup-wizard.png`}
               alt="Setup Wizard interface"

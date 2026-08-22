@@ -1362,3 +1362,20 @@
   }
 }
 
+
+/* Final Portfolio UI polish: retain the full RoleFit architecture schema on narrow screens. */
+@media (max-width: 48rem) {
+  .diagram {
+    margin-inline: 0;
+    overflow: visible;
+    padding-inline: 0;
+  }
+
+  .diagramInner {
+    width: 72.5rem;
+    min-width: 72.5rem;
+    margin-inline: 0;
+    transform-origin: top left;
+    zoom: clamp(0.29, calc((100vw - (2 * var(--ds-grid-gutter))) / 72.5rem), 0.34);
+  }
+}

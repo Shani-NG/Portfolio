@@ -1020,7 +1020,7 @@
 
   .anchorNav {
     margin-inline: -0.625rem;
-    padding-inline: 0.625rem;
+    padding-inline: var(--ds-grid-gutter);
   }
 
   .c4iHero {
@@ -1040,7 +1040,7 @@
 
 @media (max-width: 48rem) {
   .page {
-    width: min(100% - 1.25rem, 38rem);
+    width: min(calc(100% - (2 * var(--ds-grid-gutter))), 38rem);
   }
 
   .c4iPage {
@@ -1048,7 +1048,7 @@
   }
 
   .c4iPage :is(.section, .boundary, .anchorNav) {
-    width: min(100% - 1.25rem, 38rem);
+    width: min(calc(100% - (2 * var(--ds-grid-gutter))), 38rem);
   }
 
   .hero {
@@ -1070,7 +1070,7 @@
   }
 
   .c4iHeroInner {
-    width: min(100% - 1.25rem, 38rem);
+    width: min(calc(100% - (2 * var(--ds-grid-gutter))), 38rem);
     padding-block: clamp(3rem, 16vw, 5rem);
   }
 
@@ -1093,7 +1093,7 @@
   .bigRedHeroCopy {
     justify-items: center;
     text-align: center;
-    padding-inline: 0.625rem;
+    padding-inline: var(--ds-grid-gutter);
   }
 
   .bigRedHeroCopy h1 {
@@ -1141,7 +1141,7 @@
   }
 
   .bigRedPage :is(.bigRedIntro, .bigRedSection, .anchorNav) {
-    width: min(100% - 1.25rem, 38rem);
+    width: min(calc(100% - (2 * var(--ds-grid-gutter))), 38rem);
   }
 }
 
@@ -4402,7 +4402,7 @@
 
 @media (max-width: 48rem) {
   .bigRedHtmlWrap {
-    padding: 0 20px;
+    padding: 0 var(--ds-grid-gutter);
   }
 
   .bigRedHtmlSection {
@@ -4411,6 +4411,17 @@
 
   .bigRedHtmlHero {
     padding-top: calc(var(--site-header-height) + 3.5rem);
+  }
+
+  .bigRedHtmlHero .bigRedHtmlWrap {
+    display: grid;
+    justify-items: center;
+    max-width: 18rem;
+    text-align: center;
+  }
+
+  .bigRedHtmlHero p {
+    max-width: 100%;
   }
 
   .bigRedHeroVisual {
@@ -4443,6 +4454,10 @@
     grid-template-columns: 1fr;
   }
 
+  .problemGrid > :last-child {
+    order: -1;
+  }
+
   .solutionRow.reverse .solutionVisual {
     order: 1;
   }
@@ -4461,14 +4476,14 @@
   }
 
   .controlToggleTabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
-    flex-wrap: wrap;
-    justify-content: space-between;
   }
 
   .controlToggleTab {
-    flex: 1 1 calc(50% - var(--ds-space-2xs));
-    padding-inline: 0.5rem;
+    min-width: 0;
+    padding-inline: 0.35rem;
     text-align: center;
   }
 
@@ -7660,4 +7675,227 @@
   margin-left: calc(2.625rem + var(--ds-space-md));
   font-size: 16px;
   line-height: 1.55;
+}
+
+/* Final Portfolio UI polish: C4I responsive composition corrections. */
+@media (min-width: 48.01rem) {
+  .c4iHtmlPage .c4iMergeViz {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 48rem) {
+  .c4iHtmlPage .c4iSystemStructure {
+    min-height: 0;
+    aspect-ratio: 1282 / 721;
+    align-items: center;
+  }
+
+  .c4iHtmlPage .c4iSystemStructure::before {
+    background-position: center;
+    background-size: 100% auto;
+  }
+
+  .c4iHtmlPage .c4iSystemStructure .c4iSectionHead {
+    justify-self: center;
+    max-width: min(100% - (2 * var(--ds-grid-gutter)), 28rem);
+    text-align: center;
+  }
+
+  .c4iHtmlPage .c4iFusionCard {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    align-items: center;
+    gap: var(--ds-space-sm);
+  }
+
+  .c4iHtmlPage .c4iFusionCopy {
+    min-width: 0;
+  }
+
+  .c4iHtmlPage .c4iFusionList {
+    gap: var(--ds-space-xs);
+  }
+
+  .c4iHtmlPage .c4iFusionItem {
+    min-width: 0;
+    font-size: clamp(0.6875rem, 3vw, var(--ds-type-body-14-size));
+  }
+
+  .c4iHtmlPage .c4iMergeViz,
+  .c4iHtmlPage .c4iMergeFrame {
+    width: 100%;
+    min-height: 0;
+    aspect-ratio: 1;
+  }
+
+  .c4iHtmlPage .c4iMergeViz {
+    justify-self: start;
+  }
+
+  .c4iHtmlPage .c4iFlowSteps {
+    gap: clamp(0.25rem, 1.5vw, 0.5rem);
+  }
+
+  .c4iHtmlPage .c4iFlowStep {
+    gap: 0.5rem;
+    font-size: clamp(0.6875rem, 3.1vw, var(--ds-type-body-14-size));
+  }
+
+  .c4iHtmlPage .c4iFlowStep span {
+    width: 0.875rem;
+  }
+
+  .c4iHtmlPage .c4iFlowStep:not(:last-child)::after {
+    top: 0.34rem;
+    left: calc(50% + 0.75rem);
+    width: calc(100% - 1.5rem);
+  }
+}
+
+/* Final Portfolio UI polish: Monitoring mobile composition corrections. */
+@media (max-width: 48rem) {
+  .monitoringHeroBg :global(img) {
+    object-fit: contain;
+    object-position: center top;
+  }
+
+  .monitoringPills {
+    display: none;
+  }
+
+  .monitoringSection {
+    min-height: 0;
+  }
+
+  .monitoringPersonalGrid > .monitoringCardsCopy {
+    order: -1;
+  }
+}
+
+/* Final Portfolio UI polish: Nobody Reads the Manual mobile presentation. */
+@media (max-width: 48rem) {
+  .kmsHeroCopy {
+    justify-items: center;
+    margin-inline: auto;
+    text-align: center;
+  }
+
+  .kmsProblemCard {
+    min-height: 0;
+  }
+
+  .kmsProblemCard p {
+    display: none;
+  }
+}
+
+/* Final Portfolio UI polish: UX from the Heart mobile composition corrections. */
+.epdSetupCaption {
+  color: var(--ds-color-text-primary);
+  font-family: var(--font-display);
+  font-size: var(--ds-type-heading-18-size);
+  font-weight: var(--ds-type-weight-semibold);
+  line-height: var(--ds-type-heading-18-line);
+}
+
+@media (max-width: 48rem) {
+  .epdHeroCopy {
+    justify-items: center;
+    margin-inline: auto;
+    text-align: center;
+  }
+
+  .epdSplit,
+  .epdFeatureSplit,
+  .epdPrinciple,
+  .epdTimeline article {
+    grid-template-columns: 1fr;
+    gap: var(--ds-space-xl);
+  }
+
+  .epdSplit > .epdRoleList {
+    order: 2;
+  }
+
+  .epdRoleList article {
+    grid-template-columns: 1fr;
+    gap: var(--ds-space-sm);
+  }
+
+  .epdRoleMedia {
+    width: min(100%, 16rem);
+    justify-self: start;
+  }
+
+  .epdFeatureSplit > .epdSetupVisual {
+    order: -1;
+  }
+
+  .epdSetupSecondary {
+    gap: var(--ds-space-md);
+    margin-top: var(--ds-space-2xl);
+  }
+
+  .epdFeatureCards,
+  .epdDriverGrid {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
+
+  .epdFeatureCards article,
+  .epdDriverGrid article {
+    min-height: 0;
+  }
+
+  .epdDriverGrid {
+    margin-top: var(--ds-space-2xl);
+  }
+
+  .epdPrinciple > .epdPrincipleVisual {
+    order: -1;
+  }
+
+  .epdTimeline {
+    gap: var(--ds-space-2xl);
+    margin-top: var(--ds-space-2xl);
+  }
+
+  .epdTimeline article {
+    align-items: start;
+    padding-block: var(--ds-space-xl);
+  }
+
+  .epdTimelineCopy {
+    display: contents;
+  }
+
+  .epdTimelineHeading {
+    order: 1;
+  }
+
+  .epdTimelineVisual,
+  .epdTimeline article:nth-child(even) > .epdTimelineVisual {
+    order: 2;
+  }
+
+  .epdTimelineCopy > p {
+    order: 3;
+    margin: 0;
+  }
+
+  .epdOutcome,
+  .epdTakeaway {
+    margin-top: var(--ds-space-2xl);
+  }
+
+  .epdTakeaway {
+    margin-bottom: var(--ds-space-2xl);
+  }
+}
+
+/* Final Portfolio UI polish: consistent solution copy-to-checklist rhythm on mobile. */
+@media (max-width: 48rem) {
+  .bigRedHtmlPage .solutionDesc {
+    margin-bottom: var(--ds-space-lg);
+  }
 }

@@ -81,17 +81,33 @@
 
 @media (max-width: 48rem) {
   .galleryShell {
-    grid-template-columns: 1fr;
+    grid-template-areas:
+      "previous next"
+      "gallery gallery";
+    grid-template-columns: repeat(2, auto);
+    justify-content: center;
     max-width: 36rem;
   }
 
   .gallery {
+    grid-area: gallery;
     grid-template-columns: 1fr;
   }
 
-  .item,
-  .control {
+  .item {
     display: none;
+  }
+
+  .control {
+    display: grid;
+  }
+
+  .control:first-child {
+    grid-area: previous;
+  }
+
+  .control:last-child {
+    grid-area: next;
   }
 }
 

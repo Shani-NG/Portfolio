@@ -182,6 +182,7 @@
 
   .projectGrid {
     grid-template-columns: 1fr;
+    gap: var(--ds-space-lg);
   }
 
   .projectCard {

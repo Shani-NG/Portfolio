@@ -98,7 +98,7 @@
     bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + 3.35rem);
   }
 
-  .fab span {
+  .fab > span:last-child {
     position: absolute;
     width: 1px;
     height: 1px;

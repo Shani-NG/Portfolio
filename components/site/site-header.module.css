@@ -180,7 +180,7 @@
 
 @media (max-width: 48rem) {
   .inner {
-    width: min(100% - 1.25rem, 38rem);
+    width: min(calc(100% - (2 * var(--ds-grid-gutter))), 38rem);
     min-height: 4rem;
   }
 
@@ -190,14 +190,16 @@
   }
 
   .menuToggle {
+    position: relative;
+    z-index: 3;
     display: inline-grid;
     place-items: center;
   }
 
   .navigation {
     position: fixed;
-    inset: 4rem 0 0;
-    z-index: 1;
+    inset: var(--site-header-height) 0 0;
+    z-index: 2;
     display: grid;
     align-content: start;
     overflow-y: auto;
@@ -207,7 +209,7 @@
     backdrop-filter: blur(1.5rem) saturate(145%);
     -webkit-backdrop-filter: blur(1.5rem) saturate(145%);
     opacity: 0;
-    padding-inline: max(0.625rem, calc((100vw - 38rem) / 2));
+    padding-inline: max(var(--ds-grid-gutter), calc((100vw - 38rem) / 2 + var(--ds-grid-gutter)));
     pointer-events: none;
     transform: translateY(calc(var(--ds-distance-sm) * -1));
     transition: opacity var(--ds-duration-fast) var(--ds-ease-standard), transform var(--ds-duration-base) var(--ds-ease-standard), border-color var(--ds-duration-base) var(--ds-ease-standard);

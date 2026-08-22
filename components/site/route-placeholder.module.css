@@ -79,7 +79,7 @@
 
 @media (max-width: 48rem) {
   .main {
-    width: min(100% - 1.25rem, 38rem);
+    width: min(calc(100% - (2 * var(--ds-grid-gutter))), 38rem);
   }
 }
 

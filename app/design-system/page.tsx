@@ -96,6 +96,54 @@ const typeScale = [
   ["nav-14", "var(--ds-type-nav-14-size)", "var(--ds-type-nav-14-line)", "var(--ds-type-weight-medium)"],
 ] as const;
 
+
+const drawerIcons: Record<string, string> = {
+  foundations: "palette",
+  "responsive-grid": "grid_view",
+  typography: "text_fields",
+  buttons: "smart_button",
+  eyebrows: "label",
+  cards: "dashboard",
+  chips: "sell",
+  depth: "layers",
+  motion: "animation",
+  "scroll-reveal": "swipe_up",
+  icons: "category",
+};
+
+function DesignSystemDrawer({
+  id,
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  id: string;
+  eyebrow: string;
+  title: string;
+  description: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className={styles.drawer} id={id}>
+      <summary>
+        <span className={styles.drawerSummary}>
+          <span className={styles.drawerIcon} aria-hidden="true"><MaterialIcon name={drawerIcons[id] ?? "layers"} /></span>
+          <span className={styles.drawerSummaryCopy}>
+            <span className={styles.eyebrow}>{eyebrow}</span>
+            <span className={styles.drawerTitle} id={id + "-title"}>{title}</span>
+          </span>
+        </span>
+        <MaterialIcon className={styles.drawerChevron} name="add" />
+      </summary>
+      <div className={styles.drawerContent}>
+        <p className={styles.drawerDescription}>{description}</p>
+        {children}
+      </div>
+    </details>
+  );
+}
+
 export default function DesignSystemPage() {
   return (
     <main className={styles.page}>
@@ -109,15 +157,13 @@ export default function DesignSystemPage() {
         </p>
       </section>
 
-      <section className={styles.section} aria-labelledby="foundations-title" id="foundations">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>01 Foundations</p>
-          <h2 id="foundations-title">Semantic color roles</h2>
-          <p>
-            Components consume roles, not raw colors. This keeps a future
-            primary color or theme swap centralized.
-          </p>
-        </div>
+      <DesignSystemDrawer
+        id="foundations"
+        eyebrow={"01 Foundations"}
+        title={"Semantic color roles"}
+        description={<>Components consume roles, not raw colors. This keeps a future
+            primary color or theme swap centralized.</>}
+      >
         <div className={styles.swatchGrid}>
           {colorRoles.map((role) => (
             <article className={styles.swatchCard} key={role.name}>
@@ -155,18 +201,16 @@ export default function DesignSystemPage() {
             </div>
           ))}
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="grid-title" id="responsive-grid">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>02 Layout grid</p>
-          <h2 id="grid-title">One responsive geometry</h2>
-          <p>
-            The same layout contract scales from 12 columns on desktop to 8 on
+      <DesignSystemDrawer
+        id="responsive-grid"
+        eyebrow={"02 Layout grid"}
+        title={"One responsive geometry"}
+        description={<>The same layout contract scales from 12 columns on desktop to 8 on
             tablet and 4 on mobile. Gutters and gaps are tokens, so page-level
-            layouts can change together without rewriting each section.
-          </p>
-        </div>
+            layouts can change together without rewriting each section.</>}
+      >
         <div className={styles.gridPreviewPanel}>
           <div className="ds-grid" aria-label="Responsive grid preview">
             {Array.from({ length: 12 }, (_, index) => (
@@ -176,21 +220,19 @@ export default function DesignSystemPage() {
           <div className={styles.gridLegend}>
             <span><strong>Desktop</strong> 12 columns · 48px gutter · 24px gap</span>
             <span><strong>Tablet</strong> 8 columns · 24px gutter · 20px gap</span>
-            <span><strong>Mobile</strong> 4 columns · 16px gutter · 16px gap</span>
+            <span><strong>Mobile</strong> 4 columns · 24px gutter · 16px gap</span>
           </div>
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="type-title" id="typography">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>03 Typography</p>
-          <h2 id="type-title">Outfit as the system voice</h2>
-          <p>
-            The scale is expressive enough for portfolio storytelling, but
+      <DesignSystemDrawer
+        id="typography"
+        eyebrow={"03 Typography"}
+        title={"Outfit as the system voice"}
+        description={<>The scale is expressive enough for portfolio storytelling, but
             bounded by semantic roles so sections, cards and body copy keep a
-            consistent rhythm across viewports.
-          </p>
-        </div>
+            consistent rhythm across viewports.</>}
+      >
         <div className={styles.typePanel}>
           {typeScale.map(([name, size, line, weight]) => (
             <div className={styles.typeRow} key={name}>
@@ -201,17 +243,15 @@ export default function DesignSystemPage() {
             </div>
           ))}
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="buttons-title" id="buttons">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>04 Buttons</p>
-          <h2 id="buttons-title">One component, explicit variants</h2>
-          <p>
-            The hierarchy supports primary decisions, secondary paths and quiet
-            tertiary actions with focus and disabled states.
-          </p>
-        </div>
+      <DesignSystemDrawer
+        id="buttons"
+        eyebrow={"04 Buttons"}
+        title={"One component, explicit variants"}
+        description={<>The hierarchy supports primary decisions, secondary paths and quiet
+            tertiary actions with focus and disabled states.</>}
+      >
         <div className={styles.buttonPanel}>
           {buttonExamples.map((example) => (
             <div className={styles.componentExample} key={`${example.variant}-${example.tone}`}>
@@ -224,17 +264,15 @@ export default function DesignSystemPage() {
             <span className={styles.componentLabel}>Button / primary / disabled</span>
           </div>
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="eyebrow-title" id="eyebrows">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>05 Eyebrow</p>
-          <h2 id="eyebrow-title">Small label, consistent signal</h2>
-          <p>
-            Eyebrows are always uppercase, can appear with or without an icon,
-            and default to the primary action color.
-          </p>
-        </div>
+      <DesignSystemDrawer
+        id="eyebrows"
+        eyebrow={"05 Eyebrow"}
+        title={"Small label, consistent signal"}
+        description={<>Eyebrows are always uppercase, can appear with or without an icon,
+            and default to the primary action color.</>}
+      >
         <div className={styles.eyebrowPanel}>
           <div className={styles.componentExample}>
             <Eyebrow>Primary label</Eyebrow>
@@ -249,17 +287,15 @@ export default function DesignSystemPage() {
             <span className={styles.componentLabel}>Eyebrow / primary hover</span>
           </div>
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="cards-title" id="cards">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>06 Reusable cards</p>
-          <h2 id="cards-title">Flexible composition, not a fixed box</h2>
-          <p>
-            The card is a reusable structure only when it creates meaningful
-            grouping, comparison, action or status.
-          </p>
-        </div>
+      <DesignSystemDrawer
+        id="cards"
+        eyebrow={"06 Reusable cards"}
+        title={"Flexible composition, not a fixed box"}
+        description={<>The card is a reusable structure only when it creates meaningful
+            grouping, comparison, action or status.</>}
+      >
         <div className={styles.cardGrid}>
           <div className={styles.componentExample}>
             <SystemCard interaction="lift">
@@ -281,17 +317,15 @@ export default function DesignSystemPage() {
             <span className={styles.componentLabel}>SystemCard / static / no icon / no actions</span>
           </div>
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="chips-title" id="chips">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>07 Chips</p>
-          <h2 id="chips-title">Compact labels with clear behavior</h2>
-          <p>
-            Chips separate information, actions and links. They stay on one
-            line, truncate long text and expose the full label on hover.
-          </p>
-        </div>
+      <DesignSystemDrawer
+        id="chips"
+        eyebrow={"07 Chips"}
+        title={"Compact labels with clear behavior"}
+        description={<>Chips separate information, actions and links. They stay on one
+            line, truncate long text and expose the full label on hover.</>}
+      >
         <div className={styles.chipPanel}>
           <div className={styles.chipGroup}>
             <span className={styles.componentLabel}>Info</span>
@@ -318,28 +352,28 @@ export default function DesignSystemPage() {
             </Chip>
           </div>
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="depth-title" id="depth">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>08 Depth</p>
-          <h2 id="depth-title">Quiet elevation hierarchy</h2>
-          <p>Shadows separate meaningful layers. They do not turn every surface into a floating card.</p>
-        </div>
+      <DesignSystemDrawer
+        id="depth"
+        eyebrow={"08 Depth"}
+        title={"Quiet elevation hierarchy"}
+        description={<>Shadows separate meaningful layers. They do not turn every surface into a floating card.</>}
+      >
         <div className={styles.shadowGrid}>
           <div className={styles.shadowSample} style={{ boxShadow: "var(--ds-shadow-none)" }}><span>None</span></div>
           <div className={styles.shadowSample} style={{ boxShadow: "var(--ds-shadow-soft)" }}><span>Soft</span></div>
           <div className={styles.shadowSample} style={{ boxShadow: "var(--ds-shadow-raised)" }}><span>Raised</span></div>
           <div className={styles.shadowSample} style={{ boxShadow: "var(--ds-shadow-focus)" }}><span>Focus</span></div>
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="motion-title" id="motion">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>09 Motion</p>
-          <h2 id="motion-title">Four patterns, one motion language</h2>
-          <p>Each pattern has one purpose, shared timing tokens and an opacity-only reduced-motion fallback.</p>
-        </div>
+      <DesignSystemDrawer
+        id="motion"
+        eyebrow={"09 Motion"}
+        title={"Four patterns, one motion language"}
+        description={<>Each pattern has one purpose, shared timing tokens and an opacity-only reduced-motion fallback.</>}
+      >
         <div className={styles.motionGrid}>
           {(Object.keys(motionPatterns) as Array<keyof typeof motionPatterns>).map((pattern) => (
             <div className={`${styles.motionSample} ${styles[pattern]}`} data-motion={pattern} style={motionStyle(pattern)} key={pattern}>
@@ -348,14 +382,14 @@ export default function DesignSystemPage() {
             </div>
           ))}
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="scroll-title" id="scroll-reveal">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>10 Scroll behavior</p>
-          <h2 id="scroll-title">Three section modes</h2>
-          <p>Scroll down and each mode demonstrates a different level of movement without introducing a new animation language.</p>
-        </div>
+      <DesignSystemDrawer
+        id="scroll-reveal"
+        eyebrow={"10 Scroll behavior"}
+        title={"Three section modes"}
+        description={<>Scroll down and each mode demonstrates a different level of movement without introducing a new animation language.</>}
+      >
         <div className={styles.scrollDemoGrid}>
           <div className={styles.scrollDemoCard}>
             <span className={styles.eyebrow}>Overlap</span>
@@ -385,14 +419,14 @@ export default function DesignSystemPage() {
             </ScrollReveal>
           </div>
         </div>
-      </section>
+      </DesignSystemDrawer>
 
-      <section className={styles.section} aria-labelledby="icons-title" id="icons">
-        <div className={styles.sectionIntro}>
-          <p className={styles.eyebrow}>11 Icons</p>
-          <h2 id="icons-title">ICONS</h2>
-          <p>Material Icons currently used across the portfolio, presented as one shared visual vocabulary.</p>
-        </div>
+      <DesignSystemDrawer
+        id="icons"
+        eyebrow={"11 Icons"}
+        title={"ICONS"}
+        description={<>Material Icons currently used across the portfolio, presented as one shared visual vocabulary.</>}
+      >
         <div className={styles.iconGrid} aria-label="Material icons used in the portfolio">
           {projectIconNames.map((name) => (
             <div className={styles.iconSample} key={name} aria-label={name}>
@@ -400,7 +434,7 @@ export default function DesignSystemPage() {
             </div>
           ))}
         </div>
-      </section>
+      </DesignSystemDrawer>
     </main>
   );
 }

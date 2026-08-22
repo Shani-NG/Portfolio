@@ -145,6 +145,7 @@
 
   .content {
     --role-fit-content-width: min(100%, 34rem);
+    --role-fit-action-row-width: min(100%, 20rem);
     gap: var(--ds-space-md);
   }
 
@@ -153,8 +154,10 @@
   }
 
   .supportingText {
+    width: var(--role-fit-action-row-width);
     margin-bottom: 1.5rem;
     font-size: 1.0625rem;
+    text-wrap: balance;
   }
 }
 

@@ -181,6 +181,11 @@
 }
 
 @media (max-width: 48rem) {
+  .beforeLabels,
+  .labelGroup {
+    display: none;
+  }
+
   .labelGroup {
     bottom: 0.75rem;
     max-width: calc(100% - 1.5rem);

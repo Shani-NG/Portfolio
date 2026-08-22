@@ -650,3 +650,134 @@
 .darkPreview {
   scroll-margin-top: calc(var(--site-header-height) + 1rem);
 }
+
+/* Final Portfolio UI polish: Design System drawers. */
+.drawer {
+  width: min(100%, var(--ds-layout-content-max));
+  margin: 0 auto;
+  border-top: 1px solid var(--ds-color-border-subtle);
+  border-bottom: 1px solid var(--ds-color-border-subtle);
+}
+
+.drawer + .drawer {
+  margin-top: -1px;
+}
+
+.drawer summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-lg);
+  min-height: 6.5rem;
+  padding: clamp(1.25rem, 3vw, 1.75rem) var(--ds-grid-gutter);
+  cursor: pointer;
+  list-style: none;
+}
+
+.drawer summary::-webkit-details-marker {
+  display: none;
+}
+
+.drawerSummary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ds-space-md);
+  min-width: 0;
+}
+
+.drawerIcon {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ds-color-action-primary) 30%, var(--ds-color-border-subtle));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ds-color-action-primary) 10%, transparent);
+  color: var(--ds-color-action-primary-hover);
+}
+
+.drawerIcon :global(.material-symbols-outlined) {
+  font-size: 1.25rem;
+}
+
+.drawerSummaryCopy {
+  display: grid;
+  gap: var(--ds-space-3xs);
+  min-width: 0;
+}
+
+.drawerSummaryCopy .eyebrow {
+  margin: 0;
+}
+
+.drawerTitle {
+  color: var(--ds-color-text-primary);
+  font-family: var(--ds-font-family-display);
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+  font-weight: var(--ds-type-weight-semibold);
+  line-height: 1.25;
+}
+
+.drawerChevron {
+  flex: 0 0 auto;
+  color: var(--ds-color-text-secondary);
+  transition: transform var(--ds-duration-fast) var(--ds-ease-standard), color var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.drawer[open] .drawerChevron {
+  color: var(--ds-color-action-primary-hover);
+  transform: rotate(45deg);
+}
+
+.drawer summary:hover .drawerTitle,
+.drawer summary:focus-visible .drawerTitle {
+  color: var(--ds-color-action-primary-hover);
+}
+
+.drawer summary:focus-visible {
+  outline: 0;
+  box-shadow: inset var(--ds-shadow-focus);
+}
+
+.drawerContent {
+  display: grid;
+  gap: var(--ds-space-2xl);
+  padding: 0 var(--ds-grid-gutter) clamp(2.5rem, 5vw, 4rem);
+}
+
+.drawerDescription {
+  max-width: 46rem;
+  margin: 0;
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-type-body-18-size);
+  line-height: var(--ds-type-body-18-line);
+}
+
+.drawerContent .scaleGrid,
+.drawerContent .neutralGrid,
+.drawerContent .gridPreviewPanel {
+  grid-column: auto;
+}
+
+@media (max-width: 48rem) {
+  .drawer summary {
+    min-height: 5.5rem;
+  }
+
+  .drawerIcon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .drawerContent {
+    gap: var(--ds-space-xl);
+    padding-bottom: var(--ds-space-2xl);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawerChevron {
+    transition: none;
+  }
+}
