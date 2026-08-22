@@ -90,10 +90,10 @@ describe("Role Fit runtime conversation contract", () => {
     assert.doesNotMatch(page, /useState<RoleFitLiveSession>\(\(\) => getRoleFitLiveSession\(\)\)/);
   });
 
-  it("renders the narrow report switch from the active report in both directions", async () => {
+  it("renders the narrow report switch for every split workspace state, including report recovery", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
 
-    assert.match(page, /isNarrowLayout && activeReport/);
+    assert.match(page, /isNarrowLayout && splitCanvas/);
     assert.match(page, /activePane === "report" \? "Switch to chat" : "Switch to report"/);
     assert.match(page, /switchPane\(activePane === "report" \? "chat" : "report"\)/);
   });
