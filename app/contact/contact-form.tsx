@@ -246,8 +246,8 @@ export function ContactForm() {
               ? errors.message
               : "Short context is enough"}
           </span>
-        </span>
-        . You can contact me at{" "}
+        </span>{" "}
+        You can contact me at{" "}
         <span
           className={`${styles.inlineField} ${styles.longField} ${getFieldState(
             "email",
@@ -287,7 +287,6 @@ export function ContactForm() {
               : "Best email for follow-up"}
           </span>
         </span>
-        .
       </p>
 
       <div className={styles.actions}>

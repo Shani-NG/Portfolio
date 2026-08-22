@@ -1789,3 +1789,11 @@
     outline-offset: 3px;
   }
 }
+
+@media (max-width: 48rem) {
+  .paneToggleFab {
+    top: calc(var(--site-header-height) + var(--ds-space-lg));
+    right: max(var(--ds-grid-gutter), calc(env(safe-area-inset-right) + var(--ds-grid-gutter)));
+    bottom: auto;
+  }
+}

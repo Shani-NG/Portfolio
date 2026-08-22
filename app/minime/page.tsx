@@ -485,14 +485,14 @@ export default function RoleFitPage() {
       >
         Generate Report
       </button> : null}
-      {isNarrowLayout && activeReport ? (
+      {isNarrowLayout && splitCanvas ? (
         <button
           aria-label={activePane === "report" ? "Switch to chat" : "Switch to report"}
           className={styles.paneToggleFab}
           onClick={() => switchPane(activePane === "report" ? "chat" : "report")}
           type="button"
         >
-          <span className={styles.msi} aria-hidden="true">{activePane === "report" ? "chat" : "description"}</span>
+          <span className={styles.msi} aria-hidden="true">{activePane === "report" ? "arrow_back" : "arrow_forward"}</span>
           <span>{activePane === "report" ? "Chat" : "Report"}</span>
         </button>
       ) : null}

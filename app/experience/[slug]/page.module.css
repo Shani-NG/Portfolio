@@ -7899,3 +7899,79 @@
     margin-bottom: var(--ds-space-lg);
   }
 }
+
+/* Final recruiter-preview finishes: mobile-only adjustments preserve the desktop composition. */
+@media (max-width: 48rem) {
+  .bigRedHeroCopy p:last-child {
+    width: 100%;
+    max-width: none;
+  }
+
+  .c4iHtmlPage .c4iMergeViz {
+    width: min(100%, 10.25rem);
+    justify-self: center;
+  }
+
+  .c4iHtmlPage .c4iFusionCard {
+    grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+  }
+
+  .c4iHtmlPage .c4iFlowSteps {
+    gap: 0;
+  }
+
+  .c4iHtmlPage .c4iFlowStep {
+    gap: var(--ds-space-sm);
+    font-size: clamp(0.6875rem, 2.85vw, var(--ds-type-body-14-size));
+  }
+
+  .c4iHtmlPage .c4iFlowStep span {
+    position: relative;
+    z-index: 1;
+    width: clamp(0.75rem, 3.5vw, 1.0625rem);
+  }
+
+  .c4iHtmlPage .c4iFlowStep:not(:last-child)::after {
+    z-index: 0;
+    top: clamp(0.375rem, 1.75vw, 0.53125rem);
+    left: 50%;
+    width: 100%;
+  }
+
+  .epdPage #two-users-operating-one-system,
+  .epdPage #prepare-the-system-before-pressure,
+  .epdPage #flexible-procedure-model {
+    margin-top: var(--ds-space-xl);
+  }
+
+  .epdTimelineCopy > p {
+    margin-inline-start: calc(2.625rem + var(--ds-space-md));
+  }
+
+  .epdOutcome {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .epdOutcome aside {
+    display: none;
+  }
+}
+
+/* C4I Operational Decisions: dot-to-dot connectors remain continuous at every larger breakpoint. */
+@media (min-width: 48.01rem) {
+  .c4iHtmlPage .c4iFlowSteps {
+    gap: 0;
+  }
+
+  .c4iHtmlPage .c4iFlowStep span {
+    position: relative;
+    z-index: 1;
+  }
+
+  .c4iHtmlPage .c4iFlowStep:not(:last-child)::after {
+    z-index: 0;
+    top: 0.53125rem;
+    left: 50%;
+    width: 100%;
+  }
+}
