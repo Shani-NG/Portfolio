@@ -174,11 +174,13 @@ function selectDisplayedEvidenceSourceIds(
   sourceIds: string[],
   sourceById: Map<string, ApprovedEvidenceBundle["sources"][number]>,
 ) {
-  const caseStudyIds = sourceIds.filter((sourceId) => sourceById.get(sourceId)?.sourceType === "case-study");
-  const cvIds = sourceIds.filter((sourceId) => sourceById.get(sourceId)?.sourceType === "cv");
+  const selectedSourceIds = new Set(sourceIds);
+  const orderedSourceIds = [...sourceById.keys()].filter((sourceId) => selectedSourceIds.has(sourceId));
+  const caseStudyIds = orderedSourceIds.filter((sourceId) => sourceById.get(sourceId)?.sourceType === "case-study");
+  const cvIds = orderedSourceIds.filter((sourceId) => sourceById.get(sourceId)?.sourceType === "cv");
 
+  // CV knowledge is a fallback only: public case-study evidence remains authoritative whenever it exists.
   if (caseStudyIds.length === 0) return cvIds.slice(0, 1);
-  if (caseStudyIds.length === 4 && cvIds.length > 0) return [...caseStudyIds, cvIds[0]];
   return caseStudyIds.slice(0, 5);
 }
 

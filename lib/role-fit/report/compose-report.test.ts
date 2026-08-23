@@ -292,7 +292,7 @@ describe("Task C evidence and report integrity", () => {
     assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["cv"]);
   });
 
-  it("places CV evidence last only when it completes five evidence cards", () => {
+  it("never displays CV evidence when supporting case studies exist", () => {
     const caseStudySources: ApprovedEvidenceBundle["sources"] = [
       { id: "c4i", label: "C4I", content: "C4I evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "c4i", slug: "c4i-beyond-clarity", title: "C4I" } },
       { id: "epd", label: "EPD", content: "EPD evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "epd", slug: "ux-from-the-heart", title: "EPD" } },
@@ -315,7 +315,7 @@ describe("Task C evidence and report integrity", () => {
 
     assert.equal(result.ok, true);
     if (!result.ok) return;
-    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i", "epd", "howtool", "monitoring", "cv"]);
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i", "epd", "howtool", "monitoring"]);
   });
 
   it("C15 never turns raw JD text into an approved evidence source", async () => {

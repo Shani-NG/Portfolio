@@ -1176,10 +1176,10 @@
   }
 
   .stickyReportChip {
-    bottom: 16px;
+    bottom: auto;
     left: auto;
-    right: 16px;
-    top: auto;
+    right: max(var(--ds-grid-gutter), calc(env(safe-area-inset-right) + var(--ds-grid-gutter)));
+    top: calc(var(--site-header-height) + 72px);
     justify-content: center;
   }
 

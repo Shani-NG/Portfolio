@@ -4410,13 +4410,14 @@
   }
 
   .bigRedHtmlHero {
-    padding-top: calc(var(--site-header-height) + 3.5rem);
+    min-height: clamp(36rem, 150vw, 48rem);
+    padding: calc(var(--site-header-height) + 3.5rem) 0 clamp(7rem, 42vw, 15rem);
   }
 
   .bigRedHtmlHero .bigRedHtmlWrap {
     display: grid;
     justify-items: center;
-    max-width: 18rem;
+    max-width: none;
     text-align: center;
   }
 
@@ -4425,7 +4426,17 @@
   }
 
   .bigRedHeroVisual {
-    height: 100%;
+    align-items: flex-end;
+    height: clamp(16rem, 84vw, 28rem);
+    inset: auto 0 0;
+  }
+
+  .bigRedHeroVisual .bigRedInlineImage {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
+    object-fit: cover;
+    object-position: center bottom;
   }
 
   .snapshotGridHtml {
