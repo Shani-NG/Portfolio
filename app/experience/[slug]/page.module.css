@@ -7988,3 +7988,24 @@
     width: 100%;
   }
 }
+
+/* Big Red Button: phone-only continuous hero composition. */
+@media (max-width: 47.99rem) {
+  .bigRedHtmlHero {
+    min-height: calc(100svh + var(--site-header-height));
+    padding: calc(var(--site-header-height) + 3.5rem) 0 clamp(5rem, 10vw, 8rem);
+  }
+
+  .bigRedHeroVisual {
+    height: 100%;
+    inset: 0;
+  }
+
+  .bigRedHeroVisual .bigRedInlineImage {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    object-fit: cover;
+    object-position: right center;
+  }
+}
