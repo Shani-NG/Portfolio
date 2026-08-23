@@ -510,7 +510,7 @@ function BigRedInlineImage({
 }
 
 function ReportReturnFab({ show }: { show: boolean }) {
-  return show ? <ContextFab href="/minime" label="Back to report" icon="arrow_back" placement="secondary" variant="report-return" /> : null;
+  return show ? <ContextFab href="/minime" label="Report" ariaLabel="Back to report" icon="arrow_back" placement="top" variant="report-return" /> : null;
 }
 
 function BigRedHtmlCaseStudy({ showReportReturnFab = false }: { showReportReturnFab?: boolean }) {

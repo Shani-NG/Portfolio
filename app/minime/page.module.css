@@ -1768,7 +1768,8 @@
     background: var(--rf-rose-500);
     border: 0;
     border-radius: var(--radius-pill);
-    bottom: max(var(--ds-space-lg), env(safe-area-inset-bottom));
+    top: calc(var(--site-header-height) + var(--ds-space-lg));
+    bottom: auto;
     box-shadow: var(--rf-shadow);
     color: #fff;
     cursor: pointer;
@@ -1780,20 +1781,12 @@
     min-height: 2.75rem;
     padding: 0 var(--ds-space-md);
     position: fixed;
-    right: max(var(--ds-space-xl), calc(env(safe-area-inset-right) + var(--ds-space-lg)));
-    z-index: 40;
+    right: max(var(--ds-grid-gutter), calc(env(safe-area-inset-right) + var(--ds-grid-gutter)));
+    z-index: 15;
   }
 
   .paneToggleFab:focus-visible {
     outline: 3px solid var(--ds-color-focus);
     outline-offset: 3px;
-  }
-}
-
-@media (max-width: 48rem) {
-  .paneToggleFab {
-    top: calc(var(--site-header-height) + var(--ds-space-lg));
-    right: max(var(--ds-grid-gutter), calc(env(safe-area-inset-right) + var(--ds-grid-gutter)));
-    bottom: auto;
   }
 }

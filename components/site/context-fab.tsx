@@ -5,17 +5,22 @@ import styles from "./context-fab.module.css";
 type ContextFabProps = {
   href: string;
   label: string;
+  ariaLabel?: string;
   icon?: string;
-  placement?: "primary" | "secondary";
+  placement?: "primary" | "secondary" | "top";
   variant?: "default" | "report-return";
 };
 
-export function ContextFab({ href, label, icon = "arrow_back", placement = "primary", variant = "default" }: ContextFabProps) {
+export function ContextFab({ href, label, ariaLabel, icon = "arrow_back", placement = "primary", variant = "default" }: ContextFabProps) {
   return (
     <Link
-      aria-label={label}
-      className={[styles.fab, placement === "secondary" ? styles.secondary : "", variant === "report-return" ? styles.reportReturn : ""].filter(Boolean).join(" ")}
-      data-tooltip={variant === "report-return" ? label.toUpperCase() : undefined}
+      aria-label={ariaLabel ?? label}
+      className={[
+        styles.fab,
+        placement === "secondary" ? styles.secondary : "",
+        placement === "top" ? styles.top : "",
+        variant === "report-return" ? styles.reportReturn : "",
+      ].filter(Boolean).join(" ")}
       href={href}
     >
       <MaterialIcon name={icon} />

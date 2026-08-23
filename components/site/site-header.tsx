@@ -90,77 +90,79 @@ export function SiteHeader() {
   }
 
   return (
-    <header className={styles.header}>
-      <div className={styles.inner}>
-        <Link className={styles.brand} href="/" onClick={closeMenu}>
-          <span>Shani Nakash-Gomel</span>
+    <>
+      <header className={styles.header}>
+        <div className={styles.inner}>
+          <Link className={styles.brand} href="/" onClick={closeMenu}>
+            <span>Shani Nakash-Gomel</span>
+          </Link>
+
+          <button
+            aria-controls={menuId}
+            aria-expanded={menuOpen}
+            aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+            className={styles.menuToggle}
+            onClick={() => {
+              setMenuOpen((open) => !open);
+              setProjectsOpen(false);
+            }}
+            type="button"
+          >
+            <MenuIcon open={menuOpen} />
+          </button>
+        </div>
+      </header>
+
+      <nav
+        aria-label="Main navigation"
+        className={`${styles.navigation} ${menuOpen ? styles.navigationOpen : ""}`}
+        id={menuId}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) closeMenu();
+        }}
+      >
+        <Link className={`${styles.navLink} ${isAboutActive ? styles.active : ""}`} href={navigationItems.about.href} onClick={closeMenu}>
+          {navigationItems.about.label}
         </Link>
 
-        <button
-          aria-controls={menuId}
-          aria-expanded={menuOpen}
-          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-          className={styles.menuToggle}
-          onClick={() => {
-            setMenuOpen((open) => !open);
-            setProjectsOpen(false);
-          }}
-          type="button"
-        >
-          <MenuIcon open={menuOpen} />
-        </button>
-
-        <nav
-          aria-label="Main navigation"
-          className={`${styles.navigation} ${menuOpen ? styles.navigationOpen : ""}`}
-          id={menuId}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) closeMenu();
+        <div
+          ref={experienceRef}
+          className={`${styles.experienceItem} ${isExperienceActive ? styles.active : ""}`}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setProjectsOpen(false);
+            }
           }}
         >
-          <Link className={`${styles.navLink} ${isAboutActive ? styles.active : ""}`} href={navigationItems.about.href} onClick={closeMenu}>
-            {navigationItems.about.label}
+          <Link className={`${styles.navLink} ${styles.experiencePrimary}`} href={navigationItems.experience.href} onClick={closeMenu}>
+            {navigationItems.experience.label}
           </Link>
-
-          <div
-            ref={experienceRef}
-            className={`${styles.experienceItem} ${isExperienceActive ? styles.active : ""}`}
-            onBlur={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget)) {
-                setProjectsOpen(false);
-              }
-            }}
+          <button
+            aria-controls={projectMenuId}
+            aria-expanded={projectsOpen}
+            aria-label={projectsOpen ? "Close experience projects menu" : "Open experience projects menu"}
+            className={styles.experienceButton}
+            onClick={() => setProjectsOpen((open) => !open)}
+            type="button"
           >
-            <Link className={`${styles.navLink} ${styles.experiencePrimary}`} href={navigationItems.experience.href} onClick={closeMenu}>
-              {navigationItems.experience.label}
-            </Link>
-            <button
-              aria-controls={projectMenuId}
-              aria-expanded={projectsOpen}
-              aria-label={projectsOpen ? "Close experience projects menu" : "Open experience projects menu"}
-              className={styles.experienceButton}
-              onClick={() => setProjectsOpen((open) => !open)}
-              type="button"
-            >
-              <Chevron />
-            </button>
-            <div className={`${styles.projectMenu} ${projectsOpen ? styles.projectMenuOpen : ""}`} id={projectMenuId}>
-              {projects.map((project) => (
-                <Link className={styles.projectLink} href={project.href} key={project.href} onClick={closeMenu}>
-                  {project.label}
-                </Link>
-              ))}
-            </div>
+            <Chevron />
+          </button>
+          <div className={`${styles.projectMenu} ${projectsOpen ? styles.projectMenuOpen : ""}`} id={projectMenuId}>
+            {projects.map((project) => (
+              <Link className={styles.projectLink} href={project.href} key={project.href} onClick={closeMenu}>
+                {project.label}
+              </Link>
+            ))}
           </div>
+        </div>
 
-          <Link className={`${styles.navLink} ${isRoleFitActive ? styles.active : ""}`} href={navigationItems.roleFit.href} onClick={closeMenu}>
-            {navigationItems.roleFit.label}
-          </Link>
-          <Link className={`${styles.navLink} ${isContactActive ? styles.active : ""}`} href={navigationItems.contact.href} onClick={closeMenu}>
-            {navigationItems.contact.label}
-          </Link>
-        </nav>
-      </div>
-    </header>
+        <Link className={`${styles.navLink} ${isRoleFitActive ? styles.active : ""}`} href={navigationItems.roleFit.href} onClick={closeMenu}>
+          {navigationItems.roleFit.label}
+        </Link>
+        <Link className={`${styles.navLink} ${isContactActive ? styles.active : ""}`} href={navigationItems.contact.href} onClick={closeMenu}>
+          {navigationItems.contact.label}
+        </Link>
+      </nav>
+    </>
   );
 }
