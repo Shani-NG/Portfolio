@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { ContextFab } from "@/components/site/context-fab";
 import { MaterialIcon } from "@/components/ui/material-icon";
@@ -167,10 +167,14 @@ function PhaseContent({ id }: { id: string }) {
   </div>;
 }
 
-export default function RoleFitAgentCaseStudyPage() {
+function ReportReturnFab() {
   const searchParams = useSearchParams();
   const hasReportSource = searchParams.get("source") === "role-fit-report";
 
+  return hasReportSource ? <ContextFab href="/minime" label="Report" ariaLabel="Back to report" icon="arrow_back" placement="top" variant="report-return" /> : null;
+}
+
+export default function RoleFitAgentCaseStudyPage() {
   useEffect(() => {
     const openAnchoredDrawer = () => {
       const id = decodeURIComponent(window.location.hash.slice(1));
@@ -249,7 +253,7 @@ export default function RoleFitAgentCaseStudyPage() {
           <div className={`${styles.processHeading} ${styles.reveal}`}><div><p className={styles.eyebrow}><MaterialIcon name="route" />The Process</p><h2 className={styles.sectionTitle} id="process-title">From hiring friction to a governed AI product.</h2></div><p className={styles.sectionSubtitle}>Each stage resolved a different product risk.</p></div>
           <div className={styles.phaseList}>
             {phases.map((phase) => <details className={`${styles.phase} ${styles.reveal}`} id={phase.id} key={phase.id} open={phase.id === "technical-architecture"}>
-              <summary>
+              <summary id={phase.id === "product-framing" ? "mvp-scope" : undefined}>
                 <span className={styles.phaseNumber}>{phase.number}</span>
                 <span className={styles.phaseTitle}><small>{phase.label}</small><h3>{phase.title}</h3><p>{phase.subtitle}</p></span>
                 <span className={styles.summaryTools} aria-label="Tools used">{phase.tools.map((tool) => <ToolChip key={tool.label} {...tool} />)}</span>
@@ -286,7 +290,9 @@ export default function RoleFitAgentCaseStudyPage() {
         </div>
       </section>
 
-      {hasReportSource ? <ContextFab href="/minime" label="Report" ariaLabel="Back to report" icon="arrow_back" placement="top" variant="report-return" /> : null}
+      <Suspense fallback={null}>
+        <ReportReturnFab />
+      </Suspense>
       <ContextFab href="/design-system" label="Next Case Study" icon="arrow_forward" />
     </main>
   );
