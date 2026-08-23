@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import type { ReportUIPayload } from "@/lib/role-fit/contracts";
+import { evidenceClusterTitle, evidenceConfidenceAccessibilityLabel, evidenceProjectTitles } from "@/lib/role-fit/report/evidence-card-display";
 import styles from "./role-fit-live-report.module.css";
 
 type ReportItem = ReportUIPayload["requirementMapping"]["items"][number];
@@ -164,11 +165,13 @@ function EvidenceContent({
     );
   }
 
+  const hasMultipleProjects = evidenceProjectTitles(clusters).length > 1;
+
   return (
     <div className={styles.evidenceContent}>
       {clusters.map((cluster) => (
         <div className={styles.evidenceBlock} key={cluster.clusterId}>
-          <h4>{cluster.project?.title || cluster.title}</h4>
+          <h4>{evidenceClusterTitle(cluster, hasMultipleProjects)}</h4>
           <p>{cluster.summary}</p>
           <div className={styles.supportReason}>
             <strong>Why this supports the requirement</strong>
@@ -218,12 +221,14 @@ function EvidenceSection({
           const isOpen = openIds.has(item.itemId);
           const panelId = `evidence-panel-${report.reportId}-${item.itemId}`;
           const clusters = item.clusterIds.map((id) => clusterById.get(id)).filter((cluster): cluster is EvidenceCluster => Boolean(cluster));
-          const caseStudyTitles = [...new Set(clusters.map((cluster) => cluster.project?.title || cluster.title))];
-          const evidenceSourceLabel = caseStudyTitles.length === 0
-            ? "No case studies"
-            : caseStudyTitles.length === 1
-            ? caseStudyTitles[0]
-            : `${caseStudyTitles.length} Case studies`;
+          const caseStudyTitles = evidenceProjectTitles(clusters);
+          const evidenceSourceLabel = caseStudyTitles.length === 0 ? "No case studies" : caseStudyTitles.join(", ");
+          const confidenceClass = {
+            high: styles.evidenceConfidenceHigh,
+            medium: styles.evidenceConfidenceMedium,
+            low: styles.evidenceConfidenceLow,
+            insufficient: styles.evidenceConfidenceInsufficient,
+          }[item.evidenceConfidence];
           return (
             <article className={`${styles.requirement} ${isOpen ? styles.requirementOpen : ""}`} key={item.itemId}>
               <button
@@ -243,7 +248,12 @@ function EvidenceSection({
                 <span className={styles.requirementCopy}>
                   <strong title={item.displayLabel || item.originalText}>{item.displayLabel || item.originalText}</strong>
                   <small title={item.shortRationale}>{item.shortRationale}</small>
-                  <span className={styles.matchLabel}>{evidenceSourceLabel} | {item.evidenceConfidence.replaceAll("-", " ")}</span>
+                  <span
+                    aria-label={evidenceConfidenceAccessibilityLabel(caseStudyTitles, item.evidenceConfidence)}
+                    className={`${styles.matchLabel} ${confidenceClass}`}
+                  >
+                    {evidenceSourceLabel}
+                  </span>
                 </span>
                 <MaterialIcon className={styles.chevron} name="expand_more" />
               </button>

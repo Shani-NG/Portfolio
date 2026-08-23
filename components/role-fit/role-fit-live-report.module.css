@@ -402,13 +402,17 @@
 .requirementCopy small { color: var(--ds-color-text-secondary); font-size: var(--ds-type-label-13-size); line-height: 1.45; margin-top: var(--ds-space-2xs); }
 
 .matchLabel {
-  color: var(--fit-color);
   display: block;
   font-size: 0.6875rem;
   font-weight: var(--ds-type-weight-semibold);
   margin-top: var(--ds-space-xs);
-  text-transform: capitalize;
+  overflow-wrap: anywhere;
 }
+
+.evidenceConfidenceHigh { color: var(--ds-color-action-secondary-hover); }
+.evidenceConfidenceMedium { color: var(--ds-color-action-primary-hover); }
+.evidenceConfidenceLow,
+.evidenceConfidenceInsufficient { color: var(--ds-color-text-secondary); }
 
 .chevron { color: var(--ds-color-text-secondary); transition: transform var(--ds-duration-base) var(--ds-ease-standard); }
 .requirementOpen .chevron { color: var(--fit-color); transform: rotate(180deg); }

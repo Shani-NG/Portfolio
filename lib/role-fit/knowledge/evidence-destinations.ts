@@ -11,6 +11,7 @@ type ApprovedProjectDestination = {
   title: string;
   slug: string;
   anchors: ReadonlySet<string>;
+  anchorLabels: Readonly<Record<string, string>>;
 };
 
 function project(
@@ -18,8 +19,9 @@ function project(
   title: string,
   slug: string,
   anchors: readonly string[],
+  anchorLabels: Readonly<Record<string, string>> = {},
 ): ApprovedProjectDestination {
-  return { projectId, title, slug, anchors: new Set(anchors) };
+  return { projectId, title, slug, anchors: new Set(anchors), anchorLabels };
 }
 
 export const approvedProjectDestinations: Record<ApprovedProjectId, ApprovedProjectDestination> = {
@@ -46,7 +48,16 @@ export const approvedProjectDestinations: Record<ApprovedProjectId, ApprovedProj
     "ux-engineering-through-integration",
     "screens-as-proof",
     "operational-resilience",
-  ]),
+  ], {
+    "c4i-beyond-clarity": "C4I - Beyond Clarity",
+    "before-ux-organizational-alignment": "Before UX: organizational alignment.",
+    "four-pillars-one-shared-logic": "Four pillars. One shared logic.",
+    "the-real-ux-was-invisible": "The real UX was invisible.",
+    "defaults-made-each-workspace-feel-purpose-built": "Defaults made each workspace feel purpose-built.",
+    "designed-for-threat-response": "Designed for threat response, not just information display.",
+    "ux-engineering-through-integration": "UX engineering through integration.",
+    "screens-as-proof": "Screens as proof.",
+  }),
   epd: project("epd", "UX from the Heart", "ux-from-the-heart", [
     "ux-from-the-heart",
     "project-overview",
@@ -79,7 +90,17 @@ export const approvedProjectDestinations: Record<ApprovedProjectId, ApprovedProj
     "first-week-product-value",
     "insight-loop-prioritization",
     "product-judgment",
-  ]),
+  ], {
+    "monitoring-and-product-intelligence": "Monitoring and Product Intelligence",
+    "from-field-noise-to-product-judgment": "From field noise to product judgment",
+    "a-learning-system": "I did not want another feedback loop. I wanted a learning system.",
+    "scenario-mapping": "Scenario mapping turned usage into measurable intent",
+    "matomo-product-evaluation-layer": "Matomo became a product evaluation layer",
+    "evidence-backed-ux-decisions": "From analytics to evidence-backed UX decisions",
+    "first-week-product-value": "The first week surfaced hidden product value",
+    "insight-loop-prioritization": "The insight loop changed prioritization",
+    "product-judgment": "Not dashboards. Product judgment.",
+  }),
   "role-fit-agent": project("role-fit-agent", "Role Fit Agent", "role-fit-agent", [
     "overview",
     "opportunity",
@@ -90,8 +111,27 @@ export const approvedProjectDestinations: Record<ApprovedProjectId, ApprovedProj
     "mvp-scope",
     "behind-the-build",
     "live-experience",
-  ]),
+  ], {
+    overview: "Overview",
+    opportunity: "Opportunity",
+    "build-journey": "Build journey",
+    "product-story": "Product story",
+    "technical-architecture": "Technical system architecture",
+    "decision-evolution": "Decision evolution",
+    "mvp-scope": "MVP scope",
+    "behind-the-build": "Behind the build",
+    "live-experience": "Explore the experience",
+  }),
 };
+
+export function evidenceDestinationDisplayLabel(input: {
+  project?: { slug: string; title: string };
+  destination: { mode: "anchor"; href: string; anchorId: string; dedupeKey: string } | { mode: "project-top"; href: string; dedupeKey: string } | { mode: "no-link"; dedupeKey: string };
+}) {
+  if (input.destination.mode !== "anchor" || !input.project) return undefined;
+  const project = Object.values(approvedProjectDestinations).find((candidate) => candidate.slug === input.project?.slug);
+  return project?.anchorLabels[input.destination.anchorId] ?? input.project.title;
+}
 
 export type ApprovedEvidenceDestination =
   | {
