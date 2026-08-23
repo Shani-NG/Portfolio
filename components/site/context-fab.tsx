@@ -21,6 +21,7 @@ export function ContextFab({ href, label, ariaLabel, icon = "arrow_back", placem
         placement === "top" ? styles.top : "",
         variant === "report-return" ? styles.reportReturn : "",
       ].filter(Boolean).join(" ")}
+      data-tooltip={variant === "report-return" ? "BACK TO REPORT" : undefined}
       href={href}
     >
       <MaterialIcon name={icon} />
