@@ -172,7 +172,28 @@ describe("Task C evidence and report integrity", () => {
 
   it("C06 does not select Role Fit Agent for an unrelated requirement", async () => {
     const bundle = await loadApprovedEvidence("clinical electrophysiology catheter visualization");
-    assert.equal(bundle.sources.some((source) => source.id.startsWith("role-fit-agent:")), false);
+    assert.equal(
+      bundle.candidatesByRoleItem?.[0]?.candidates.some((candidate) => candidate.sourceId.startsWith("role-fit-agent:")),
+      false,
+    );
+  });
+
+  it("rejects a globally approved source that is outside the specific requirement candidate set", () => {
+    const requirementBoundEvidence: ApprovedEvidenceBundle = {
+      promptContext: evidence.promptContext,
+      sources: [
+        ...evidence.sources,
+        { id: "epd", label: "EPD", content: "Clinical evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "epd", slug: "ux-from-the-heart", title: "EPD" } },
+      ],
+      candidatesByRoleItem: [{ roleItemIndex: 0, roleItemText: "Complex-system UX strategy", candidates: [{ sourceId: "c4i", relevanceScore: 10 }] }],
+    };
+    const result = composeReportUIPayload({
+      analysis: analysis({ items: [item(0, "direct", "strength", ["epd"])] }),
+      roleDraft: roleDraft(),
+      evidence: requirementBoundEvidence,
+      language: "en",
+    });
+    assert.deepEqual(result, { ok: false, diagnostic: "evidence:source-not-in-requirement-candidates" });
   });
 
   it("C07 limits Top Strengths to supported direct, semantic, and transferable strengths", () => {

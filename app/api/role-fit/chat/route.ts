@@ -34,19 +34,19 @@ const pendingFieldSchema = z.enum(["company", "title", "responsibilities", "requ
 
 const requestSchema = z
   .object({
-    conversationId: z.string(),
-    sessionId: z.string().optional(),
-    message: z.string().min(1),
+    conversationId: z.string().min(1).max(160),
+    sessionId: z.string().min(1).max(160).optional(),
+    message: z.string().min(1).max(20_000),
     language: z.enum(["he", "en", "mixed"]).default("en"),
     repeatedInput: z.boolean().optional().default(false),
     roleCollectionActive: z.boolean().optional().default(false),
     clarificationAttempts: z.number().int().nonnegative().max(10).optional().default(0),
     completedReportCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional().default(0),
-    conversationContext: z.string().optional(),
-    reportContext: z.string().optional(),
+    conversationContext: z.string().max(12_000).optional(),
+    reportContext: z.string().max(18_000).optional(),
     roleContext: z
       .object({
-        roleText: z.string(),
+        roleText: z.string().max(20_000),
         pendingField: pendingFieldSchema.optional(),
       })
       .strict()

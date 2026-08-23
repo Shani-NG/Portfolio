@@ -117,8 +117,8 @@ For general questions:
 
 For role-fit analysis:
 
-1\. Search the CV for direct qualification evidence.  
-2\. Use capability routing to identify the strongest relevant case study.  
+1\. Use only the application-supplied candidate evidence set for the specific requirement.
+2\. Prefer qualifying case-study evidence; use CV evidence only when no qualifying case-study evidence supports that requirement.
 3\. Prefer specific evidence over broad project summaries.  
 4\. Use one primary evidence item and up to two supporting items when useful.  
 5\. Separate implemented work, proposed concepts, and future vision.  

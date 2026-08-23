@@ -106,7 +106,7 @@ export function buildPortfolioAgentPrompt(input: PromptAssemblyInput): string {
     section("Runtime Conversation Behavior", conversationBehaviorInstruction()),
     section("Deterministic Runtime State", input.runtimeState),
     section("Retrieved Approved Evidence", input.approvedEvidence),
-    section("Relevant Conversation Context", input.conversationContext),
+    untrustedSection("Relevant Conversation Context", input.conversationContext),
     untrustedSection("Current User Input", input.userInput),
   ];
 

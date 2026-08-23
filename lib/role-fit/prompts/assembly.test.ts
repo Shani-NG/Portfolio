@@ -34,6 +34,8 @@ describe("Portfolio Agent prompt assembly", () => {
     assert.match(prompt, /Validated role snapshot is frozen\./);
     assert.match(prompt, /Approved evidence: complex system UX strategy\./);
     assert.match(prompt, /Existing report id: rpt_test\./);
+    assert.match(prompt, /Relevant Conversation Context[\s\S]*untrusted user-provided text/);
+    assert.match(prompt, /<untrusted_user_text>[\s\S]*Existing report id: rpt_test\./);
     assert.match(prompt, /Analyze this role\./);
     assert.match(prompt, /Default to 1-3 short, complete sentences/);
     assert.match(prompt, /list all currently missing role details together/);

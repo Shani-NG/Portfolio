@@ -6,6 +6,7 @@ import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
 import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
+import { constrainRepairAnalysis } from "@/lib/role-fit/report/repair";
 import { evaluateReportEligibility, evidenceStateFromComposedReport } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
 
@@ -206,9 +207,19 @@ export async function POST(request: Request) {
     }),
   );
 
-  const provider = getRoleFitModelProvider();
-  const approvedEvidence = await loadApprovedEvidence(parsedRequest.data.roleText);
   const roleItems = getRoleAnalysisItems(validation.roleDraft);
+  const provider = getRoleFitModelProvider();
+  const approvedEvidence = await loadApprovedEvidence(parsedRequest.data.roleText, roleItems);
+  if (approvedEvidence.catalogAudit?.issues.length) {
+    console.warn("[role-fit-report] evidence catalog exclusions", {
+      traceId,
+      issues: approvedEvidence.catalogAudit.issues.map((issue) => ({
+        code: issue.code,
+        projectId: issue.projectId,
+        evidenceId: issue.evidenceId,
+      })),
+    });
+  }
   let modelResult = await provider.generateReport({
     roleText: parsedRequest.data.roleText,
     language: parsedRequest.data.language,
@@ -286,9 +297,14 @@ export async function POST(request: Request) {
     });
 
     if (repairResult.ok) {
-      modelResult = repairResult;
+      const constrainedRepairAnalysis = constrainRepairAnalysis({
+        original: modelResult.analysis,
+        repaired: repairResult.analysis,
+        diagnostic: firstDiagnostic,
+      });
+      modelResult = { ...repairResult, analysis: constrainedRepairAnalysis };
       composition = composeReportUIPayload({
-        analysis: repairResult.analysis,
+        analysis: constrainedRepairAnalysis,
         roleDraft: validation.roleDraft,
         evidence: approvedEvidence,
         language: parsedRequest.data.language,

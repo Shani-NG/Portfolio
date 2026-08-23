@@ -19,6 +19,8 @@ type LiveReportState = {
 type ErrorContext = "conversation" | "report" | "validation" | null;
 
 const reportRequestTimeoutMs = 150_000;
+const maxRoleFileBytes = 64 * 1024;
+const approvedRoleFileExtensions = new Set(["txt", "md", "csv"]);
 
 type ReportFailureResult = {
   state?: string;
@@ -166,7 +168,7 @@ export default function RoleFitPage() {
           roleCollectionActive: currentSession.state === "awaiting-role-completion" && !currentSession.reportPayload,
           clarificationAttempts: currentSession.clarificationAttempts,
           completedReportCount: currentSession.completedReportCount,
-          conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)),
+          conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)).slice(-12000),
           reportContext: currentSession.reportPayload ? JSON.stringify(currentSession.reportPayload).slice(0, 18000) : undefined,
           roleContext: currentSession.activeRoleText
             ? {
@@ -427,6 +429,16 @@ export default function RoleFitPage() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+
+    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!approvedRoleFileExtensions.has(extension)) {
+      appendLiveMessage({ role: "agent", content: "Please choose a TXT, Markdown, or CSV file." });
+      return;
+    }
+    if (file.size > maxRoleFileBytes) {
+      appendLiveMessage({ role: "agent", content: "The selected file is too large. Please upload a file smaller than 64 KB." });
+      return;
+    }
 
     void file.text()
       .then((fileText) => {

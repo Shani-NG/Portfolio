@@ -5,13 +5,13 @@ export type RoleClarificationField = "company" | "title" | "responsibilities" | 
 export type RoleCorrection = { field: RoleClarificationField; value: string };
 
 const roleSectionHeadings: Array<{ kind: RoleSectionKind; labels: string[] }> = [
-  { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity", "Overview"] },
-  { kind: "responsibilities", labels: ["What You'll Do", "What You Will Do", "Responsibilities", "Key Responsibilities", "Your Responsibilities", "The Role"] },
+  { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity", "Overview", "תיאור המשרה", "על התפקיד"] },
+  { kind: "responsibilities", labels: ["What You'll Do", "What You Will Do", "Responsibilities", "Key Responsibilities", "Your Responsibilities", "The Role", "תחומי אחריות", "אחריות", "מה תעשו", "מה תעשי"] },
   {
     kind: "requirements",
-    labels: ["Requirements", "What We're Looking For", "What You Have", "Qualifications", "Required Qualifications", "Key Qualifications", "Must Have", "Skills"],
+    labels: ["Requirements", "What We're Looking For", "What You Have", "Qualifications", "Required Qualifications", "Key Qualifications", "Must Have", "Skills", "דרישות", "כישורים נדרשים", "מה אנחנו מחפשים"],
   },
-  { kind: "preferred", labels: ["Nice to Have", "Preferred Qualifications", "Bonus Points", "Preferred"] },
+  { kind: "preferred", labels: ["Nice to Have", "Preferred Qualifications", "Bonus Points", "Preferred", "יתרון", "כישורים מועדפים"] },
 ];
 
 const normalizedHeadingEntries = roleSectionHeadings.flatMap((section) =>
@@ -122,7 +122,7 @@ export function isPlausibleRoleTitle(value: string): boolean {
 }
 
 function inferTitle(roleText: string): string {
-  const labeledTitle = extractSection(roleText, ["title", "role"]);
+  const labeledTitle = extractSection(roleText, ["title", "role", "תפקיד", "שם המשרה"]);
   if (labeledTitle) return labeledTitle;
 
   const normalizedText = normalizeRoleText(roleText);
@@ -239,7 +239,7 @@ export function resolveRoleTextForValidation(input: {
 }
 
 function inferCompany(roleText: string): string {
-  const labeledCompany = extractSection(roleText, ["company", "organization"]);
+  const labeledCompany = extractSection(roleText, ["company", "organization", "חברה", "ארגון"]);
   if (labeledCompany) return labeledCompany;
 
   const match = roleText.match(/\b([A-Z][A-Z0-9&.-]{1,})\s+is looking\b/);
@@ -282,10 +282,10 @@ export function createRoleDraftFromText(roleText: string) {
   const title = inferTitle(roleText);
   const blocks = extractSectionBlocks(roleText);
   const description =
-    extractSection(roleText, ["description", "summary"]) ||
+    extractSection(roleText, ["description", "summary", "תיאור", "תיאור המשרה"]) ||
     blocks.description.join("\n");
-  const labeledResponsibilities = extractList(roleText, ["responsibilities", "responsibility", "key responsibilities"]);
-  const labeledRequirements = extractList(roleText, ["requirements", "must have", "required", "qualifications", "skills"]);
+  const labeledResponsibilities = extractList(roleText, ["responsibilities", "responsibility", "key responsibilities", "תחומי אחריות", "אחריות"]);
+  const labeledRequirements = extractList(roleText, ["requirements", "must have", "required", "qualifications", "skills", "דרישות", "כישורים נדרשים"]);
   const responsibilities = labeledResponsibilities.length > 0
     ? labeledResponsibilities
     : blocks.responsibilities.flatMap(splitBlockItems);

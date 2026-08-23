@@ -11,4 +11,4 @@ The knowledge layer must not:
 - invent evidence IDs, project details, metrics, clients, responsibilities, or outcomes
 - expose internal-only evidence to the browser
 
-Current status: foundation placeholder only. No retrieval, indexing, or evidence loading has been implemented.
+Current status: canonical case-study evidence is parsed into a validated catalog, bounded per requirement, and resolved through application-owned selection and public destinations. Invalid items are excluded only with structured audit reasons.

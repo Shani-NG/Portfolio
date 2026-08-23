@@ -91,7 +91,7 @@ export async function evaluateCanonicalJobFit(candidate: NormalizedJobCandidate)
   const prepared = prepareCanonicalJobFit(candidate);
   if (!prepared.ok) return prepared.response;
 
-  const approvedEvidence = await loadApprovedEvidence(candidate.cleanedJobContent);
+  const approvedEvidence = await loadApprovedEvidence(candidate.cleanedJobContent, prepared.roleItems);
   const modelResult = await getRoleFitModelProvider().generateReport({
     roleText: candidate.cleanedJobContent,
     language: candidate.language,
