@@ -75,4 +75,20 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(failureLogBlock, /finalDiagnostic:/);
     assert.doesNotMatch(failureLogBlock, /roleText|approvedEvidence|runtimeState|authorization|secret/i);
   });
+
+  test("recovers an unrepresented trusted limitation before requesting a second model analysis", async () => {
+    const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
+    const originalDiagnostic = route.indexOf("const originalCompositionDiagnostic");
+    const deterministicRecovery = route.indexOf("getDeterministicLimitationRepresentation", originalDiagnostic);
+    const modelRepair = route.indexOf("if (!composition.ok && shouldUseModelRepair", deterministicRecovery);
+    const recoveryBlock = route.slice(deterministicRecovery, modelRepair);
+
+    assert.ok(originalDiagnostic >= 0);
+    assert.ok(deterministicRecovery > originalDiagnostic);
+    assert.ok(modelRepair > deterministicRecovery);
+    assert.match(recoveryBlock, /analysis: modelResult\.analysis/);
+    assert.match(recoveryBlock, /representedLimitationRoleItemIndexes/);
+    assert.match(recoveryBlock, /composition = composeReportUIPayload/);
+    assert.doesNotMatch(recoveryBlock, /provider\.generateReport/);
+  });
 });

@@ -109,9 +109,15 @@ function semanticRationale(item: AnalysisItem, language: "he" | "en" | "mixed") 
   return conciseSentences([base, ...details].filter(Boolean).join(". "), 5, 620);
 }
 
-function semanticDiagnostic(analysis: QualitativeReportAnalysis): string | null {
+function semanticDiagnostic(
+  analysis: QualitativeReportAnalysis,
+  representedLimitationRoleItemIndexes: ReadonlySet<number>,
+): string | null {
   const gapEligibleItems = analysis.items.filter((item) => gapMatchTypes.has(item.matchType) && item.impact === "gap");
   const limitationItems = analysis.items.filter((item) => gapMatchTypes.has(item.matchType));
+  const unrepresentedLimitationItems = limitationItems.filter((item) =>
+    item.impact !== "gap" && !representedLimitationRoleItemIndexes.has(item.roleItemIndex),
+  );
 
   for (const item of analysis.items) {
     if (positiveMatchTypes.has(item.matchType) && item.impact === "gap") return "semantic:positive-match-marked-gap";
@@ -131,7 +137,7 @@ function semanticDiagnostic(analysis: QualitativeReportAnalysis): string | null 
   if (
     (analysis.fitLevel === "strong" || analysis.fitLevel === "good")
     && gapEligibleItems.length === 0
-    && limitationItems.length > 0
+    && unrepresentedLimitationItems.length > 0
   ) {
     return "semantic:unrepresented-limitation";
   }
@@ -192,9 +198,12 @@ export function deriveTopStrengths(items: ReportItem[]) {
   );
 }
 
-export function deriveKeyGaps(items: ReportItem[]) {
+export function deriveKeyGaps(items: ReportItem[], representedLimitationItemIds: ReadonlySet<string> = new Set()) {
   return dedupeReportItems(
-    items.filter((item) => gapMatchTypes.has(item.matchType) && item.impact === "gap"),
+    items.filter((item) =>
+      gapMatchTypes.has(item.matchType)
+      && (item.impact === "gap" || representedLimitationItemIds.has(item.itemId)),
+    ),
     3,
   );
 }
@@ -205,6 +214,7 @@ export function composeReportUIPayload(input: {
   evidence: ApprovedEvidenceBundle;
   language: "he" | "en" | "mixed";
   reportId?: string;
+  representedLimitationRoleItemIndexes?: readonly number[];
 }): CompositionResult {
   const roleItems = getRoleAnalysisItems(input.roleDraft);
   const sourceById = new Map(input.evidence.sources.map((source) => [source.id, source]));
@@ -215,11 +225,19 @@ export function composeReportUIPayload(input: {
     return { ok: false, diagnostic: "composition:item-count" };
   }
 
-  const semanticIssue = semanticDiagnostic(input.analysis);
+  const recoverableLimitationRoleItemIndexes = new Set(input.analysis.items
+    .filter((item) => gapMatchTypes.has(item.matchType) && item.impact === "neutral")
+    .map((item) => item.roleItemIndex));
+  const representedLimitationRoleItemIndexes = new Set(
+    (input.representedLimitationRoleItemIndexes ?? [])
+      .filter((roleItemIndex) => recoverableLimitationRoleItemIndexes.has(roleItemIndex)),
+  );
+  const semanticIssue = semanticDiagnostic(input.analysis, representedLimitationRoleItemIndexes);
   if (semanticIssue) return { ok: false, diagnostic: semanticIssue };
   const analysis = { ...input.analysis, fitLevel: resolveStableFitLevel(input.analysis) };
 
   const reportItems: ReportItem[] = [];
+  const representedLimitationItemIds = new Set<string>();
 
   for (const [position, analysisItem] of analysis.items.entries()) {
     const roleItem = roleItems[analysisItem.roleItemIndex];
@@ -246,7 +264,7 @@ export function composeReportUIPayload(input: {
       ? normalizeItemText(roleItem.originalText, rawRationale, 620)
       : rawRationale;
 
-    reportItems.push({
+    const reportItem: ReportItem = {
       itemId: `role-item-${position + 1}`,
       originalText: roleItem.originalText,
       displayLabel,
@@ -258,7 +276,11 @@ export function composeReportUIPayload(input: {
       evidenceConfidence: analysisItem.evidenceConfidence,
       shortRationale,
       clusterIds: evidenceSourceIds.map((sourceId) => `evidence-${sourceId}`),
-    });
+    };
+    reportItems.push(reportItem);
+    if (representedLimitationRoleItemIndexes.has(analysisItem.roleItemIndex)) {
+      representedLimitationItemIds.add(reportItem.itemId);
+    }
   }
 
   const referencedSourceIds = [...new Set(reportItems.flatMap((item) =>
@@ -310,7 +332,7 @@ export function composeReportUIPayload(input: {
   }
 
   const strengths = deriveTopStrengths(reportItems);
-  const gaps = deriveKeyGaps(reportItems);
+  const gaps = deriveKeyGaps(reportItems, representedLimitationItemIds);
   const matchedRequirements = reportItems.filter((item) =>
     positiveMatchTypes.has(item.matchType) && item.clusterIds.length > 0,
   ).length;

@@ -260,6 +260,82 @@ describe("Task C evidence and report integrity", () => {
     assert.deepEqual(result, { ok: false, diagnostic: "semantic:low-confidence-without-gap" });
   });
 
+  it("blocks a genuine structured limitation before deterministic representation recovery", () => {
+    const limitedAnalysis = analysis({
+      fitLevel: "good",
+      items: [
+        item(0, "direct", "strength", ["c4i"]),
+        item(1, "insufficient-evidence", "neutral", []),
+      ],
+    });
+
+    const result = composeReportUIPayload({
+      analysis: limitedAnalysis,
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.deepEqual(result, { ok: false, diagnostic: "semantic:unrepresented-limitation" });
+  });
+
+  it("deterministically represents the same trusted limitation without changing its classification or evidence", () => {
+    const limitedAnalysis = analysis({
+      fitLevel: "good",
+      items: [
+        item(0, "direct", "strength", ["c4i"]),
+        item(1, "insufficient-evidence", "neutral", []),
+      ],
+    });
+    const originalAnalysis = structuredClone(limitedAnalysis);
+
+    const result = composeReportUIPayload({
+      analysis: limitedAnalysis,
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+      representedLimitationRoleItemIndexes: [1],
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(limitedAnalysis, originalAnalysis);
+    assert.equal(result.report.overallFitVisual.mode, "fit");
+    if (result.report.overallFitVisual.mode !== "fit") return;
+    assert.equal(result.report.overallFitVisual.level, "partial");
+    assert.equal(result.report.requirementMapping.items[1]?.matchType, "insufficient-evidence");
+    assert.equal(result.report.requirementMapping.items[1]?.impact, "neutral");
+    assert.deepEqual(result.report.requirementMapping.items[1]?.clusterIds, []);
+    assert.deepEqual(result.report.keyGaps.items, [result.report.requirementMapping.items[1]]);
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i"]);
+  });
+
+  it("cannot invent limitation representation with an unrelated role item index", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({ fitLevel: "good", items: [item(0, "partial", "neutral", ["c4i"])] }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+      representedLimitationRoleItemIndexes: [999],
+    });
+
+    assert.deepEqual(result, { ok: false, diagnostic: "semantic:unrepresented-limitation" });
+  });
+
+  it("does not force a key gap when no qualifying limitation exists", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({ fitLevel: "good" }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+      representedLimitationRoleItemIndexes: [0],
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.report.keyGaps.items, []);
+  });
+
   it("C14 recovers exact evidence reuse with a different canonical item", () => {
     const evidenceWithAlternative: ApprovedEvidenceBundle = {
       ...evidence,

@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
 import { createCompositionFailureMetadata } from "./composition-observability.ts";
-import { constrainRepairAnalysis, shouldUseModelRepair } from "./repair.ts";
+import {
+  constrainRepairAnalysis,
+  getDeterministicLimitationRepresentation,
+  shouldUseModelRepair,
+} from "./repair.ts";
 
 function analysis(overrides: Partial<QualitativeReportAnalysis> = {}): QualitativeReportAnalysis {
   return {
@@ -61,6 +65,34 @@ describe("report repair boundary", () => {
       constrainRepairAnalysis({ original, repaired, diagnostic: "semantic:incomplete-semantic-rationale" }),
       repaired,
     );
+  });
+
+  it("derives deterministic representation only from existing neutral limitation items", () => {
+    const limited = analysis({
+      fitLevel: "good",
+      items: [{
+        ...analysis().items[0]!,
+        roleItemIndex: 2,
+        matchType: "partial",
+        impact: "neutral",
+      }],
+    });
+
+    assert.deepEqual(getDeterministicLimitationRepresentation({
+      analysis: limited,
+      diagnostic: "semantic:unrepresented-limitation",
+    }), [2]);
+    assert.equal(getDeterministicLimitationRepresentation({
+      analysis: limited,
+      diagnostic: "semantic:partial-fit-without-gap",
+    }), null);
+  });
+
+  it("cannot invent a limitation when the trusted analysis contains none", () => {
+    assert.equal(getDeterministicLimitationRepresentation({
+      analysis: analysis(),
+      diagnostic: "semantic:unrepresented-limitation",
+    }), null);
   });
 });
 
