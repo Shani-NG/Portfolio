@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
+import { createCompositionFailureMetadata } from "./composition-observability.ts";
 import { constrainRepairAnalysis, shouldUseModelRepair } from "./repair.ts";
 
 function analysis(overrides: Partial<QualitativeReportAnalysis> = {}): QualitativeReportAnalysis {
@@ -60,5 +61,87 @@ describe("report repair boundary", () => {
       constrainRepairAnalysis({ original, repaired, diagnostic: "semantic:incomplete-semantic-rationale" }),
       repaired,
     );
+  });
+});
+
+describe("composition failure observability", () => {
+  const common = {
+    traceId: "trace_safe",
+    provider: "gemini",
+    model: "gemini-test",
+    originalDiagnostic: "semantic:partial-fit-without-gap",
+  };
+
+  it("records a composition failure that does not use model repair", () => {
+    assert.deepEqual(createCompositionFailureMetadata({
+      ...common,
+      originalDiagnostic: "evidence:no-sufficiently-relevant-canonical-source",
+      repairOutcome: "not-attempted",
+      finalDiagnostic: "evidence:no-sufficiently-relevant-canonical-source",
+    }), {
+      traceId: "trace_safe",
+      provider: "gemini",
+      model: "gemini-test",
+      originalDiagnostic: "evidence:no-sufficiently-relevant-canonical-source",
+      repairAttempted: false,
+      repairOutcome: "not-attempted",
+      finalDiagnostic: "evidence:no-sufficiently-relevant-canonical-source",
+    });
+  });
+
+  it("distinguishes a failed repair call with a safe category", () => {
+    assert.deepEqual(createCompositionFailureMetadata({
+      ...common,
+      repairOutcome: "repair-call-failed",
+      repairFailureCategory: "provider-error",
+      finalDiagnostic: "semantic:partial-fit-without-gap",
+    }), {
+      traceId: "trace_safe",
+      provider: "gemini",
+      model: "gemini-test",
+      originalDiagnostic: "semantic:partial-fit-without-gap",
+      repairAttempted: true,
+      repairOutcome: "repair-call-failed",
+      repairFailureCategory: "provider-error",
+      finalDiagnostic: "semantic:partial-fit-without-gap",
+    });
+  });
+
+  it("distinguishes repaired output that still fails composition", () => {
+    assert.deepEqual(createCompositionFailureMetadata({
+      ...common,
+      repairOutcome: "repaired-output-still-invalid",
+      finalDiagnostic: "semantic:low-confidence-without-gap",
+    }), {
+      traceId: "trace_safe",
+      provider: "gemini",
+      model: "gemini-test",
+      originalDiagnostic: "semantic:partial-fit-without-gap",
+      repairAttempted: true,
+      repairOutcome: "repaired-output-still-invalid",
+      finalDiagnostic: "semantic:low-confidence-without-gap",
+    });
+  });
+
+  it("emits only allowlisted metadata without raw request or model content", () => {
+    const metadata = createCompositionFailureMetadata({
+      ...common,
+      repairOutcome: "repair-call-failed",
+      repairFailureCategory: "invalid-output",
+      finalDiagnostic: "semantic:partial-fit-without-gap",
+    });
+    const serialized = JSON.stringify(metadata);
+
+    assert.deepEqual(Object.keys(metadata), [
+      "traceId",
+      "provider",
+      "model",
+      "originalDiagnostic",
+      "repairAttempted",
+      "repairOutcome",
+      "repairFailureCategory",
+      "finalDiagnostic",
+    ]);
+    assert.doesNotMatch(serialized, /roleText|prompt|payload|authorization|secret/i);
   });
 });

@@ -54,4 +54,25 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(page, /pendingReportConfirmation: isNoReport \? false : !missingField/);
     assert.match(page, /pendingReportId: isNoReport \? null : reportId/);
   });
+
+  test("logs allowlisted composition and repair diagnostics at the existing failure boundary", async () => {
+    const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
+    const originalDiagnostic = route.indexOf("const originalCompositionDiagnostic");
+    const repairBranch = route.indexOf("if (!composition.ok && shouldUseModelRepair", originalDiagnostic);
+    const failureLog = route.indexOf('console.error("[role-fit-report] report composition failed"', repairBranch);
+    const failureLogEnd = route.indexOf("after(() =>", failureLog);
+    const failureLogBlock = route.slice(failureLog, failureLogEnd);
+
+    assert.ok(originalDiagnostic >= 0);
+    assert.ok(repairBranch > originalDiagnostic);
+    assert.ok(failureLog > repairBranch);
+    assert.match(route, /repairOutcome = "repair-call-failed"/);
+    assert.match(route, /repairOutcome = "repaired-output-still-invalid"/);
+    assert.match(failureLogBlock, /createCompositionFailureMetadata/);
+    assert.match(failureLogBlock, /originalDiagnostic:/);
+    assert.match(failureLogBlock, /repairOutcome,/);
+    assert.match(failureLogBlock, /repairFailureCategory,/);
+    assert.match(failureLogBlock, /finalDiagnostic:/);
+    assert.doesNotMatch(failureLogBlock, /roleText|approvedEvidence|runtimeState|authorization|secret/i);
+  });
 });

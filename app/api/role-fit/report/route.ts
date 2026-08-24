@@ -6,6 +6,7 @@ import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
 import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
+import { createCompositionFailureMetadata, type CompositionRepairOutcome } from "@/lib/role-fit/report/composition-observability";
 import { constrainRepairAnalysis, shouldUseModelRepair } from "@/lib/role-fit/report/repair";
 import { evaluateReportEligibility, evidenceStateFromComposedReport } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
@@ -277,6 +278,9 @@ export async function POST(request: Request) {
     language: parsedRequest.data.language,
     reportId: parsedRequest.data.reportId,
   });
+  const originalCompositionDiagnostic = composition.ok ? undefined : composition.diagnostic;
+  let repairOutcome: CompositionRepairOutcome = "not-attempted";
+  let repairFailureCategory: "missing-configuration" | "provider-error" | "invalid-output" | undefined;
 
   if (!composition.ok && shouldUseModelRepair(composition.diagnostic)) {
     const firstDiagnostic = composition.diagnostic;
@@ -310,16 +314,23 @@ export async function POST(request: Request) {
         language: parsedRequest.data.language,
         reportId: parsedRequest.data.reportId,
       });
+      if (!composition.ok) repairOutcome = "repaired-output-still-invalid";
+    } else {
+      repairOutcome = "repair-call-failed";
+      repairFailureCategory = repairResult.error;
     }
   }
 
   if (!composition.ok) {
-    console.error("[role-fit-report] report composition failed", {
+    console.error("[role-fit-report] report composition failed", createCompositionFailureMetadata({
       traceId,
       provider: modelResult.provider,
       model: modelResult.model,
-      diagnostic: composition.diagnostic,
-    });
+      originalDiagnostic: originalCompositionDiagnostic ?? composition.diagnostic,
+      repairOutcome,
+      repairFailureCategory,
+      finalDiagnostic: composition.diagnostic,
+    }));
     after(() =>
       logRoleFitEvent({
         eventName: "report.failed",
