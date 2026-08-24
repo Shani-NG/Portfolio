@@ -60,6 +60,28 @@ describe("Role Fit runtime conversation contract", () => {
     assert.doesNotMatch(page, /submitLiveMessage\("I want to upload a job description/);
   });
 
+  it("validates upload type and size before reading file contents", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+    const extensionCheck = page.indexOf("approvedRoleFileExtensions.has(extension)");
+    const sizeCheck = page.indexOf("file.size > maxRoleFileBytes");
+    const read = page.indexOf("void file.text()");
+
+    assert.ok(extensionCheck >= 0);
+    assert.ok(sizeCheck > extensionCheck);
+    assert.ok(read > sizeCheck);
+  });
+
+  it("bounds conversation and report context before model execution", async () => {
+    const [page, route] = await Promise.all([
+      readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8"),
+      readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8"),
+    ]);
+
+    assert.match(page, /conversationContext:[^\n]+\.slice\(-12000\)/);
+    assert.match(route, /conversationContext: z\.string\(\)\.max\(12_000\)/);
+    assert.match(route, /reportContext: z\.string\(\)\.max\(18_000\)/);
+  });
+
   it("disables conversation submission when the live agent is unavailable", async () => {
     const [page, route] = await Promise.all([
       readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8"),

@@ -185,6 +185,27 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(result.parseStatus, "valid-complete");
   });
 
+  it("parses a complete Hebrew JD through the approved Hebrew path", () => {
+    const roleText = [
+      "חברה: חברת מוצר רפואי",
+      "תפקיד: אסטרטגית חוויית משתמש בכירה",
+      "תיאור המשרה: הובלת חוויית המוצר במערכת רפואית מורכבת",
+      "תחומי אחריות: הובלת מחקר משתמשים; הגדרת אסטרטגיית מוצר; עבודה עם צוותי פיתוח",
+      "דרישות: ניסיון במערכות מורכבות; ניסיון במחקר משתמשים; הובלה חוצת ארגון",
+      "יתרון: ניסיון במוצרים רפואיים",
+    ].join("\n");
+    const result = validateRoleText({ conversationId: "conv_he", traceId: "trace_he", roleText, detectedLanguage: "he" });
+
+    assert.equal(looksLikeRoleInput(roleText), true);
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.deepEqual(result.missingFields, []);
+    assert.equal(result.roleDraft.company?.originalValue, "חברת מוצר רפואי");
+    assert.equal(result.roleDraft.title?.originalValue, "אסטרטגית חוויית משתמש בכירה");
+    assert.equal(result.roleDraft.responsibilities.length, 3);
+    assert.equal(result.roleDraft.requirements.length, 3);
+    assert.equal(result.roleDraft.preferredQualifications.length, 1);
+  });
+
   it("merges a requested title as a labeled deterministic clarification", () => {
     const initialRole = [
       "Responsibilities: Lead product discovery and align stakeholders",

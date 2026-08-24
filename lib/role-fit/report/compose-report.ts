@@ -1,5 +1,6 @@
 import { reportUIPayloadSchema, type ReportUIPayload, type RoleValidationResult } from "../contracts/index.ts";
 import { resolveApprovedEvidenceDestination } from "../knowledge/evidence-destinations.ts";
+import { createEvidenceSelectionState, selectRequirementEvidence } from "../knowledge/evidence-selection.ts";
 import type { ApprovedEvidenceBundle } from "../knowledge/load-approved-evidence.ts";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
 import { createReportId } from "../identifiers.ts";
@@ -208,6 +209,7 @@ export function composeReportUIPayload(input: {
   const roleItems = getRoleAnalysisItems(input.roleDraft);
   const sourceById = new Map(input.evidence.sources.map((source) => [source.id, source]));
   const seenIndexes = new Set<number>();
+  const evidenceSelectionState = createEvidenceSelectionState();
 
   if (input.analysis.items.length === 0 || input.analysis.items.length > 5) {
     return { ok: false, diagnostic: "composition:item-count" };
@@ -226,16 +228,17 @@ export function composeReportUIPayload(input: {
     }
     seenIndexes.add(analysisItem.roleItemIndex);
 
-    const approvedEvidenceSourceIds = [...new Set(analysisItem.evidenceSourceIds)];
-    if (approvedEvidenceSourceIds.some((sourceId) => !sourceById.has(sourceId))) {
-      return { ok: false, diagnostic: "evidence:unapproved-source-id" };
-    }
-
     const requiresEvidence = positiveMatchTypes.has(analysisItem.matchType) || analysisItem.matchType === "partial";
-    if (requiresEvidence && approvedEvidenceSourceIds.length === 0) {
-      return { ok: false, diagnostic: "evidence:positive-item-without-source" };
-    }
-    const evidenceSourceIds = selectDisplayedEvidenceSourceIds(approvedEvidenceSourceIds, sourceById);
+    const selection = selectRequirementEvidence({
+      roleItemIndex: analysisItem.roleItemIndex,
+      requirementText: roleItem.originalText,
+      requestedSourceIds: analysisItem.evidenceSourceIds,
+      evidence: input.evidence,
+      requiresEvidence,
+      state: evidenceSelectionState,
+    });
+    if (!selection.ok) return selection;
+    const evidenceSourceIds = selectDisplayedEvidenceSourceIds(selection.sourceIds, sourceById);
 
     const displayLabel = normalizeItemText(analysisItem.displayLabel, roleItem.originalText, 64);
     const rawRationale = semanticRationale(analysisItem, input.language);

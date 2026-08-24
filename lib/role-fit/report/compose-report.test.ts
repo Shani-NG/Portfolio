@@ -19,6 +19,7 @@ const evidence: ApprovedEvidenceBundle = {
       sourceType: "case-study",
       approvedPublicVisibility: true,
       claim: "The project required aligning product, design, development, and stakeholders before solving individual screens.",
+      capabilities: ["Complex-system UX strategy", "Cross-functional product alignment", "Evidence-based decisions", "Conversation design", "Privacy-aware product architecture", "Lead product discovery and align stakeholders"],
       project: {
         id: "c4i",
         slug: "c4i-beyond-clarity",
@@ -149,9 +150,11 @@ describe("Task C evidence and report integrity", () => {
     });
   });
 
-  it("C03 rejects an invalid evidence ID", () => {
+  it("C03 replaces an invalid evidence ID deterministically instead of failing composition", () => {
     const result = composeReportUIPayload({ analysis: analysis({ items: [item(0, "direct", "strength", ["invented-source"])] }), roleDraft: roleDraft(), evidence, language: "en" });
-    assert.deepEqual(result, { ok: false, diagnostic: "evidence:unapproved-source-id" });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i"]);
   });
 
   it("C04 ignores an invented anchor and uses the approved fallback", () => {
@@ -172,7 +175,30 @@ describe("Task C evidence and report integrity", () => {
 
   it("C06 does not select Role Fit Agent for an unrelated requirement", async () => {
     const bundle = await loadApprovedEvidence("clinical electrophysiology catheter visualization");
-    assert.equal(bundle.sources.some((source) => source.id.startsWith("role-fit-agent:")), false);
+    assert.equal(
+      bundle.candidatesByRoleItem?.[0]?.candidates.some((candidate) => candidate.sourceId.startsWith("role-fit-agent:")),
+      false,
+    );
+  });
+
+  it("accepts sufficiently relevant canonical evidence outside the specific candidate set", () => {
+    const requirementBoundEvidence: ApprovedEvidenceBundle = {
+      promptContext: evidence.promptContext,
+      sources: [
+        ...evidence.sources,
+        { id: "epd", label: "EPD", content: "Complex-system UX strategy evidence", claim: "Complex-system UX strategy evidence", capabilities: ["Complex-system UX strategy"], sourceType: "case-study", approvedPublicVisibility: true, project: { id: "epd", slug: "ux-from-the-heart", title: "EPD" } },
+      ],
+      candidatesByRoleItem: [{ roleItemIndex: 0, roleItemText: "Complex-system UX strategy", candidates: [{ sourceId: "c4i", relevanceScore: 10 }] }],
+    };
+    const result = composeReportUIPayload({
+      analysis: analysis({ items: [item(0, "direct", "strength", ["epd"])] }),
+      roleDraft: roleDraft(),
+      evidence: requirementBoundEvidence,
+      language: "en",
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["epd"]);
   });
 
   it("C07 limits Top Strengths to supported direct, semantic, and transferable strengths", () => {
@@ -234,13 +260,28 @@ describe("Task C evidence and report integrity", () => {
     assert.deepEqual(result, { ok: false, diagnostic: "semantic:low-confidence-without-gap" });
   });
 
-  it("C14 deduplicates one evidence card used by two requirements", () => {
-    const result = composeReportUIPayload({ analysis: analysis({ items: [item(0), item(1)] }), roleDraft: roleDraft(), evidence, language: "en" });
+  it("C14 recovers exact evidence reuse with a different canonical item", () => {
+    const evidenceWithAlternative: ApprovedEvidenceBundle = {
+      ...evidence,
+      sources: [
+        ...evidence.sources,
+        {
+          id: "epd:alignment",
+          label: "EPD alignment evidence",
+          content: "Cross-functional product alignment",
+          claim: "Cross-functional product alignment",
+          capabilities: ["Cross-functional product alignment"],
+          sourceType: "case-study",
+          approvedPublicVisibility: true,
+          project: { id: "epd", slug: "ux-from-the-heart", title: "EPD" },
+        },
+      ],
+    };
+    const result = composeReportUIPayload({ analysis: analysis({ items: [item(0), item(1)] }), roleDraft: roleDraft(), evidence: evidenceWithAlternative, language: "en" });
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.report.requirementMapping.items.length, 2);
-    assert.equal(result.report.evidencePanel.clusters.length, 1);
-    assert.equal(result.report.evidencePanel.clusters[0]?.supportedItemIds.length, 2);
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i", "epd:alignment"]);
   });
 
   it("prefers supporting case studies over CV evidence", () => {
@@ -251,7 +292,7 @@ describe("Task C evidence and report integrity", () => {
         {
           id: "cv",
           label: "CV knowledge",
-          content: "Approved CV evidence.",
+          content: "Complex-system UX strategy portfolio evidence.",
           sourceType: "cv",
           approvedPublicVisibility: true,
         },
@@ -275,7 +316,7 @@ describe("Task C evidence and report integrity", () => {
       sources: [{
         id: "cv",
         label: "CV knowledge",
-        content: "Approved CV evidence.",
+        content: "Complex-system UX strategy portfolio evidence.",
         sourceType: "cv",
         approvedPublicVisibility: true,
       }],
@@ -294,15 +335,15 @@ describe("Task C evidence and report integrity", () => {
 
   it("never displays CV evidence when supporting case studies exist", () => {
     const caseStudySources: ApprovedEvidenceBundle["sources"] = [
-      { id: "c4i", label: "C4I", content: "C4I evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "c4i", slug: "c4i-beyond-clarity", title: "C4I" } },
-      { id: "epd", label: "EPD", content: "EPD evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "epd", slug: "ux-from-the-heart", title: "EPD" } },
-      { id: "howtool", label: "HOWTOOL", content: "HOWTOOL evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "howtool", slug: "nobody-reads-the-manual", title: "HOWTOOL" } },
-      { id: "monitoring", label: "Monitoring", content: "Monitoring evidence", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "monitoring", slug: "monitoring-product-intelligence", title: "Monitoring" } },
+      { id: "c4i", label: "C4I", content: "Complex-system UX strategy", claim: "Complex-system UX strategy", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "c4i", slug: "c4i-beyond-clarity", title: "C4I" } },
+      { id: "epd", label: "EPD", content: "Complex-system UX strategy", claim: "Complex-system UX strategy", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "epd", slug: "ux-from-the-heart", title: "EPD" } },
+      { id: "howtool", label: "HOWTOOL", content: "Complex-system UX strategy", claim: "Complex-system UX strategy", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "howtool", slug: "nobody-reads-the-manual", title: "HOWTOOL" } },
+      { id: "monitoring", label: "Monitoring", content: "Complex-system UX strategy", claim: "Complex-system UX strategy", sourceType: "case-study", approvedPublicVisibility: true, project: { id: "monitoring", slug: "monitoring-product-intelligence", title: "Monitoring" } },
     ];
     const fiveCardEvidence: ApprovedEvidenceBundle = {
       promptContext: "Approved evidence",
       sources: [
-        { id: "cv", label: "CV", content: "CV evidence", sourceType: "cv", approvedPublicVisibility: true },
+        { id: "cv", label: "CV", content: "Complex-system UX strategy portfolio evidence", sourceType: "cv", approvedPublicVisibility: true },
         ...caseStudySources,
       ],
     };
@@ -315,7 +356,8 @@ describe("Task C evidence and report integrity", () => {
 
     assert.equal(result.ok, true);
     if (!result.ok) return;
-    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i", "epd", "howtool", "monitoring"]);
+    assert.equal(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds).length, 1);
+    assert.notDeepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["cv"]);
   });
 
   it("C15 never turns raw JD text into an approved evidence source", async () => {

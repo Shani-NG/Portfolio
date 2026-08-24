@@ -30,6 +30,7 @@ This folder is the implementation-ready documentation package for building the R
 - `Case_Study_Knowledge_EPD.md`
 - `Case_Study_Knowledge_Monitoring_and_Product_Intelligence.md`
 - `Case_Study_Knowledge_HOWTOOL.md`
+- `Case_Study_Knowledge_Role_Fit_Agent.md`
 
 ### Agent, runtime, QA, and implementation
 - `Final_Portfolio_Agent_System_Prompt.md`

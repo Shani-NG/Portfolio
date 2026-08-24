@@ -4,7 +4,7 @@
 
 Document status: v1.1 — consolidated routing and role-interpretation index  
 Language: English  
-Scope: CV, general profile, and five approved case-study knowledge files  
+Scope: CV, general profile, and six approved case-study knowledge files
 Primary use: Retrieval routing, evidence selection, report generation, follow-up questions, and portfolio navigation
 
 1\. Purpose
@@ -86,6 +86,12 @@ Public title: Nobody Reads the Manual
 Primary aliases: Beyond the Manual, KMS redesign, interactive manual, operational guidance platform.  
 Primary use: Knowledge-management systems, SaaS redesign, publishing validation, web-to-mobile workflows, content authoring, and structured pre-AI automation.  
 Critical rule: HOWTOOL did not use generative AI, RAG, agents, or prompt engineering.
+
+H. Case\_Study\_Knowledge\_Role\_Fit\_Agent
+Canonical file: `Case_Study_Knowledge_Role_Fit_Agent.md`
+Canonical identity: Role Fit Agent
+Primary use: Evidence-based AI product architecture, governed role analysis, deterministic evidence selection, conversation design, QA, and privacy-aware persistence.
+Critical rule: Use only the four approved evidence cards in the canonical file; do not infer ML engineering, model research, enterprise-scale governance, or numeric hiring prediction.
 
 4\. Retrieval Routing by User Intent
 
@@ -187,9 +193,9 @@ Supporting evidence: Monitoring and Product Intelligence and HOWTOOL
 
 For every extracted job requirement:
 
-1\. Search the CV first for direct qualification evidence.  
-2\. Search the capability map for the strongest relevant case study.  
-3\. Select one primary evidence item and up to two supporting items.  
+1\. Build a bounded candidate set for the specific requirement from validated canonical evidence.
+2\. Prefer the strongest qualifying case-study evidence.
+3\. Use CV evidence only when no qualifying case-study evidence supports that requirement.
 4\. Prefer documented implementation evidence over general positioning.  
 5\. Prefer the most specific Evidence Card over a broad project summary.  
 6\. Separate current implementation, proposed concept, and future vision.  
