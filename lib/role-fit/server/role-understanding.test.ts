@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyRoleCorrection, createRoleDraftFromText, detectRoleCorrection, isNoRoleTitleAnswer, looksLikeRoleInput, mergeRoleClarification, normalizeRoleTitleClarification, resolveRoleTextForValidation, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText } from "./role-understanding.ts";
+import { applyRoleCorrection, createRoleDraftFromText, detectRoleCorrection, extractStandaloneRoleTitle, isNoRoleTitleAnswer, looksLikeRoleInput, mergeRoleClarification, normalizeRoleTitleClarification, resolveRoleTextForValidation, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -158,6 +158,56 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(shouldValidateRoleCollectionMessage({ message: "UX", roleCollectionActive: true }), true);
     assert.equal(shouldValidateRoleCollectionMessage({ message: "UX", roleCollectionActive: false }), false);
     assert.equal(shouldValidateRoleCollectionMessage({ message: "Tell me about Shani", roleCollectionActive: true }), false);
+  });
+
+  it("preserves a standalone title supplied before the role details", () => {
+    const title = extractStandaloneRoleTitle("Senior UX Strategist");
+    assert.equal(title, "Senior UX Strategist");
+    assert.equal(extractStandaloneRoleTitle("מנהלת מוצר"), "מנהלת מוצר");
+    assert.equal(extractStandaloneRoleTitle("שם המשרה: מנהלת מוצר"), "מנהלת מוצר");
+
+    const markedTitle = mergeRoleClarification("", "title", title ?? "");
+    const titleValidation = validateRoleText({ conversationId: "conv_test", traceId: "trace_title", roleText: markedTitle, detectedLanguage: "en" });
+    assert.equal(titleValidation.parseStatus, "valid-incomplete");
+    assert.equal(titleValidation.roleDraft.title?.originalValue, "Senior UX Strategist");
+    assert.deepEqual(titleValidation.missingFields, ["responsibilities", "requirements"]);
+
+    const completedRole = resolveRoleTextForValidation({
+      message: "Responsibilities: Lead product discovery and align stakeholders across product and engineering teams\nRequirements: Strong UX strategy, research, and stakeholder facilitation experience",
+      savedRoleText: markedTitle,
+      pendingField: titleValidation.missingFields[0],
+      hasRoleInput: true,
+      hasReportIntent: false,
+    });
+    const completedValidation = validateRoleText({ conversationId: "conv_test", traceId: "trace_details", roleText: completedRole, detectedLanguage: "en" });
+
+    assert.equal(completedValidation.parseStatus, "valid-complete");
+    assert.equal(completedValidation.roleDraft.title?.originalValue, "Senior UX Strategist");
+  });
+
+  it("preserves role details supplied before the standalone title", () => {
+    const details = "Responsibilities: Lead product discovery and align stakeholders across product and engineering teams\nRequirements: Strong UX strategy, research, and stakeholder facilitation experience";
+    const detailsValidation = validateRoleText({ conversationId: "conv_test", traceId: "trace_details", roleText: details, detectedLanguage: "en" });
+    assert.deepEqual(detailsValidation.missingFields, ["title"]);
+
+    const completedRole = resolveRoleTextForValidation({
+      message: "Senior UX Strategist",
+      savedRoleText: details,
+      pendingField: "title",
+      hasRoleInput: false,
+      hasReportIntent: false,
+    });
+    const completedValidation = validateRoleText({ conversationId: "conv_test", traceId: "trace_title", roleText: completedRole, detectedLanguage: "en" });
+
+    assert.equal(completedValidation.parseStatus, "valid-complete");
+    assert.equal(completedValidation.roleDraft.title?.originalValue, "Senior UX Strategist");
+  });
+
+  it("does not classify a normal conversational question as a standalone title", () => {
+    assert.equal(extractStandaloneRoleTitle("What does a Product Manager do?"), null);
+    assert.equal(extractStandaloneRoleTitle("How can a UX strategist help a startup"), null);
+    assert.equal(extractStandaloneRoleTitle("Tell me about product strategy"), null);
+    assert.equal(extractStandaloneRoleTitle("איך מנהלת מוצר יכולה לעזור לצוות"), null);
   });
 
   it("treats a long pasted role as role input after a new analysis starts", () => {

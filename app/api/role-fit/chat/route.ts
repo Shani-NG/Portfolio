@@ -20,10 +20,12 @@ import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import {
   applyRoleCorrection,
   detectRoleCorrection,
+  extractStandaloneRoleTitle,
   inferRoleFamily,
   isNoRoleTitleAnswer,
   isValidRoleClarificationAnswer,
   looksLikeReportIntent,
+  mergeRoleClarification,
   resolveRoleTextForValidation,
   shouldValidateRoleCollectionMessage,
   shouldTreatAsRoleClarification,
@@ -97,11 +99,14 @@ export async function POST(request: Request) {
 
   const traceId = crypto.randomUUID();
   const hasReportIntent = looksLikeReportIntent(parsedRequest.data.message);
-  const hasRoleInput = shouldValidateRoleCollectionMessage({
+  const roleContext = parsedRequest.data.roleContext;
+  const standaloneRoleTitle = !roleContext && !parsedRequest.data.reportContext
+    ? extractStandaloneRoleTitle(parsedRequest.data.message)
+    : null;
+  const hasRoleInput = Boolean(standaloneRoleTitle) || shouldValidateRoleCollectionMessage({
     message: parsedRequest.data.message,
     roleCollectionActive: parsedRequest.data.roleCollectionActive,
   });
-  const roleContext = parsedRequest.data.roleContext;
   const pendingRoleField = roleContext?.pendingField;
   const isFieldClarification = Boolean(roleContext && shouldTreatAsRoleClarification(pendingRoleField, parsedRequest.data.message));
   const roleCorrection = roleContext && !pendingRoleField
@@ -160,15 +165,17 @@ export async function POST(request: Request) {
     });
   }
 
-  const roleTextForValidation = roleCorrection && roleContext
-    ? applyRoleCorrection(roleContext.roleText, roleCorrection)
-    : resolveRoleTextForValidation({
-        message: parsedRequest.data.message,
-        savedRoleText: roleContext?.roleText,
-        pendingField: pendingRoleField,
-        hasRoleInput: hasRoleInput && !isFieldClarification,
-        hasReportIntent,
-      });
+  const roleTextForValidation = standaloneRoleTitle
+    ? mergeRoleClarification("", "title", standaloneRoleTitle)
+    : roleCorrection && roleContext
+      ? applyRoleCorrection(roleContext.roleText, roleCorrection)
+      : resolveRoleTextForValidation({
+          message: parsedRequest.data.message,
+          savedRoleText: roleContext?.roleText,
+          pendingField: pendingRoleField,
+          hasRoleInput: hasRoleInput && !isFieldClarification,
+          hasReportIntent,
+        });
 
   if (roleTextForValidation.length > policy.maxInputChars) {
     return NextResponse.json(

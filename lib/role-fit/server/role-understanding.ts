@@ -103,12 +103,17 @@ function extractList(roleText: string, labels: string[]): string[] {
 function inferListBySignals(roleText: string, signals: RegExp[]): string[] {
   return splitBlockItems(normalizeRoleText(roleText))
     .filter((item) => item.length >= 18)
+    .filter((item) => !/^(?:job title|title|role|תפקיד|שם המשרה)\s*:/i.test(item))
     .filter((item) => signals.some((signal) => signal.test(item)));
 }
 
 const roleTitleSignal = /\b(ux|ui|user experience|product|design(?:er)?|research(?:er)?|strateg(?:y|ist)|manager|management|lead|director|head|vice president|vp|chief|engineer|developer|architect|analyst|specialist|consultant|coordinator|innovation|implementation|operations)\b/i;
 const setupInstructionSignal = /\b(upload|paste|provide|send|share|attach|going to|want to|would like to|job description|role details)\b/i;
 const hebrewSetupInstructionSignal = /^(?:אני|היי|שלום|רוצה|אפשר|צריך|צריכה|תודה)\b/;
+const conversationalQuestionSignal = /^(?:what|how|why|who|where|when|which|can|could|would|should|do|does|did|is|are|tell me|explain)\b/i;
+const hebrewConversationalQuestionSignal = /^(?:מה|איך|למה|מי|איפה|מתי|האם|איזה|איזו|אפשר|תוכלי|את יכולה|ספרי|הסבירי|תסבירי)(?:\s|$)/;
+const hebrewRoleTitleSignal = /(?:^|\s)(?:מנהל(?:ת)?|מעצב(?:ת)?|חוקר(?:ת)?|אסטרטג(?:ית)?|מוביל(?:ת)?|ראש(?:ת)?|מהנדס(?:ת)?|מפתח(?:ת)?|אנליסט(?:ית)?|יועץ|יועצת|רכז|רכזת|ארכיטקט(?:ית)?|מומחה|מומחית|דירקטור(?:ית)?|סמנכ["״]ל)(?:\s|$)/;
+const standaloneTitleLabel = /^(?:job title|title|role|שם המשרה|תפקיד)\s*:\s*(.+)$/i;
 
 export function isPlausibleRoleTitle(value: string): boolean {
   const title = value.trim();
@@ -119,6 +124,21 @@ export function isPlausibleRoleTitle(value: string): boolean {
   if (/^(about|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(title)) return false;
 
   return roleTitleSignal.test(title) || (/[\u0590-\u05ff]/.test(title) && !hebrewSetupInstructionSignal.test(title));
+}
+
+export function extractStandaloneRoleTitle(value: string): string | null {
+  const input = value.trim();
+  if (!input || input.includes("\n") || input.length > 100) return null;
+
+  const labeledTitle = input.match(standaloneTitleLabel)?.[1]?.trim();
+  const title = labeledTitle ?? input;
+  if (!title || conversationalQuestionSignal.test(title) || hebrewConversationalQuestionSignal.test(title) || !isPlausibleRoleTitle(title)) return null;
+
+  if (labeledTitle || roleTitleSignal.test(title) || hebrewRoleTitleSignal.test(title)) {
+    return normalizeRoleTitleClarification(title);
+  }
+
+  return null;
 }
 
 function inferTitle(roleText: string): string {
