@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { MaterialIcon } from "@/components/ui/material-icon";
-import { projectCards } from "@/lib/portfolio-content";
+import { experienceProjectCards } from "@/lib/portfolio-content";
 import styles from "./selected-work-gallery.module.css";
 
 const shortestLoopOffset = (index: number, activeIndex: number, total: number) => {
@@ -26,11 +26,11 @@ const shortestLoopOffset = (index: number, activeIndex: number, total: number) =
 export function SelectedWorkGallery() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [dragStart, setDragStart] = useState<number | null>(null);
-  const total = projectCards.length;
+  const total = experienceProjectCards.length;
 
   const positionedProjects = useMemo(
     () =>
-      projectCards.map((project, index) => ({
+      experienceProjectCards.map((project, index) => ({
         ...project,
         offset: shortestLoopOffset(index, activeIndex, total),
       })),
@@ -113,7 +113,7 @@ export function SelectedWorkGallery() {
           <MaterialIcon name="arrow_back" />
         </button>
         <div className={styles.indicators} aria-label="Project position">
-          {projectCards.map((project, index) => (
+          {experienceProjectCards.map((project, index) => (
             <button
               aria-label={`Show ${project.title}`}
               aria-current={activeIndex === index}
