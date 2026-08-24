@@ -6772,6 +6772,10 @@
     grid-template-columns: 1fr;
   }
 
+  .c4iHtmlPage .c4iThreatCard {
+    display: none;
+  }
+
   .c4iHtmlPage .c4iThreatCard .c4iFlowSteps {
     width: 100%;
   }
@@ -7949,9 +7953,9 @@
     width: 100%;
   }
 
-  .epdPage #two-users-operating-one-system,
-  .epdPage #prepare-the-system-before-pressure,
-  .epdPage #flexible-procedure-model {
+  .epdPage :global(#two-users-operating-one-system),
+  .epdPage :global(#prepare-the-system-before-pressure),
+  .epdPage :global(#flexible-procedure-model) {
     /* Padding lives inside the section, so it cannot collapse through a reveal wrapper. */
     margin-top: 0;
     padding-top: calc(var(--ds-case-section-padding) + var(--ds-space-xl));
