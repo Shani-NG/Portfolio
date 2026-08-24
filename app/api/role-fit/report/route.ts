@@ -7,7 +7,11 @@ import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evi
 import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
 import { createCompositionFailureMetadata, type CompositionRepairOutcome } from "@/lib/role-fit/report/composition-observability";
-import { constrainRepairAnalysis, shouldUseModelRepair } from "@/lib/role-fit/report/repair";
+import {
+  constrainRepairAnalysis,
+  getDeterministicLimitationRepresentation,
+  shouldUseModelRepair,
+} from "@/lib/role-fit/report/repair";
 import { evaluateReportEligibility, evidenceStateFromComposedReport } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
 
@@ -281,6 +285,23 @@ export async function POST(request: Request) {
   const originalCompositionDiagnostic = composition.ok ? undefined : composition.diagnostic;
   let repairOutcome: CompositionRepairOutcome = "not-attempted";
   let repairFailureCategory: "missing-configuration" | "provider-error" | "invalid-output" | undefined;
+
+  if (!composition.ok) {
+    const representedLimitationRoleItemIndexes = getDeterministicLimitationRepresentation({
+      analysis: modelResult.analysis,
+      diagnostic: composition.diagnostic,
+    });
+    if (representedLimitationRoleItemIndexes) {
+      composition = composeReportUIPayload({
+        analysis: modelResult.analysis,
+        roleDraft: validation.roleDraft,
+        evidence: approvedEvidence,
+        language: parsedRequest.data.language,
+        reportId: parsedRequest.data.reportId,
+        representedLimitationRoleItemIndexes,
+      });
+    }
+  }
 
   if (!composition.ok && shouldUseModelRepair(composition.diagnostic)) {
     const firstDiagnostic = composition.diagnostic;

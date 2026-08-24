@@ -1,5 +1,24 @@
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
 
+const limitationMatchTypes = new Set<QualitativeReportAnalysis["items"][number]["matchType"]>([
+  "partial",
+  "insufficient-evidence",
+  "real-gap",
+]);
+
+export function getDeterministicLimitationRepresentation(input: {
+  analysis: QualitativeReportAnalysis;
+  diagnostic: string;
+}): readonly number[] | null {
+  if (input.diagnostic !== "semantic:unrepresented-limitation") return null;
+
+  const roleItemIndexes = input.analysis.items
+    .filter((item) => limitationMatchTypes.has(item.matchType) && item.impact === "neutral")
+    .map((item) => item.roleItemIndex);
+
+  return roleItemIndexes.length > 0 ? roleItemIndexes : null;
+}
+
 export function shouldUseModelRepair(diagnostic: string) {
   return !diagnostic.startsWith("evidence:");
 }
