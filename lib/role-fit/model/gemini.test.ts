@@ -186,7 +186,8 @@ describe("Gemini chat completion guard", () => {
     assert.equal(requests.length, 2);
     const reportPrompt = String((requests[0]?.contents as Array<{ parts: Array<{ text: string }> }>)[0]?.parts[0]?.text);
     assert.match(reportPrompt, /ROLE_ITEM_CANDIDATE_SOURCE_IDS are ranked suggestions.*not an authorization boundary/);
-    assert.match(reportPrompt, /use CV evidence only when no sufficiently relevant case-study evidence supports the requirement/);
+    assert.match(reportPrompt, /CV fallback/);
+    assert.match(reportPrompt, /same canonical evidence ID may support multiple requirements/);
   });
 
   it("repairs a report that references a role item outside the runtime index set", async () => {

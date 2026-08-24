@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyRoleCorrection, createRoleDraftFromText, detectRoleCorrection, extractStandaloneRoleTitle, isNoRoleTitleAnswer, looksLikeRoleInput, mergeRoleClarification, normalizeRoleTitleClarification, resolveRoleTextForValidation, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText } from "./role-understanding.ts";
+import { applyRoleDraftCorrection, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeRoleTitleClarification, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -139,6 +139,40 @@ describe("Role Fit pasted job understanding", () => {
     assert.deepEqual(result.missingFields, ["title"]);
   });
 
+  it("separates a conversational prefix from a complete English JD", () => {
+    const roleText = [
+      "נסה עבור זאת",
+      "Senior Product Innovation Manager",
+      "About the job",
+      "Lead product and AI innovation programs across complex services.",
+      "Responsibilities",
+      "Shape product strategy and align cross-functional delivery teams",
+      "Requirements",
+      "Experience leading product innovation and AI-enabled initiatives",
+    ].join("\n");
+
+    const roleContent = extractRoleContent(roleText);
+    const draft = createRoleDraftFromText(roleText);
+
+    assert.match(roleContent, /^Senior Product Innovation Manager/);
+    assert.doesNotMatch(serializeRoleDraftForBoundary(draft), /נסה עבור זאת/);
+    assert.equal(draft.title?.originalValue, "Senior Product Innovation Manager");
+  });
+
+  it("keeps a Hebrew canonical title while producing a faithful English report title", () => {
+    const canonicalTitle = "אסטרטגית חוויית משתמש בכירה";
+    const draft = createRoleDraftFromText([
+      "תבדקי לי את זו",
+      `תפקיד: ${canonicalTitle}`,
+      "תחומי אחריות: הובלת אסטרטגיית חוויית משתמש במערכות מורכבות",
+      "דרישות: ניסיון באסטרטגיית UX ובהובלה חוצת תחומים",
+    ].join("\n"));
+
+    assert.equal(draft.title?.originalValue, canonicalTitle);
+    assert.equal(resolveEnglishReportTitle(canonicalTitle), "Senior UX Strategist");
+    assert.doesNotMatch(resolveEnglishReportTitle(canonicalTitle), /[\u0590-\u05ff]/);
+  });
+
   it("keeps a labeled company as company without promoting it to the role title", () => {
     const roleText = [
       "Company: Example Product Team",
@@ -208,38 +242,27 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(extractStandaloneRoleTitle("מנהלת מוצר"), "מנהלת מוצר");
     assert.equal(extractStandaloneRoleTitle("שם המשרה: מנהלת מוצר"), "מנהלת מוצר");
 
-    const markedTitle = mergeRoleClarification("", "title", title ?? "");
-    const titleValidation = validateRoleText({ conversationId: "conv_test", traceId: "trace_title", roleText: markedTitle, detectedLanguage: "en" });
+    const titleDraft = mergeRoleDraftClarification(undefined, "title", title ?? "");
+    const titleValidation = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_title", roleDraft: titleDraft, detectedLanguage: "en" });
     assert.equal(titleValidation.parseStatus, "valid-incomplete");
     assert.equal(titleValidation.roleDraft.title?.originalValue, "Senior UX Strategist");
     assert.deepEqual(titleValidation.missingFields, ["responsibilities", "requirements"]);
 
-    const completedRole = resolveRoleTextForValidation({
-      message: "Responsibilities: Lead product discovery and align stakeholders across product and engineering teams\nRequirements: Strong UX strategy, research, and stakeholder facilitation experience",
-      savedRoleText: markedTitle,
-      pendingField: titleValidation.missingFields[0],
-      hasRoleInput: true,
-      hasReportIntent: false,
-    });
-    const completedValidation = validateRoleText({ conversationId: "conv_test", traceId: "trace_details", roleText: completedRole, detectedLanguage: "en" });
+    const detailsDraft = createRoleDraftFromText("Responsibilities: Lead product discovery and align stakeholders across product and engineering teams\nRequirements: Strong UX strategy, research, and stakeholder facilitation experience");
+    const completedRole = mergeStructuredRoleDraft(titleDraft, detailsDraft, { replaceCompleteRole: true });
+    const completedValidation = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_details", roleDraft: completedRole, detectedLanguage: "en" });
 
     assert.equal(completedValidation.parseStatus, "valid-complete");
     assert.equal(completedValidation.roleDraft.title?.originalValue, "Senior UX Strategist");
   });
 
   it("preserves role details supplied before the standalone title", () => {
-    const details = "Responsibilities: Lead product discovery and align stakeholders across product and engineering teams\nRequirements: Strong UX strategy, research, and stakeholder facilitation experience";
-    const detailsValidation = validateRoleText({ conversationId: "conv_test", traceId: "trace_details", roleText: details, detectedLanguage: "en" });
+    const details = createRoleDraftFromText("Responsibilities: Lead product discovery and align stakeholders across product and engineering teams\nRequirements: Strong UX strategy, research, and stakeholder facilitation experience");
+    const detailsValidation = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_details", roleDraft: details, detectedLanguage: "en" });
     assert.deepEqual(detailsValidation.missingFields, ["title"]);
 
-    const completedRole = resolveRoleTextForValidation({
-      message: "Senior UX Strategist",
-      savedRoleText: details,
-      pendingField: "title",
-      hasRoleInput: false,
-      hasReportIntent: false,
-    });
-    const completedValidation = validateRoleText({ conversationId: "conv_test", traceId: "trace_title", roleText: completedRole, detectedLanguage: "en" });
+    const completedRole = mergeRoleDraftClarification(details, "title", "Senior UX Strategist");
+    const completedValidation = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_title", roleDraft: completedRole, detectedLanguage: "en" });
 
     assert.equal(completedValidation.parseStatus, "valid-complete");
     assert.equal(completedValidation.roleDraft.title?.originalValue, "Senior UX Strategist");
@@ -264,14 +287,10 @@ describe("Role Fit pasted job understanding", () => {
   });
 
   it("keeps a short Hebrew title when details are added afterward", () => {
-    const merged = resolveRoleTextForValidation({
-      message: "Responsibilities: Lead product discovery with stakeholders\nRequirements: Strong UX strategy experience",
-      savedRoleText: "מנהל מוצר",
-      pendingField: "responsibilities",
-      hasRoleInput: true,
-      hasReportIntent: false,
-    });
-    const result = validateRoleText({ conversationId: "conv_test", traceId: "trace_test", roleText: merged, detectedLanguage: "he" });
+    const titleDraft = mergeRoleDraftClarification(undefined, "title", "מנהל מוצר");
+    const detailsDraft = createRoleDraftFromText("Responsibilities: Lead product discovery with stakeholders\nRequirements: Strong UX strategy experience");
+    const merged = mergeStructuredRoleDraft(titleDraft, detailsDraft, { replaceCompleteRole: true });
+    const result = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_test", roleDraft: merged, detectedLanguage: "he" });
 
     assert.equal(result.roleDraft.title?.originalValue, "מנהל מוצר");
     assert.equal(result.parseStatus, "valid-complete");
@@ -299,16 +318,16 @@ describe("Role Fit pasted job understanding", () => {
   });
 
   it("merges a requested title as a labeled deterministic clarification", () => {
-    const initialRole = [
+    const initialRole = createRoleDraftFromText([
       "Responsibilities: Lead product discovery and align stakeholders",
       "Requirements: Strong UX strategy and research experience",
-    ].join("\n");
-    const clarifiedRole = mergeRoleClarification(initialRole, "title", "Senior UX Strategist");
+    ].join("\n"));
+    const clarifiedRole = mergeRoleDraftClarification(initialRole, "title", "Senior UX Strategist");
 
-    const result = validateRoleText({
+    const result = validateStructuredRoleDraft({
       conversationId: "conv_test",
       traceId: "trace_test",
-      roleText: clarifiedRole,
+      roleDraft: clarifiedRole,
       detectedLanguage: "en",
     });
 
@@ -321,12 +340,12 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(normalizeRoleTitleClarification("UX"), "UX Position");
     assert.equal(normalizeRoleTitleClarification("strategy"), "Strategy Position");
 
-    const clarifiedRole = mergeRoleClarification(
-      "Responsibilities: Lead product discovery\nRequirements: Strong UX strategy experience",
+    const clarifiedRole = mergeRoleDraftClarification(
+      createRoleDraftFromText("Responsibilities: Lead product discovery\nRequirements: Strong UX strategy experience"),
       "title",
       "AI",
     );
-    const result = validateRoleText({ conversationId: "conv_test", traceId: "trace_test", roleText: clarifiedRole, detectedLanguage: "en" });
+    const result = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_test", roleDraft: clarifiedRole, detectedLanguage: "en" });
     assert.equal(result.roleDraft.title?.originalValue, "AI Position");
   });
 
@@ -337,53 +356,42 @@ describe("Role Fit pasted job understanding", () => {
       false,
     );
 
-    const merged = resolveRoleTextForValidation({
-      message: "Innovation",
-      savedRoleText: "Responsibilities: Lead discovery\nRequirements: Innovation strategy experience",
-      pendingField: "title",
-      hasRoleInput: false,
-      hasReportIntent: false,
-    });
-    assert.match(merged, /Title: Innovation Position/);
+    const merged = mergeRoleDraftClarification(
+      createRoleDraftFromText("Responsibilities: Lead discovery\nRequirements: Innovation strategy experience"),
+      "title",
+      "Innovation",
+    );
+    assert.equal(merged.title?.originalValue, "Innovation Position");
   });
 
   it("appends structured role details to an active incomplete role", () => {
-    const merged = resolveRoleTextForValidation({
-      message: "Responsibilities: Lead product discovery with stakeholders\nRequirements: Strong UX strategy experience",
-      savedRoleText: "Title: UX Position",
-      pendingField: "responsibilities",
-      hasRoleInput: true,
-      hasReportIntent: false,
-    });
-    const result = validateRoleText({ conversationId: "conv_test", traceId: "trace_test", roleText: merged, detectedLanguage: "en" });
+    const titleDraft = mergeRoleDraftClarification(undefined, "title", "UX");
+    const detailsDraft = createRoleDraftFromText("Responsibilities: Lead product discovery with stakeholders\nRequirements: Strong UX strategy experience");
+    const merged = mergeStructuredRoleDraft(titleDraft, detailsDraft, { replaceCompleteRole: true });
+    const result = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_test", roleDraft: merged, detectedLanguage: "en" });
 
     assert.equal(result.roleDraft.title?.originalValue, "UX Position");
     assert.equal(result.parseStatus, "valid-complete");
   });
 
   it("keeps the approved role draft when a report-status follow-up is not a new role", () => {
-    const savedRoleText = [
+    const savedRoleDraft = createRoleDraftFromText([
       "Company: Example Systems",
       "Title: Senior UX / Human Factors Specialist",
       "Description: Shape complex operational products",
       "Responsibilities: Lead UX research and product alignment",
       "Requirements: Human factors and complex-system UX experience",
-    ].join("\n");
+    ].join("\n"));
 
-    const selectedRoleText = resolveRoleTextForValidation({
-      message: "I don't see the report",
-      savedRoleText,
-      hasRoleInput: false,
-      hasReportIntent: true,
-    });
-    const result = validateRoleText({
+    const selectedRoleDraft = savedRoleDraft;
+    const result = validateStructuredRoleDraft({
       conversationId: "conv_test",
       traceId: "trace_test",
-      roleText: selectedRoleText,
+      roleDraft: selectedRoleDraft,
       detectedLanguage: "en",
     });
 
-    assert.equal(selectedRoleText, savedRoleText);
+    assert.equal(selectedRoleDraft, savedRoleDraft);
     assert.equal(result.parseStatus, "valid-complete");
     assert.equal(result.roleDraft.title?.originalValue, "Senior UX / Human Factors Specialist");
   });
@@ -392,11 +400,45 @@ describe("Role Fit pasted job understanding", () => {
     const correction = detectRoleCorrection("Actually, the title is Principal Product Designer.");
     assert.deepEqual(correction, { field: "title", value: "Principal Product Designer" });
 
-    const updated = applyRoleCorrection(
-      "Company: Acme\nTitle: Senior Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience",
-      correction!,
-    );
-    const result = validateRoleText({ conversationId: "conv_test", traceId: "trace_test", roleText: updated, detectedLanguage: "en" });
+    const original = createRoleDraftFromText("Company: Acme\nTitle: Senior Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
+    const updated = applyRoleDraftCorrection(original, correction!);
+    const result = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_test", roleDraft: updated, detectedLanguage: "en" });
     assert.equal(result.roleDraft.title?.originalValue, "Principal Product Designer");
+  });
+
+  it("merges details-first and title-first flows through the same structured RoleDraft path", () => {
+    const details = createRoleDraftFromText("Responsibilities: Lead product discovery and stakeholder alignment\nRequirements: Product strategy and UX research experience");
+    const detailsFirst = mergeRoleDraftClarification(details, "title", "Senior UX Strategist");
+    assert.equal(detailsFirst.title?.originalValue, "Senior UX Strategist");
+    assert.equal(detailsFirst.responsibilities.length, 1);
+    assert.equal(detailsFirst.requirements.length, 1);
+
+    const titleFirst = mergeRoleDraftClarification(undefined, "title", "Senior UX Strategist");
+    const completed = mergeStructuredRoleDraft(titleFirst, details, { replaceCompleteRole: true });
+    assert.equal(completed.title?.originalValue, "Senior UX Strategist");
+    assert.equal(completed.responsibilities.length, 1);
+    assert.equal(completed.requirements.length, 1);
+  });
+
+  it("applies an explicit title correction without losing structured role details", () => {
+    const original = createRoleDraftFromText("Title: Product Designer\nResponsibilities: Lead product discovery\nRequirements: Product design experience");
+    const corrected = applyRoleDraftCorrection(original, { field: "title", value: "Principal Product Designer" });
+    assert.equal(corrected.title?.originalValue, "Principal Product Designer");
+    assert.deepEqual(corrected.responsibilities, original.responsibilities);
+    assert.deepEqual(corrected.requirements, original.requirements);
+  });
+
+  it("replaces an existing role when a new complete JD follows conversational context", () => {
+    const oldRole = createRoleDraftFromText("Title: UX Researcher\nResponsibilities: Lead discovery research\nRequirements: UX research experience");
+    const newRole = createRoleDraftFromText([
+      "ומה לגבי זאת?",
+      "Title: AI Implementation Lead",
+      "Responsibilities: Lead AI workflow adoption across product teams",
+      "Requirements: Experience implementing human-centered AI initiatives",
+    ].join("\n"));
+    const merged = mergeStructuredRoleDraft(oldRole, newRole, { replaceCompleteRole: true });
+
+    assert.equal(merged.title?.originalValue, "AI Implementation Lead");
+    assert.equal(merged.responsibilities.some((item) => /discovery research/i.test(item.originalValue)), false);
   });
 });

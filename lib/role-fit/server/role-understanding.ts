@@ -1,8 +1,11 @@
 import { createRoleValidationResult } from "./eligibility.ts";
+import type { RoleValidationResult } from "../contracts/index.ts";
+import { findLexiconMatches, getRoleFitLexiconEntries, normalizeLexiconText } from "../lexicon.ts";
 
 type RoleSectionKind = "description" | "responsibilities" | "requirements" | "preferred";
 export type RoleClarificationField = "company" | "title" | "responsibilities" | "requirements";
 export type RoleCorrection = { field: RoleClarificationField; value: string };
+export type StructuredRoleDraft = RoleValidationResult["roleDraft"];
 
 const roleSectionHeadings: Array<{ kind: RoleSectionKind; labels: string[] }> = [
   { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity", "Overview", "תיאור המשרה", "על התפקיד"] },
@@ -29,14 +32,18 @@ const headingPattern = new RegExp(
   "gi",
 );
 
-function roleField<T extends string | number>(originalValue: T, sourceId: string) {
+function roleField<T extends string | number>(
+  originalValue: T,
+  sourceId: string,
+  options: { kind?: "user-text" | "uploaded-file" | "clarification"; confidence?: "high" | "medium" | "low" } = {},
+) {
   return {
     originalValue,
     sourceRef: {
       sourceId,
-      kind: "user-text" as const,
+      kind: options.kind ?? "user-text" as const,
     },
-    confidence: "medium" as const,
+    confidence: options.confidence ?? "medium" as const,
     confirmed: Boolean(String(originalValue).trim()),
   };
 }
@@ -114,6 +121,12 @@ const conversationalQuestionSignal = /^(?:what|how|why|who|where|when|which|can|
 const hebrewConversationalQuestionSignal = /^(?:מה|איך|למה|מי|איפה|מתי|האם|איזה|איזו|אפשר|תוכלי|את יכולה|ספרי|הסבירי|תסבירי)(?:\s|$)/;
 const hebrewRoleTitleSignal = /(?:^|\s)(?:מנהל(?:ת)?|מעצב(?:ת)?|חוקר(?:ת)?|אסטרטג(?:ית)?|מוביל(?:ת)?|ראש(?:ת)?|מהנדס(?:ת)?|מפתח(?:ת)?|אנליסט(?:ית)?|יועץ|יועצת|רכז|רכזת|ארכיטקט(?:ית)?|מומחה|מומחית|דירקטור(?:ית)?|סמנכ["״]ל)(?:\s|$)/;
 const standaloneTitleLabel = /^(?:job title|title|role|שם המשרה|תפקיד)\s*:\s*(.+)$/i;
+const roleFieldLabelSignal = /^(?:company|organization|title|job title|role|description|responsibilities|requirements|qualifications|skills|location|job location|חברה|ארגון|תפקיד|שם המשרה|תיאור|תיאור המשרה|תחומי אחריות|אחריות|דרישות|כישורים נדרשים)\s*:/i;
+
+function hasStrongTitleLexiconMatch(value: string) {
+  return findLexiconMatches({ text: value, language: "mixed" })
+    .some((match) => match.entry.kind === "title_family" && match.matched_by !== "keyword");
+}
 
 export function isPlausibleRoleTitle(value: string): boolean {
   const title = value.trim();
@@ -123,7 +136,7 @@ export function isPlausibleRoleTitle(value: string): boolean {
   if (/[.!?]$/.test(title) || setupInstructionSignal.test(title)) return false;
   if (/^(about|company|organization|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(title)) return false;
 
-  return roleTitleSignal.test(title) || (/[\u0590-\u05ff]/.test(title) && !hebrewSetupInstructionSignal.test(title));
+  return roleTitleSignal.test(title) || hebrewRoleTitleSignal.test(title) || hasStrongTitleLexiconMatch(title);
 }
 
 export function extractStandaloneRoleTitle(value: string): string | null {
@@ -141,9 +154,45 @@ export function extractStandaloneRoleTitle(value: string): string | null {
   return null;
 }
 
-function inferTitle(roleText: string): string {
+function isKnownSectionHeading(value: string) {
+  const normalized = value.trim().replace(/[:.]+$/, "").toLowerCase();
+  return normalizedHeadingEntries.some(({ label }) => label.toLowerCase() === normalized);
+}
+
+function isRoleBoundaryLine(value: string) {
+  const line = value.trim();
+  return roleFieldLabelSignal.test(line) || isKnownSectionHeading(line) || isPlausibleRoleTitle(line);
+}
+
+export function extractRoleContent(message: string): string {
+  const normalized = normalizeRoleText(message).trim();
+  if (!normalized) return "";
+
+  const lines = normalized.split(/\r?\n/);
+  const firstRoleLine = lines.findIndex(isRoleBoundaryLine);
+  if (firstRoleLine < 0) return normalized;
+  return lines.slice(firstRoleLine).join("\n").trim();
+}
+
+function inferSemanticTitle(roleText: string): string {
+  const titleEntries = getRoleFitLexiconEntries().filter((entry) => entry.kind === "title_family");
+  const normalizedRoleText = normalizeLexiconText(roleText);
+  const scored = titleEntries.map((entry) => {
+    const keywordHits = entry.keywords.filter((term) => normalizedRoleText.includes(normalizeLexiconText(term))).length;
+    const contextHits = entry.context_signals.filter((term) => normalizedRoleText.includes(normalizeLexiconText(term))).length;
+    return { entry, keywordHits, contextHits, score: keywordHits * 2 + contextHits };
+  }).filter(({ keywordHits, contextHits, score }) => score >= 5 && (keywordHits >= 3 || (keywordHits >= 1 && contextHits >= 2)))
+    .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id));
+
+  const best = scored[0];
+  const next = scored.find((candidate) => candidate.entry.concept_id !== best?.entry.concept_id);
+  if (!best || (next && best.score - next.score < 4)) return "";
+  return best.entry.preferred_label;
+}
+
+function inferTitle(roleText: string): { value: string; confidence: "high" | "medium" | "low" } {
   const labeledTitle = extractSection(roleText, ["title", "role", "תפקיד", "שם המשרה"]);
-  if (labeledTitle) return labeledTitle;
+  if (labeledTitle) return { value: labeledTitle, confidence: "high" };
 
   const normalizedText = normalizeRoleText(roleText);
   const firstHeadingIndex = normalizedText.search(headingPattern);
@@ -159,7 +208,9 @@ function inferTitle(roleText: string): string {
       isPlausibleRoleTitle(line),
     );
 
-  return inferredTitle ?? "";
+  if (inferredTitle) return { value: inferredTitle, confidence: "medium" };
+  const semanticTitle = inferSemanticTitle(roleText);
+  return { value: semanticTitle, confidence: semanticTitle ? "low" : "medium" };
 }
 
 const genericRoleTitles = new Map([
@@ -178,24 +229,12 @@ export function normalizeRoleTitleClarification(value: string): string {
   return genericRoleTitles.get(value.trim().toLowerCase()) ?? value.trim();
 }
 
-const clarificationLabels: Record<RoleClarificationField, string> = {
-  company: "Company",
-  title: "Title",
-  responsibilities: "Responsibilities",
-  requirements: "Requirements",
-};
-
 export function isValidRoleClarificationAnswer(field: RoleClarificationField, value: string): boolean {
   const answer = value.trim();
   if (!answer || answer.length > 1000) return false;
   if (field === "title") return isPlausibleRoleTitle(normalizeRoleTitleClarification(answer));
   if (field === "company") return answer.length <= 120 && !/[.!?]\s/.test(answer);
   return answer.length >= 8;
-}
-
-export function mergeRoleClarification(roleText: string, field: RoleClarificationField, value: string): string {
-  const normalizedValue = field === "title" ? normalizeRoleTitleClarification(value) : value.trim();
-  return [roleText.trim(), `${clarificationLabels[field]}: ${normalizedValue}`].filter(Boolean).join("\n");
 }
 
 export function detectRoleCorrection(message: string): RoleCorrection | null {
@@ -222,40 +261,170 @@ export function detectRoleCorrection(message: string): RoleCorrection | null {
   return value ? { field: fieldByLabel[hebrew[1]], value } : null;
 }
 
-export function applyRoleCorrection(roleText: string, correction: RoleCorrection): string {
-  const labels: Record<RoleClarificationField, RegExp> = {
-    company: /^(?:Company|Organization):.*$/im,
-    title: /^(?:Title|Role):.*$/im,
-    responsibilities: /^(?:Responsibilities|Responsibility|Key Responsibilities):.*$/im,
-    requirements: /^(?:Requirements|Qualifications|Skills):.*$/im,
-  };
-  const replacement = `${clarificationLabels[correction.field]}: ${correction.value}`;
-
-  return labels[correction.field].test(roleText)
-    ? roleText.replace(labels[correction.field], replacement)
-    : [roleText.trim(), replacement].filter(Boolean).join("\n");
+function nonEmptyField<T extends { originalValue: string | number }>(field: T | undefined) {
+  return field && String(field.originalValue).trim() ? field : undefined;
 }
 
-export function resolveRoleTextForValidation(input: {
-  message: string;
-  savedRoleText?: string;
-  pendingField?: RoleClarificationField;
-  hasRoleInput: boolean;
-  hasReportIntent: boolean;
-}): string {
-  if (input.savedRoleText && input.pendingField && input.hasRoleInput) {
-    return [input.savedRoleText.trim(), input.message.trim()].filter(Boolean).join("\n");
+function mergeRoleFieldLists<T extends { originalValue: string }>(current: T[], incoming: T[]) {
+  const seen = new Set<string>();
+  return [...current, ...incoming].filter((field) => {
+    const key = field.originalValue.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function createEmptyRoleDraft(): StructuredRoleDraft {
+  return { responsibilities: [], requirements: [], preferredQualifications: [] };
+}
+
+export function hasRoleDraftContent(
+  roleDraft: StructuredRoleDraft | null | undefined,
+): roleDraft is StructuredRoleDraft {
+  if (!roleDraft) return false;
+  return Boolean(
+    nonEmptyField(roleDraft.company)
+    || nonEmptyField(roleDraft.title)
+    || nonEmptyField(roleDraft.description)
+    || roleDraft.responsibilities.length
+    || roleDraft.requirements.length
+    || roleDraft.preferredQualifications.length,
+  );
+}
+
+function isCompleteDraft(roleDraft: StructuredRoleDraft) {
+  return Boolean(nonEmptyField(roleDraft.title) && roleDraft.responsibilities.length && roleDraft.requirements.length);
+}
+
+export function mergeStructuredRoleDraft(
+  current: StructuredRoleDraft | null | undefined,
+  incoming: StructuredRoleDraft,
+  options: { replaceCompleteRole?: boolean } = {},
+): StructuredRoleDraft {
+  if (!current || !hasRoleDraftContent(current)) return incoming;
+  if (options.replaceCompleteRole && isCompleteDraft(incoming)) return incoming;
+
+  return {
+    company: nonEmptyField(incoming.company) ?? current.company,
+    title: nonEmptyField(incoming.title) ?? current.title,
+    description: nonEmptyField(incoming.description) ?? current.description,
+    responsibilities: mergeRoleFieldLists(current.responsibilities, incoming.responsibilities),
+    requirements: mergeRoleFieldLists(current.requirements, incoming.requirements),
+    preferredQualifications: mergeRoleFieldLists(current.preferredQualifications, incoming.preferredQualifications),
+    seniority: nonEmptyField(incoming.seniority) ?? current.seniority,
+    yearsOfExperience: incoming.yearsOfExperience ?? current.yearsOfExperience,
+    location: nonEmptyField(incoming.location) ?? current.location,
+    workModel: nonEmptyField(incoming.workModel) ?? current.workModel,
+    employmentType: nonEmptyField(incoming.employmentType) ?? current.employmentType,
+  };
+}
+
+export function mergeRoleDraftClarification(
+  roleDraft: StructuredRoleDraft | null | undefined,
+  field: RoleClarificationField,
+  value: string,
+): StructuredRoleDraft {
+  const next = roleDraft ?? createEmptyRoleDraft();
+  const normalizedValue = field === "title" ? normalizeRoleTitleClarification(value) : value.trim();
+  const fieldValue = roleField(normalizedValue, `role_clarification_${field}`, { kind: "clarification", confidence: "high" });
+
+  if (field === "responsibilities" || field === "requirements") {
+    return { ...next, [field]: mergeRoleFieldLists(next[field], [fieldValue]) };
+  }
+  return { ...next, [field]: fieldValue };
+}
+
+export function applyRoleDraftCorrection(roleDraft: StructuredRoleDraft, correction: RoleCorrection) {
+  return mergeRoleDraftClarification(roleDraft, correction.field, correction.value);
+}
+
+export function serializeRoleDraftForBoundary(roleDraft: StructuredRoleDraft): string {
+  const lines = [
+    nonEmptyField(roleDraft.company) ? `Company: ${roleDraft.company!.originalValue}` : "",
+    nonEmptyField(roleDraft.title) ? `Title: ${roleDraft.title!.originalValue}` : "",
+    nonEmptyField(roleDraft.description) ? `Description: ${roleDraft.description!.originalValue}` : "",
+    roleDraft.responsibilities.length ? `Responsibilities:\n${roleDraft.responsibilities.map((item) => `- ${item.originalValue}`).join("\n")}` : "",
+    roleDraft.requirements.length ? `Requirements:\n${roleDraft.requirements.map((item) => `- ${item.originalValue}`).join("\n")}` : "",
+    roleDraft.preferredQualifications.length ? `Preferred Qualifications:\n${roleDraft.preferredQualifications.map((item) => `- ${item.originalValue}`).join("\n")}` : "",
+    roleDraft.yearsOfExperience ? `Years of experience: ${roleDraft.yearsOfExperience.originalValue}` : "",
+    nonEmptyField(roleDraft.location) ? `Location: ${roleDraft.location!.originalValue}` : "",
+    nonEmptyField(roleDraft.workModel) ? `Work model: ${roleDraft.workModel!.originalValue}` : "",
+  ].filter(Boolean);
+  return lines.join("\n").trim();
+}
+
+export function resolveEnglishReportTitle(canonicalRoleTitle: string): string {
+  const title = canonicalRoleTitle.trim();
+  if (!/[\u0590-\u05ff]/.test(title)) return title;
+
+  const match = findLexiconMatches({ text: title, language: "he" })
+    .find((candidate) => candidate.entry.kind === "title_family");
+  const englishEntry = match
+    ? getRoleFitLexiconEntries().find((entry) => entry.language === "en" && entry.kind === "title_family" && entry.concept_id === match.entry.concept_id)
+    : undefined;
+
+  let baseTitle = englishEntry?.preferred_label ?? "";
+  if (/דירקטור/.test(title)) {
+    baseTitle = /ux\s*[/\\-]?\s*ui/i.test(title) ? "Director of UX/UI" : `Director of ${baseTitle || "Product Experience"}`;
+  } else if (/מנהל(?:ת)?/.test(title)) {
+    baseTitle = englishEntry?.aliases.find((alias) => /manager/i.test(alias)) ?? baseTitle;
+  } else if (/ראש/.test(title)) {
+    baseTitle = englishEntry?.aliases.find((alias) => /head/i.test(alias)) ?? baseTitle;
+  } else if (/מוביל(?:ת)?/.test(title)) {
+    baseTitle = englishEntry?.aliases.find((alias) => /lead/i.test(alias)) ?? baseTitle;
   }
 
-  if (input.savedRoleText && input.pendingField && !input.hasRoleInput) {
-    return mergeRoleClarification(input.savedRoleText, input.pendingField, input.message);
+  if (!baseTitle) {
+    const domain = /ux\s*[/\\-]?\s*ui/i.test(title)
+      ? "UX/UI"
+      : /(?:חוויית משתמש|ux)/i.test(title)
+        ? "UX"
+        : /חדשנות/.test(title)
+          ? "Innovation"
+          : /מוצר/.test(title)
+            ? /ai/i.test(title) ? "AI Product" : "Product"
+            : /(?:הטמעה|יישום).{0,12}ai|ai.{0,12}(?:הטמעה|יישום)/i.test(title)
+              ? "AI Implementation"
+              : /ai/i.test(title)
+                ? "AI"
+                : /דיגיטל/.test(title)
+                  ? "Digital"
+                  : /תוכנית|תכנית/.test(title)
+                    ? "Program"
+                    : "";
+    const roleNoun = /דירקטור/.test(title)
+      ? "Director"
+      : /מנהל(?:ת)?/.test(title)
+        ? "Manager"
+        : /(?:מוביל|ראש)/.test(title)
+          ? "Lead"
+          : /אסטרטג/.test(title)
+            ? "Strategist"
+            : /מעצב/.test(title)
+              ? "Designer"
+              : /חוקר/.test(title)
+                ? "Researcher"
+                : /יוע(?:ץ|צת)/.test(title)
+                  ? "Consultant"
+                  : /אנליסט/.test(title)
+                    ? "Analyst"
+                    : /ארכיטקט/.test(title)
+                      ? "Architect"
+                      : /מומח/.test(title)
+                        ? "Specialist"
+                        : /מהנדס/.test(title)
+                          ? "Engineer"
+                          : /מפתח/.test(title)
+                            ? "Developer"
+                            : /רכז/.test(title)
+                              ? "Coordinator"
+                              : "Role";
+    baseTitle = [domain, roleNoun].filter(Boolean).join(" ");
   }
 
-  if (input.savedRoleText && !input.pendingField && input.hasReportIntent && !input.hasRoleInput) {
-    return input.savedRoleText;
-  }
-
-  return input.message;
+  const hasSeniorMarker = /בכיר(?:ה|ים|ות)?/.test(title);
+  return hasSeniorMarker && !/^senior\b/i.test(baseTitle) ? `Senior ${baseTitle}` : baseTitle;
 }
 
 function inferCompany(roleText: string): string {
@@ -297,6 +466,7 @@ function inferWorkModel(roleText: string): string {
 }
 
 export function createRoleDraftFromText(roleText: string) {
+  roleText = extractRoleContent(roleText);
   const sourceId = "role_input_current_request";
   const company = inferCompany(roleText);
   const title = inferTitle(roleText);
@@ -325,7 +495,7 @@ export function createRoleDraftFromText(roleText: string) {
 
   return {
     company: roleField(company, sourceId),
-    title: roleField(title, sourceId),
+    title: roleField(title.value, sourceId, { confidence: title.confidence }),
     description: roleField(description, sourceId),
     responsibilities: inferredResponsibilities.map((item) => roleField(item, sourceId)),
     requirements: inferredRequirements.map((item) => roleField(item, sourceId)),
@@ -365,6 +535,15 @@ export function validateRoleText(input: {
     roleDraft: createRoleDraftFromText(input.roleText),
     detectedLanguage: input.detectedLanguage,
   });
+}
+
+export function validateStructuredRoleDraft(input: {
+  conversationId: string;
+  traceId: string;
+  roleDraft: StructuredRoleDraft;
+  detectedLanguage: "he" | "en" | "mixed";
+}) {
+  return createRoleValidationResult(input);
 }
 
 export function looksLikeReportIntent(message: string) {

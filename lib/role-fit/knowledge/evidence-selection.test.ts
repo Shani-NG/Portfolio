@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createEvidenceSelectionState, selectRequirementEvidence } from "./evidence-selection.ts";
+import { createEvidenceSelectionState, selectRequirementEvidence, type EvidenceSelectionReasoning } from "./evidence-selection.ts";
 import type { ApprovedEvidenceBundle, ApprovedEvidenceSource } from "./load-approved-evidence.ts";
 
 type ProjectId = "big-red-button" | "c4i" | "epd";
@@ -57,6 +57,7 @@ function select(input: {
   requirementText?: string;
   requiresEvidence?: boolean;
   suggestedSourceIds?: string[];
+  reasoning?: EvidenceSelectionReasoning;
 }) {
   return selectRequirementEvidence({
     roleItemIndex: 0,
@@ -65,6 +66,7 @@ function select(input: {
     evidence: bundle(input.sources, input.suggestedSourceIds),
     requiresEvidence: input.requiresEvidence ?? true,
     state: input.state ?? createEvidenceSelectionState(),
+    reasoning: input.reasoning,
   });
 }
 
@@ -89,6 +91,40 @@ describe("deterministic requirement evidence selection", () => {
     assert.deepEqual(result, { ok: true, sourceIds: [lowerRanked.id] });
   });
 
+  it("accepts semantic case-study support without literal requirement-to-claim overlap", () => {
+    const source = caseSource({ id: "c4i:semantic", projectId: "c4i", claim: "Product strategy roadmap prioritization" });
+    const result = select({
+      sources: [source],
+      requestedSourceIds: [source.id],
+      requirementText: "Resolve trade-offs between business goals and user value",
+      reasoning: {
+        matchType: "semantic",
+        sharedCapability: "Product strategy",
+        contextDifference: "The role applies the capability in a consulting context.",
+        bridgeability: "The decision framing method transfers across product contexts.",
+        unproven: "Consulting revenue ownership is not proven.",
+      },
+    });
+    assert.deepEqual(result, { ok: true, sourceIds: [source.id] });
+  });
+
+  it("accepts truthful transferable support while preserving the transferable reasoning boundary", () => {
+    const source = caseSource({ id: "epd:transferable", projectId: "epd", claim: "Cross-functional leadership and stakeholder alignment" });
+    const result = select({
+      sources: [source],
+      requestedSourceIds: [source.id],
+      requirementText: "Coordinate shared decisions across product and engineering leadership",
+      reasoning: {
+        matchType: "transferable",
+        sharedCapability: "Cross-functional leadership",
+        contextDifference: "The documented work is in complex product systems rather than consulting delivery.",
+        bridgeability: "Stakeholder alignment and shared decisions transfer to the target context.",
+        unproven: "Formal consulting practice ownership is not proven.",
+      },
+    });
+    assert.deepEqual(result, { ok: true, sourceIds: [source.id] });
+  });
+
   it("prefers an unused project only when deterministic recovery is needed", () => {
     const state = createEvidenceSelectionState();
     state.projectUsage.set("big-red-button", 1);
@@ -98,21 +134,21 @@ describe("deterministic requirement evidence selection", () => {
     assert.deepEqual(result, { ok: true, sourceIds: [unused.id] });
   });
 
-  it("reuses a project with a different evidence ID and Claim", () => {
+  it("allows the same canonical evidence ID to support multiple requirements", () => {
     const first = caseSource({ id: "big-red-button:first", claim: "Recovery governance leadership" });
     const second = caseSource({ id: "big-red-button:second", claim: "Recovery governance leadership safeguards" });
     const state = createEvidenceSelectionState();
     assert.deepEqual(select({ sources: [first, second], requestedSourceIds: [first.id], state }), { ok: true, sourceIds: [first.id] });
-    assert.deepEqual(select({ sources: [first, second], requestedSourceIds: [first.id], state }), { ok: true, sourceIds: [second.id] });
+    assert.deepEqual(select({ sources: [first, second], requestedSourceIds: [first.id], state }), { ok: true, sourceIds: [first.id] });
   });
 
-  it("does not treat a different ID with the same Claim and section as distinct evidence", () => {
+  it("does not use identity history as an authorization gate", () => {
     const first = caseSource({ id: "c4i:first", projectId: "c4i", claim: "Recovery governance leadership", anchorId: "same-section" });
     const alias = caseSource({ id: "c4i:alias", projectId: "c4i", claim: "Recovery governance leadership", anchorId: "same-section" });
     const distinct = caseSource({ id: "c4i:distinct", projectId: "c4i", claim: "Recovery governance leadership safeguards", anchorId: "same-section" });
     const state = createEvidenceSelectionState();
     assert.deepEqual(select({ sources: [first, alias, distinct], requestedSourceIds: [first.id], state }), { ok: true, sourceIds: [first.id] });
-    assert.deepEqual(select({ sources: [first, alias, distinct], requestedSourceIds: [alias.id], state }), { ok: true, sourceIds: [distinct.id] });
+    assert.deepEqual(select({ sources: [first, alias, distinct], requestedSourceIds: [alias.id], state }), { ok: true, sourceIds: [alias.id] });
   });
 
   it("keeps CV as the last fallback even when the model requests it", () => {

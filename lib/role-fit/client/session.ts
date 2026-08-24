@@ -1,6 +1,6 @@
 "use client";
 
-import { reportUIPayloadSchema, type ReportUIPayload } from "../contracts/index.ts";
+import { reportUIPayloadSchema, type ReportUIPayload, type RoleValidationResult } from "../contracts/index.ts";
 
 export type RoleFitMessage = {
   id: string;
@@ -28,9 +28,7 @@ export type RoleFitLiveSession = {
   state: RoleFitLiveState;
   messages: RoleFitMessage[];
   draftInput: string;
-  activeRoleText: string;
-  activeRoleTitle: string;
-  activeRoleCompany: string;
+  activeRoleDraft: RoleValidationResult["roleDraft"] | null;
   pendingRoleField: RoleFitPendingField | null;
   clarificationAttempts: number;
   activeLanguage: "he" | "en";
@@ -72,9 +70,7 @@ function createSession(): RoleFitLiveSession {
     state: "initial",
     messages: [],
     draftInput: "",
-    activeRoleText: "",
-    activeRoleTitle: "",
-    activeRoleCompany: "",
+    activeRoleDraft: null,
     pendingRoleField: null,
     clarificationAttempts: 0,
     activeLanguage: "en",

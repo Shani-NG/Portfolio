@@ -7,6 +7,7 @@ import { isReportConfirmationText, reportLimitAnswer, resolveConversationLanguag
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import { createReportId } from "@/lib/role-fit/identifiers";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
+import { hasRoleDraftContent } from "@/lib/role-fit/server/role-understanding";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import styles from "./page.module.css";
 
@@ -129,17 +130,16 @@ export default function RoleFitPage() {
       return;
     }
     const normalizedSubmittedText = normalizeRepeatedInput(submittedText);
-    const normalizedActiveRoleText = normalizeRepeatedInput(currentSession.activeRoleText);
+    const previousUserMessage = [...currentSession.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    const normalizedPreviousInput = normalizeRepeatedInput(previousUserMessage);
     const repeatedInput = Boolean(
-      normalizedActiveRoleText &&
+      normalizedPreviousInput &&
       (
-        normalizedSubmittedText === normalizedActiveRoleText ||
-        (normalizedSubmittedText.length > 80 && normalizedActiveRoleText.includes(normalizedSubmittedText))
+        normalizedSubmittedText === normalizedPreviousInput ||
+        (normalizedSubmittedText.length > 80 && normalizedPreviousInput.includes(normalizedSubmittedText))
       ),
     );
-    const messageForAgent = repeatedInput
-      ? currentSession.activeRoleText
-      : submittedText;
+    const messageForAgent = submittedText;
     const activeLanguage = resolveConversationLanguage(submittedText, currentSession.activeLanguage);
 
     const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
@@ -170,9 +170,9 @@ export default function RoleFitPage() {
           completedReportCount: currentSession.completedReportCount,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)).slice(-12000),
           reportContext: currentSession.reportPayload ? JSON.stringify(currentSession.reportPayload).slice(0, 18000) : undefined,
-          roleContext: currentSession.activeRoleText
+          roleContext: currentSession.activeRoleDraft
             ? {
-                roleText: currentSession.activeRoleText,
+                roleDraft: currentSession.activeRoleDraft,
                 ...(currentSession.pendingRoleField ? { pendingField: currentSession.pendingRoleField } : {}),
               }
             : undefined,
@@ -185,9 +185,7 @@ export default function RoleFitPage() {
       appendLiveMessage({ role: "agent", content: result.answer ?? "I need a little more context before I can answer safely." });
       syncLiveSession({
         state: nextState,
-        activeRoleText: result.roleText ?? currentSession.activeRoleText,
-        activeRoleTitle: result.validation?.roleDraft?.title?.originalValue ?? currentSession.activeRoleTitle,
-        activeRoleCompany: result.validation?.roleDraft?.company?.originalValue ?? currentSession.activeRoleCompany,
+        activeRoleDraft: result.roleDraft ?? result.validation?.roleDraft ?? currentSession.activeRoleDraft,
         pendingRoleField: result.pendingField !== undefined ? result.pendingField : currentSession.pendingRoleField,
         pendingReportConfirmation: nextState === "awaiting-report-confirmation",
         clarificationAttempts: nextState === "awaiting-role-completion" && !result.clarificationExhausted
@@ -230,7 +228,7 @@ export default function RoleFitPage() {
       syncLiveSession({ state: "report-ready" });
       return;
     }
-    if (!reportSession.pendingReportConfirmation || !reportSession.activeRoleText.trim()) {
+    if (!reportSession.pendingReportConfirmation || !hasRoleDraftContent(reportSession.activeRoleDraft)) {
       const missingFieldGuidance = {
         company: "The company name is still missing. Please enter the company name so I can complete the role details.",
         title: "What is the role title? If there is no title, say so and I will offer a generic category.",
@@ -239,7 +237,7 @@ export default function RoleFitPage() {
       } as const;
       const guidance = reportSession.pendingRoleField
         ? missingFieldGuidance[reportSession.pendingRoleField]
-        : reportSession.activeRoleText.trim()
+        : hasRoleDraftContent(reportSession.activeRoleDraft)
           ? "To create the report, I still need:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\nYou can add them in one message."
           : "Paste the role details or upload a text file to begin.";
       appendLiveMessage({
@@ -268,7 +266,7 @@ export default function RoleFitPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          roleText: reportSession.activeRoleText,
+          roleDraft: reportSession.activeRoleDraft,
           approved: true,
           completedReportCount: reportSession.completedReportCount,
           conversationId: reportSession.conversationId,

@@ -104,4 +104,15 @@ describe("validated canonical evidence catalog", () => {
     assert.ok((bundle.candidatesByRoleItem?.[0]?.candidates.length ?? 0) > 0);
     assert.equal(bundle.sources.some((source) => source.content.includes(hebrewRequirement)), false);
   });
+
+  it("exposes a bounded complete canonical index while keeping richer candidate context", async () => {
+    const bundle = await loadApprovedEvidence("product strategy", [{ originalText: "Lead product strategy", source: "requirement" }]);
+    const caseStudyIds = bundle.sources.filter((source) => source.sourceType === "case-study").map((source) => source.id);
+
+    assert.match(bundle.promptContext, /COMPLETE APPROVED EVIDENCE INDEX/);
+    assert.match(bundle.promptContext, /RICH CONTEXT FOR STRONGEST CANDIDATES AND CV FALLBACK/);
+    assert.match(bundle.promptContext, /EVIDENCE_ID: cv/);
+    for (const sourceId of caseStudyIds) assert.match(bundle.promptContext, new RegExp(`EVIDENCE_ID: ${sourceId}`));
+    assert.ok(bundle.promptContext.length < 45_000, `prompt context was ${bundle.promptContext.length} characters`);
+  });
 });

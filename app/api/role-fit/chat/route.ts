@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
+import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import {
   clarificationLimitAnswer,
@@ -18,18 +19,20 @@ import {
 import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import {
-  applyRoleCorrection,
+  applyRoleDraftCorrection,
+  createEmptyRoleDraft,
+  createRoleDraftFromText,
   detectRoleCorrection,
   extractStandaloneRoleTitle,
-  inferRoleFamily,
   isNoRoleTitleAnswer,
   isValidRoleClarificationAnswer,
   looksLikeReportIntent,
-  mergeRoleClarification,
-  resolveRoleTextForValidation,
+  mergeRoleDraftClarification,
+  mergeStructuredRoleDraft,
+  serializeRoleDraftForBoundary,
   shouldValidateRoleCollectionMessage,
   shouldTreatAsRoleClarification,
-  validateRoleText,
+  validateStructuredRoleDraft,
 } from "@/lib/role-fit/server/role-understanding";
 
 const pendingFieldSchema = z.enum(["company", "title", "responsibilities", "requirements"]);
@@ -48,7 +51,7 @@ const requestSchema = z
     reportContext: z.string().max(18_000).optional(),
     roleContext: z
       .object({
-        roleText: z.string().max(20_000),
+        roleDraft: roleDraftSchema,
         pendingField: pendingFieldSchema.optional(),
       })
       .strict()
@@ -131,7 +134,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       state: "report-ready",
       answer: existingReportAnswer(parsedRequest.data.language),
-      roleText: roleContext?.roleText,
+      roleDraft: roleContext?.roleDraft,
       safeMessageKey: "report.existing_role",
     });
   }
@@ -141,7 +144,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         state: "awaiting-role-completion",
         answer: genericRoleTitleAnswer(parsedRequest.data.language),
-        roleText: roleContext.roleText,
+        roleDraft: roleContext.roleDraft,
         pendingField: "title",
         clarificationExhausted: false,
         safeMessageKey: "role.generic_title_category_requested",
@@ -158,26 +161,29 @@ export async function POST(request: Request) {
             language: parsedRequest.data.language,
             repeatedInput: false,
           }),
-      roleText: roleContext.roleText,
+      roleDraft: roleContext.roleDraft,
       pendingField: clarificationExhausted ? null : pendingRoleField,
       clarificationExhausted,
       safeMessageKey: "role.invalid_clarification",
     });
   }
 
-  const roleTextForValidation = standaloneRoleTitle
-    ? mergeRoleClarification("", "title", standaloneRoleTitle)
-    : roleCorrection && roleContext
-      ? applyRoleCorrection(roleContext.roleText, roleCorrection)
-      : resolveRoleTextForValidation({
-          message: parsedRequest.data.message,
-          savedRoleText: roleContext?.roleText,
-          pendingField: pendingRoleField,
-          hasRoleInput: hasRoleInput && !isFieldClarification,
-          hasReportIntent,
-        });
+  const currentRoleDraft = roleContext?.roleDraft;
+  const incomingRoleDraft = hasRoleInput && !isFieldClarification
+    ? createRoleDraftFromText(parsedRequest.data.message)
+    : createEmptyRoleDraft();
+  const roleDraftForValidation = standaloneRoleTitle
+    ? mergeRoleDraftClarification(createEmptyRoleDraft(), "title", standaloneRoleTitle)
+    : roleCorrection && currentRoleDraft
+      ? applyRoleDraftCorrection(currentRoleDraft, roleCorrection)
+      : currentRoleDraft && pendingRoleField && isFieldClarification
+        ? mergeRoleDraftClarification(currentRoleDraft, pendingRoleField, parsedRequest.data.message)
+        : hasRoleInput
+          ? mergeStructuredRoleDraft(currentRoleDraft, incomingRoleDraft, { replaceCompleteRole: Boolean(currentRoleDraft) })
+          : currentRoleDraft ?? incomingRoleDraft;
+  const boundedRoleText = serializeRoleDraftForBoundary(roleDraftForValidation);
 
-  if (roleTextForValidation.length > policy.maxInputChars) {
+  if (boundedRoleText.length > policy.maxInputChars) {
     return NextResponse.json(
       {
         state: "recoverable-error",
@@ -197,10 +203,10 @@ export async function POST(request: Request) {
   }
 
   if (hasRoleInput || isFieldClarification || isRoleCorrection || (!parsedRequest.data.reportContext && hasReportIntent)) {
-    const validation = validateRoleText({
+    const validation = validateStructuredRoleDraft({
       conversationId,
       traceId,
-      roleText: roleTextForValidation,
+      roleDraft: roleDraftForValidation,
       detectedLanguage: parsedRequest.data.language,
     });
 
@@ -231,7 +237,7 @@ export async function POST(request: Request) {
           repeatedInput: parsedRequest.data.repeatedInput,
         }),
         validation,
-        roleText: roleTextForValidation,
+        roleDraft: validation.roleDraft,
         pendingField: null,
         clarificationExhausted: false,
         safeMessageKey: "role.ready_for_confirmation",
@@ -268,7 +274,7 @@ export async function POST(request: Request) {
             repeatedInput: parsedRequest.data.repeatedInput,
           }),
       validation,
-      roleText: roleTextForValidation,
+      roleDraft: validation.roleDraft,
       pendingField: clarificationExhausted ? null : missingField,
       clarificationExhausted,
       safeMessageKey: "role.missing_required_fields",

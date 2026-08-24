@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { findLexiconMatches } from "../lexicon.ts";
+import { findLexiconMatches, findRelatedLexiconConceptIds } from "../lexicon.ts";
 import {
   approvedProjectDestinations,
   resolveApprovedEvidenceDestination,
@@ -114,7 +114,10 @@ function lexicalRelevance(query: string, content: string) {
 }
 
 function conceptIds(value: string) {
-  return new Set(findLexiconMatches({ text: value, language: "mixed" }).map((match) => match.entry.concept_id));
+  return new Set([
+    ...findLexiconMatches({ text: value, language: "mixed" }).map((match) => match.entry.concept_id),
+    ...findRelatedLexiconConceptIds(value),
+  ]);
 }
 
 export function evidenceRelevance(requirementText: string, source: ApprovedEvidenceSource) {
@@ -174,6 +177,7 @@ export function parseCanonicalCaseStudyEvidence(source: CanonicalEvidenceSourceD
       ?.split(/[;,]/)
       .map((item) => item.trim())
       .filter(Boolean) ?? [];
+    const limitation = firstField(block, "Limit") ?? firstField(block, "Limitations");
 
     return [{
       id: evidenceId!,
@@ -183,6 +187,7 @@ export function parseCanonicalCaseStudyEvidence(source: CanonicalEvidenceSourceD
       approvedPublicVisibility: true,
       claim,
       capabilities,
+      ...(limitation ? { limitations: [limitation] } : {}),
       project: {
         ...source.project!,
         ...(anchorId ? { anchorId } : {}),
@@ -320,15 +325,37 @@ function buildRequirementCandidates(roleItems: EvidenceRoleItem[], catalogSource
 
   return roleItems.map((roleItem, roleItemIndex): RequirementEvidenceCandidates => {
     const rankedCaseStudies = rankSources(roleItem.originalText, caseStudySources).slice(0, 6);
-    const rankedFallback = rankedCaseStudies.length === 0
-      ? rankSources(roleItem.originalText, internalSources).slice(0, 1)
-      : [];
+    const rankedFallback = rankSources(roleItem.originalText, internalSources).slice(0, 1);
     return {
       roleItemIndex,
       roleItemText: roleItem.originalText,
       candidates: [...rankedCaseStudies, ...rankedFallback].map((source) => ({ sourceId: source.id, relevanceScore: source.score })),
     };
   });
+}
+
+function compactText(value: string | undefined, maxChars: number) {
+  return value?.replace(/\s+/g, " ").trim().slice(0, maxChars) ?? "";
+}
+
+function compactCatalogSource(source: ApprovedEvidenceSource) {
+  const resolution = source.sourceType === "case-study"
+    ? resolveApprovedEvidenceDestination({
+        sourceId: source.id,
+        projectId: source.project?.id,
+        exactAnchorId: source.project?.anchorId,
+        sectionAnchorId: source.project?.sectionAnchorId,
+      })
+    : null;
+  return [
+    `EVIDENCE_ID: ${source.id}`,
+    `TYPE: ${source.sourceType}`,
+    source.project ? `PROJECT: ${source.project.title}` : undefined,
+    `CLAIM: ${compactText(source.claim ?? source.content, 240)}`,
+    source.capabilities?.length ? `CAPABILITIES: ${compactText(source.capabilities.join(", "), 180)}` : undefined,
+    source.limitations?.length ? `LIMITS: ${compactText(source.limitations.join(" "), 180)}` : undefined,
+    resolution ? `DESTINATION: ${resolution.destination.mode === "no-link" ? "invalid" : resolution.destination.dedupeKey}` : "DESTINATION: approved internal CV fallback",
+  ].filter(Boolean).join(" | ");
 }
 
 function promptSource(source: ApprovedEvidenceSource) {
@@ -355,7 +382,8 @@ export async function loadApprovedEvidence(roleText: string, roleItems?: Evidenc
     : [{ originalText: roleText, source: "requirement" as const }];
   const candidatesByRoleItem = buildRequirementCandidates(effectiveRoleItems, catalog.sources);
   const selectedIds = new Set(candidatesByRoleItem.flatMap((candidateSet) => candidateSet.candidates.map((candidate) => candidate.sourceId)));
-  const selected = catalog.sources.filter((source) => selectedIds.has(source.id));
+  const selected = catalog.sources.filter((source) => selectedIds.has(source.id) || source.sourceType === "cv");
+  const selectableCatalog = catalog.sources.filter((source) => source.sourceType === "case-study" || source.sourceType === "cv");
   const candidateContract = candidatesByRoleItem.map((candidateSet) => [
     `ROLE_ITEM_INDEX: ${candidateSet.roleItemIndex}`,
     `ROLE_ITEM_CANDIDATE_SOURCE_IDS: ${candidateSet.candidates.map((candidate) => candidate.sourceId).join(", ") || "none"}`,
@@ -365,7 +393,10 @@ export async function loadApprovedEvidence(roleText: string, roleItems?: Evidenc
   return {
     promptContext: [
       "## APPLICATION-BOUNDED REQUIREMENT EVIDENCE",
+      "## COMPLETE APPROVED EVIDENCE INDEX\nThis bounded index is the complete legal evidence universe for report selection. Use semantic meaning and documented capabilities; literal keyword identity is not required. An ID remains usable even when it is absent from a role item's ranked suggestions.\n\n"
+        + selectableCatalog.map(compactCatalogSource).join("\n"),
       candidateContract,
+      "## RICH CONTEXT FOR STRONGEST CANDIDATES AND CV FALLBACK",
       selected.map(promptSource).join("\n\n---\n\n"),
     ].filter(Boolean).join("\n\n"),
     sources: catalog.sources,

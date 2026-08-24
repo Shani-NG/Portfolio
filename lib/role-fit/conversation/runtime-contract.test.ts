@@ -55,14 +55,14 @@ describe("Role Fit runtime conversation contract", () => {
   it("stores a first-message standalone title before collecting the remaining role details", async () => {
     const route = await readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8");
     const recognition = route.indexOf("extractStandaloneRoleTitle(parsedRequest.data.message)");
-    const markedRoleText = route.indexOf('mergeRoleClarification("", "title", standaloneRoleTitle)');
-    const validation = route.indexOf("validateRoleText({", markedRoleText);
+    const structuredTitle = route.indexOf('mergeRoleDraftClarification(createEmptyRoleDraft(), "title", standaloneRoleTitle)');
+    const validation = route.indexOf("validateStructuredRoleDraft({", structuredTitle);
 
     assert.ok(recognition >= 0);
-    assert.ok(markedRoleText > recognition);
-    assert.ok(validation > markedRoleText);
+    assert.ok(structuredTitle > recognition);
+    assert.ok(validation > structuredTitle);
     assert.match(route, /state: "awaiting-role-completion"/);
-    assert.match(route, /roleText: roleTextForValidation/);
+    assert.match(route, /roleDraft: validation\.roleDraft/);
   });
 
   it("opens a real file input instead of sending an upload chat message", async () => {

@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
+import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
@@ -13,7 +14,12 @@ import {
   shouldUseModelRepair,
 } from "@/lib/role-fit/report/repair";
 import { evaluateReportEligibility, evidenceStateFromComposedReport } from "@/lib/role-fit/server/eligibility";
-import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
+import {
+  inferRoleFamily,
+  resolveEnglishReportTitle,
+  serializeRoleDraftForBoundary,
+  validateStructuredRoleDraft,
+} from "@/lib/role-fit/server/role-understanding";
 
 function toSessionCompletedReportCount(value: number): 0 | 1 | 2 {
   if (value >= 2) return 2;
@@ -23,7 +29,7 @@ function toSessionCompletedReportCount(value: number): 0 | 1 | 2 {
 
 const requestSchema = z
   .object({
-    roleText: z.string(),
+    roleDraft: roleDraftSchema,
     approved: z.boolean(),
     // Retained for client display compatibility only; Supabase is authoritative for eligibility.
     completedReportCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(0),
@@ -53,8 +59,9 @@ export async function POST(request: Request) {
   const traceId = crypto.randomUUID();
   const conversationId = parsedRequest.data.conversationId ?? crypto.randomUUID();
   const sessionId = parsedRequest.data.sessionId;
+  const boundedRoleText = serializeRoleDraftForBoundary(parsedRequest.data.roleDraft);
 
-  if (parsedRequest.data.roleText.length > policy.maxInputChars) {
+  if (boundedRoleText.length > policy.maxInputChars) {
     after(() =>
       logRoleFitEvent({
         eventName: "role.validation_failed",
@@ -163,10 +170,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ state: "blocked", eligibility }, { status: 409 });
   }
 
-  const validation = validateRoleText({
+  const validation = validateStructuredRoleDraft({
     conversationId,
     traceId,
-    roleText: parsedRequest.data.roleText,
+    roleDraft: parsedRequest.data.roleDraft,
     detectedLanguage: parsedRequest.data.language,
   });
 
@@ -197,6 +204,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const canonicalRoleTitle = validation.roleDraft.title?.originalValue ?? "";
+  const reportDisplayTitle = resolveEnglishReportTitle(canonicalRoleTitle);
+
   after(() =>
     logRoleFitEvent({
       eventName: "report.generation_started",
@@ -214,7 +224,7 @@ export async function POST(request: Request) {
 
   const roleItems = getRoleAnalysisItems(validation.roleDraft);
   const provider = getRoleFitModelProvider();
-  const approvedEvidence = await loadApprovedEvidence(parsedRequest.data.roleText, roleItems);
+  const approvedEvidence = await loadApprovedEvidence(boundedRoleText, roleItems);
   if (approvedEvidence.catalogAudit?.issues.length) {
     console.warn("[role-fit-report] evidence catalog exclusions", {
       traceId,
@@ -226,7 +236,7 @@ export async function POST(request: Request) {
     });
   }
   let modelResult = await provider.generateReport({
-    roleText: parsedRequest.data.roleText,
+    roleText: boundedRoleText,
     language: parsedRequest.data.language,
     task: "analysis",
     maxOutputTokens: policy.maxOutputTokens,
@@ -281,6 +291,7 @@ export async function POST(request: Request) {
     evidence: approvedEvidence,
     language: parsedRequest.data.language,
     reportId: parsedRequest.data.reportId,
+    reportDisplayTitle,
   });
   const originalCompositionDiagnostic = composition.ok ? undefined : composition.diagnostic;
   let repairOutcome: CompositionRepairOutcome = "not-attempted";
@@ -298,6 +309,7 @@ export async function POST(request: Request) {
         evidence: approvedEvidence,
         language: parsedRequest.data.language,
         reportId: parsedRequest.data.reportId,
+        reportDisplayTitle,
         representedLimitationRoleItemIndexes,
       });
     }
@@ -306,7 +318,7 @@ export async function POST(request: Request) {
   if (!composition.ok && shouldUseModelRepair(composition.diagnostic)) {
     const firstDiagnostic = composition.diagnostic;
     const repairResult = await provider.generateReport({
-      roleText: parsedRequest.data.roleText,
+      roleText: boundedRoleText,
       language: parsedRequest.data.language,
       task: "analysis",
       maxOutputTokens: policy.maxOutputTokens,
@@ -334,6 +346,7 @@ export async function POST(request: Request) {
         evidence: approvedEvidence,
         language: parsedRequest.data.language,
         reportId: parsedRequest.data.reportId,
+        reportDisplayTitle,
       });
       if (!composition.ok) repairOutcome = "repaired-output-still-invalid";
     } else {
@@ -398,8 +411,7 @@ export async function POST(request: Request) {
     report,
   });
   const reportId = report.reportId;
-  const title = validation.roleDraft.title?.originalValue ?? "";
-  const roleFamily = inferRoleFamily(title);
+  const roleFamily = inferRoleFamily(canonicalRoleTitle);
 
   if (eligibility.state === "no-report") {
     after(() => {

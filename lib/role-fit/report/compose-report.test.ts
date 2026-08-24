@@ -243,6 +243,76 @@ describe("Task C evidence and report integrity", () => {
     assert.equal(result.report.keyGaps.items[0]?.matchType, "insufficient-evidence");
   });
 
+  it("turns one exhausted evidence ladder into requirement-level insufficient evidence instead of composition failure", () => {
+    const unsupportedEvidence: ApprovedEvidenceBundle = {
+      promptContext: "canonical evidence",
+      sources: [{
+        ...evidence.sources[0]!,
+        content: "Clinical catheter hardware calibration",
+        claim: "Clinical catheter hardware calibration",
+        capabilities: ["Clinical catheter hardware calibration"],
+      }],
+    };
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        fitLevel: "good",
+        items: [
+          item(0, "direct", "strength", ["invented-source"]),
+          item(1, "insufficient-evidence", "gap", []),
+        ],
+      }),
+      roleDraft: roleDraft(),
+      evidence: unsupportedEvidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.requirementMapping.items[0]?.matchType, "insufficient-evidence");
+    assert.equal(result.report.requirementMapping.items[0]?.evidenceConfidence, "insufficient");
+    assert.deepEqual(result.report.requirementMapping.items[0]?.clusterIds, []);
+    assert.notEqual(result.report.requirementMapping.items[0]?.matchType, "real-gap");
+  });
+
+  it("recovers a partial-fit model output whose only positive item exhausts the evidence ladder", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        fitLevel: "partial",
+        items: [item(0, "direct", "strength", ["invented-source"])],
+      }),
+      roleDraft: roleDraft(),
+      evidence: { promptContext: "canonical evidence", sources: [] },
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.overallFitVisual.mode, "insufficient");
+    assert.equal(result.report.requirementMapping.items[0]?.matchType, "insufficient-evidence");
+  });
+
+  it("keeps the canonical title separate while rendering the English report display title", () => {
+    const hebrewRoleDraft = validateRoleText({
+      conversationId: "conv_he",
+      traceId: "trace_he",
+      roleText: "תפקיד: אסטרטגית חוויית משתמש בכירה\nתחומי אחריות: הובלת אסטרטגיית מוצר במערכות מורכבות\nדרישות: ניסיון באסטרטגיית UX ובהובלה חוצת תחומים",
+      detectedLanguage: "he",
+    }).roleDraft;
+    const result = composeReportUIPayload({
+      analysis: analysis(),
+      roleDraft: hebrewRoleDraft,
+      evidence,
+      language: "en",
+      reportDisplayTitle: "Senior UX Strategist",
+    });
+
+    assert.equal(hebrewRoleDraft.title?.originalValue, "אסטרטגית חוויית משתמש בכירה");
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.roleSnapshot.title, "Senior UX Strategist");
+    assert.doesNotMatch(JSON.stringify(result.report), /[\u0590-\u05ff]/);
+  });
+
   it("C11 blocks Partial Fit when no gap-eligible item exists", () => {
     const result = composeReportUIPayload({ analysis: analysis({ fitLevel: "partial" }), roleDraft: roleDraft(), evidence, language: "en" });
     assert.deepEqual(result, { ok: false, diagnostic: "semantic:partial-fit-without-gap" });
@@ -336,7 +406,7 @@ describe("Task C evidence and report integrity", () => {
     assert.deepEqual(result.report.keyGaps.items, []);
   });
 
-  it("C14 recovers exact evidence reuse with a different canonical item", () => {
+  it("C14 reuses one truthful canonical source and deduplicates its visible cluster", () => {
     const evidenceWithAlternative: ApprovedEvidenceBundle = {
       ...evidence,
       sources: [
@@ -357,7 +427,8 @@ describe("Task C evidence and report integrity", () => {
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.report.requirementMapping.items.length, 2);
-    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i", "epd:alignment"]);
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i"]);
+    assert.deepEqual(result.report.evidencePanel.clusters[0]?.supportedItemIds, ["role-item-1", "role-item-2"]);
   });
 
   it("prefers supporting case studies over CV evidence", () => {

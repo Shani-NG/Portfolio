@@ -214,6 +214,7 @@ export function composeReportUIPayload(input: {
   evidence: ApprovedEvidenceBundle;
   language: "he" | "en" | "mixed";
   reportId?: string;
+  reportDisplayTitle?: string;
   representedLimitationRoleItemIndexes?: readonly number[];
 }): CompositionResult {
   const roleItems = getRoleAnalysisItems(input.roleDraft);
@@ -232,14 +233,11 @@ export function composeReportUIPayload(input: {
     (input.representedLimitationRoleItemIndexes ?? [])
       .filter((roleItemIndex) => recoverableLimitationRoleItemIndexes.has(roleItemIndex)),
   );
-  const semanticIssue = semanticDiagnostic(input.analysis, representedLimitationRoleItemIndexes);
-  if (semanticIssue) return { ok: false, diagnostic: semanticIssue };
-  const analysis = { ...input.analysis, fitLevel: resolveStableFitLevel(input.analysis) };
-
   const reportItems: ReportItem[] = [];
+  const resolvedAnalysisItems: AnalysisItem[] = [];
   const representedLimitationItemIds = new Set<string>();
 
-  for (const [position, analysisItem] of analysis.items.entries()) {
+  for (const [position, analysisItem] of input.analysis.items.entries()) {
     const roleItem = roleItems[analysisItem.roleItemIndex];
     if (!roleItem || seenIndexes.has(analysisItem.roleItemIndex)) {
       return { ok: false, diagnostic: "composition:invalid-role-item-index" };
@@ -254,26 +252,51 @@ export function composeReportUIPayload(input: {
       evidence: input.evidence,
       requiresEvidence,
       state: evidenceSelectionState,
+      reasoning: {
+        matchType: analysisItem.matchType,
+        sharedCapability: analysisItem.sharedCapability,
+        contextDifference: analysisItem.contextDifference,
+        bridgeability: analysisItem.bridgeability,
+        unproven: analysisItem.unproven,
+      },
     });
-    if (!selection.ok) return selection;
-    const evidenceSourceIds = selectDisplayedEvidenceSourceIds(selection.sourceIds, sourceById);
+    const resolvedAnalysisItem: AnalysisItem = selection.ok
+      ? { ...analysisItem, evidenceSourceIds: selection.sourceIds }
+      : {
+          ...analysisItem,
+          matchType: "insufficient-evidence",
+          impact: "gap",
+          evidenceConfidence: "insufficient",
+          shortRationale: input.language === "he"
+            ? "לא נמצאה ראיה קנונית רלוונטית מספיק לאחר מיצוי סולם הראיות; הדרישה נשארת ללא תמיכה ולא הומרה לפער מוכח."
+            : "No sufficiently relevant canonical evidence remained after the full evidence ladder; this requirement is unsupported, not proven as a real gap.",
+          evidenceSourceIds: [],
+        };
+    resolvedAnalysisItems.push(resolvedAnalysisItem);
+    const evidenceSourceIds = selectDisplayedEvidenceSourceIds(resolvedAnalysisItem.evidenceSourceIds, sourceById);
 
-    const displayLabel = normalizeItemText(analysisItem.displayLabel, roleItem.originalText, 64);
-    const rawRationale = semanticRationale(analysisItem, input.language);
-    const shortRationale = (analysisItem.matchType !== "semantic" && analysisItem.matchType !== "transferable" && isNearDuplicate(displayLabel, rawRationale))
-      ? normalizeItemText(roleItem.originalText, rawRationale, 620)
+    const displayLabel = normalizeItemText(resolvedAnalysisItem.displayLabel, roleItem.originalText, 64);
+    const rawRationale = semanticRationale(resolvedAnalysisItem, input.language);
+    const shortRationale = (resolvedAnalysisItem.matchType !== "semantic" && resolvedAnalysisItem.matchType !== "transferable" && isNearDuplicate(displayLabel, rawRationale))
+      ? normalizeItemText(
+          input.language !== "he" && /[\u0590-\u05ff]/.test(roleItem.originalText) ? rawRationale : roleItem.originalText,
+          rawRationale,
+          620,
+        )
       : rawRationale;
 
     const reportItem: ReportItem = {
       itemId: `role-item-${position + 1}`,
-      originalText: roleItem.originalText,
+      originalText: input.language !== "he" && /[\u0590-\u05ff]/.test(roleItem.originalText)
+        ? displayLabel
+        : roleItem.originalText,
       displayLabel,
-      normalizedConcept: normalizeItemText(analysisItem.sharedCapability ?? displayLabel, displayLabel, 96),
+      normalizedConcept: normalizeItemText(resolvedAnalysisItem.sharedCapability ?? displayLabel, displayLabel, 96),
       source: roleItem.source,
-      importance: analysisItem.importance,
-      matchType: analysisItem.matchType,
-      impact: analysisItem.impact,
-      evidenceConfidence: analysisItem.evidenceConfidence,
+      importance: resolvedAnalysisItem.importance,
+      matchType: resolvedAnalysisItem.matchType,
+      impact: resolvedAnalysisItem.impact,
+      evidenceConfidence: resolvedAnalysisItem.evidenceConfidence,
       shortRationale,
       clusterIds: evidenceSourceIds.map((sourceId) => `evidence-${sourceId}`),
     };
@@ -282,6 +305,10 @@ export function composeReportUIPayload(input: {
       representedLimitationItemIds.add(reportItem.itemId);
     }
   }
+
+  const resolvedAnalysis = { ...input.analysis, items: resolvedAnalysisItems };
+  const semanticIssue = semanticDiagnostic(resolvedAnalysis, representedLimitationRoleItemIndexes);
+  if (semanticIssue) return { ok: false, diagnostic: semanticIssue };
 
   const referencedSourceIds = [...new Set(reportItems.flatMap((item) =>
     item.clusterIds.map((clusterId) => clusterId.slice("evidence-".length)),
@@ -338,13 +365,13 @@ export function composeReportUIPayload(input: {
   ).length;
   const totalRequirements = reportItems.length;
   const language = input.language === "he" ? "he" : "en";
-  const fitLevel = analysis.fitLevel;
+  const fitLevel = resolveStableFitLevel(resolvedAnalysis);
   const reportId = input.reportId ?? createReportId();
   const overallFitVisual = fitLevel === "insufficient" || fitLevel === "out-of-scope"
     ? {
         mode: fitLevel,
         label: fitLevel === "insufficient" ? "Insufficient evidence" : "Outside the supported role scope",
-        rationale: conciseSentences(analysis.fitRationale, 1, 180),
+        rationale: conciseSentences(resolvedAnalysis.fitRationale, 1, 180),
       }
     : {
         mode: "fit" as const,
@@ -353,8 +380,8 @@ export function composeReportUIPayload(input: {
         illustrationKey: fitPresentation[fitLevel].illustrationKey,
         colorToken: fitPresentation[fitLevel].colorToken,
         label: fitPresentation[fitLevel].label,
-        rationale: conciseSentences(analysis.fitRationale, 1, 180),
-        ...(analysis.evidenceConfidence === "low" || analysis.evidenceConfidence === "insufficient"
+        rationale: conciseSentences(resolvedAnalysis.fitRationale, 1, 180),
+        ...(resolvedAnalysis.evidenceConfidence === "low" || resolvedAnalysis.evidenceConfidence === "insufficient"
           ? { qualifiers: ["evidence-limited" as const] }
           : {}),
       };
@@ -367,7 +394,7 @@ export function composeReportUIPayload(input: {
     state: "ready",
     roleSnapshot: {
       company: input.roleDraft.company?.originalValue.trim() ?? "",
-      title: input.roleDraft.title?.originalValue.trim() ?? "",
+      title: input.reportDisplayTitle?.trim() || input.roleDraft.title?.originalValue.trim() || "",
       ...(input.roleDraft.seniority?.originalValue ? { seniority: input.roleDraft.seniority.originalValue.trim() } : {}),
       ...(input.roleDraft.yearsOfExperience?.originalValue !== undefined ? { yearsOfExperience: input.roleDraft.yearsOfExperience.originalValue } : {}),
       ...(input.roleDraft.location?.originalValue ? { location: input.roleDraft.location.originalValue.trim() } : {}),
@@ -376,8 +403,8 @@ export function composeReportUIPayload(input: {
     },
     overallFitVisual,
     evidenceConfidence: {
-      level: analysis.evidenceConfidence,
-      rationale: conciseSentences(analysis.evidenceConfidenceRationale, 2, 220),
+      level: resolvedAnalysis.evidenceConfidence,
+      rationale: conciseSentences(resolvedAnalysis.evidenceConfidenceRationale, 2, 220),
     },
     skillsMatch: {
       items: strengths,

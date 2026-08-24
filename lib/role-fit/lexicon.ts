@@ -30,6 +30,27 @@ const entries = lexiconData.entries as LexiconEntry[];
 
 export const roleFitLexiconVersion = lexiconData.version;
 
+export function getRoleFitLexiconEntries(): readonly LexiconEntry[] {
+  return entries;
+}
+
+export function findRelatedLexiconConceptIds(value: string): string[] {
+  const normalizedText = normalizeLexiconText(value);
+  if (!normalizedText) return [];
+
+  return [...new Set(entries.flatMap((entry) => {
+    const semanticTerms = [
+      entry.preferred_label,
+      ...entry.aliases,
+      ...entry.keywords,
+      ...entry.context_signals,
+    ];
+    return semanticTerms.some((term) => termMatchesText(normalizedText, term))
+      ? [entry.concept_id]
+      : [];
+  }))];
+}
+
 export function normalizeLexiconText(value: string): string {
   return value
     .normalize("NFKC")
