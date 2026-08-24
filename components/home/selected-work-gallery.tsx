@@ -8,6 +8,8 @@ import { MaterialIcon } from "@/components/ui/material-icon";
 import { experienceProjectCards } from "@/lib/portfolio-content";
 import styles from "./selected-work-gallery.module.css";
 
+const maxVisibleOffset = 2;
+
 const shortestLoopOffset = (index: number, activeIndex: number, total: number) => {
   const rawOffset = index - activeIndex;
   const half = Math.floor(total / 2);
@@ -65,6 +67,8 @@ export function SelectedWorkGallery() {
         onPointerUp={handlePointerUp}
       >
         {positionedProjects.map((project, index) => {
+          if (Math.abs(project.offset) > maxVisibleOffset) return null;
+
           const isActive = project.offset === 0;
 
           return (
