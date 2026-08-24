@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
-import { constrainRepairAnalysis } from "./repair.ts";
+import { constrainRepairAnalysis, shouldUseModelRepair } from "./repair.ts";
 
 function analysis(overrides: Partial<QualitativeReportAnalysis> = {}): QualitativeReportAnalysis {
   return {
@@ -25,6 +25,12 @@ function analysis(overrides: Partial<QualitativeReportAnalysis> = {}): Qualitati
 }
 
 describe("report repair boundary", () => {
+  it("keeps evidence recovery deterministic and reserves Gemini repair for semantic or structural issues", () => {
+    assert.equal(shouldUseModelRepair("evidence:no-sufficiently-relevant-canonical-source"), false);
+    assert.equal(shouldUseModelRepair("semantic:incomplete-semantic-rationale"), true);
+    assert.equal(shouldUseModelRepair("composition:invalid-role-item-index"), true);
+  });
+
   it("allows an evidence repair to change only source IDs", () => {
     const original = analysis();
     const repaired = analysis({

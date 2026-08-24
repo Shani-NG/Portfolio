@@ -117,7 +117,7 @@ function conceptIds(value: string) {
   return new Set(findLexiconMatches({ text: value, language: "mixed" }).map((match) => match.entry.concept_id));
 }
 
-function evidenceRelevance(requirementText: string, source: ApprovedEvidenceSource) {
+export function evidenceRelevance(requirementText: string, source: ApprovedEvidenceSource) {
   const evidenceText = [source.capabilities?.join(" "), source.claim].filter(Boolean).join(" ") || source.content;
   const requirementConcepts = conceptIds(requirementText);
   const evidenceConcepts = conceptIds(evidenceText);
@@ -359,7 +359,7 @@ export async function loadApprovedEvidence(roleText: string, roleItems?: Evidenc
   const candidateContract = candidatesByRoleItem.map((candidateSet) => [
     `ROLE_ITEM_INDEX: ${candidateSet.roleItemIndex}`,
     `ROLE_ITEM_CANDIDATE_SOURCE_IDS: ${candidateSet.candidates.map((candidate) => candidate.sourceId).join(", ") || "none"}`,
-    "Only these IDs may support this role item. The role/JD text is a requirement, never evidence.",
+    "These IDs are ranked suggestions for this role item, not an authorization boundary. Any selected ID must still be an exact APPROVED_SOURCE_ID supplied in this context and truthfully support the requirement. The role/JD text is a requirement, never evidence.",
   ].join("\n")).join("\n\n");
 
   return {

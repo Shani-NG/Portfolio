@@ -231,6 +231,7 @@ export function composeReportUIPayload(input: {
     const requiresEvidence = positiveMatchTypes.has(analysisItem.matchType) || analysisItem.matchType === "partial";
     const selection = selectRequirementEvidence({
       roleItemIndex: analysisItem.roleItemIndex,
+      requirementText: roleItem.originalText,
       requestedSourceIds: analysisItem.evidenceSourceIds,
       evidence: input.evidence,
       requiresEvidence,

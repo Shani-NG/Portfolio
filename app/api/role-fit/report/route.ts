@@ -6,7 +6,7 @@ import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
 import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
-import { constrainRepairAnalysis } from "@/lib/role-fit/report/repair";
+import { constrainRepairAnalysis, shouldUseModelRepair } from "@/lib/role-fit/report/repair";
 import { evaluateReportEligibility, evidenceStateFromComposedReport } from "@/lib/role-fit/server/eligibility";
 import { inferRoleFamily, validateRoleText } from "@/lib/role-fit/server/role-understanding";
 
@@ -278,7 +278,7 @@ export async function POST(request: Request) {
     reportId: parsedRequest.data.reportId,
   });
 
-  if (!composition.ok) {
+  if (!composition.ok && shouldUseModelRepair(composition.diagnostic)) {
     const firstDiagnostic = composition.diagnostic;
     const repairResult = await provider.generateReport({
       roleText: parsedRequest.data.roleText,

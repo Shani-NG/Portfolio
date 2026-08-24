@@ -1,5 +1,9 @@
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
 
+export function shouldUseModelRepair(diagnostic: string) {
+  return !diagnostic.startsWith("evidence:");
+}
+
 export function constrainRepairAnalysis(input: {
   original: QualitativeReportAnalysis;
   repaired: QualitativeReportAnalysis;
