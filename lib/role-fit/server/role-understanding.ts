@@ -121,7 +121,7 @@ export function isPlausibleRoleTitle(value: string): boolean {
 
   if (!title || title.length > 100 || words.length > 12) return false;
   if (/[.!?]$/.test(title) || setupInstructionSignal.test(title)) return false;
-  if (/^(about|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(title)) return false;
+  if (/^(about|company|organization|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(title)) return false;
 
   return roleTitleSignal.test(title) || (/[\u0590-\u05ff]/.test(title) && !hebrewSetupInstructionSignal.test(title));
 }

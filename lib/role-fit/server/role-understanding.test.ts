@@ -139,6 +139,48 @@ describe("Role Fit pasted job understanding", () => {
     assert.deepEqual(result.missingFields, ["title"]);
   });
 
+  it("keeps a labeled company as company without promoting it to the role title", () => {
+    const roleText = [
+      "Company: Example Product Team",
+      "Responsibilities: Lead product discovery and align stakeholders",
+      "Requirements: Strong UX strategy and research experience",
+    ].join("\n");
+
+    const result = validateRoleText({
+      conversationId: "conv_test",
+      traceId: "trace_test",
+      roleText,
+      detectedLanguage: "en",
+    });
+
+    assert.equal(extractStandaloneRoleTitle("Company: Example Product Team"), null);
+    assert.equal(result.roleDraft.company?.originalValue, "Example Product Team");
+    assert.equal(result.roleDraft.title?.originalValue, "");
+    assert.equal(result.parseStatus, "valid-incomplete");
+    assert.deepEqual(result.missingFields, ["title"]);
+  });
+
+  it("keeps an explicit title authoritative when a labeled company precedes it", () => {
+    const roleText = [
+      "Company: Example Product Team",
+      "Title: Senior UX Strategist",
+      "Responsibilities: Lead product discovery and align stakeholders",
+      "Requirements: Strong UX strategy and research experience",
+    ].join("\n");
+
+    const result = validateRoleText({
+      conversationId: "conv_test",
+      traceId: "trace_test",
+      roleText,
+      detectedLanguage: "en",
+    });
+
+    assert.equal(result.roleDraft.company?.originalValue, "Example Product Team");
+    assert.equal(result.roleDraft.title?.originalValue, "Senior UX Strategist");
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.deepEqual(result.missingFields, []);
+  });
+
   it("does not promote a responsibility sentence when the first line is a section heading", () => {
     const roleText = [
       "About the role",
