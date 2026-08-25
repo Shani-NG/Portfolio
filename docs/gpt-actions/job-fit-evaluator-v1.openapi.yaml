@@ -1,0 +1,137 @@
+openapi: 3.1.0
+info:
+  title: Portfolio Internal Job-Fit Evaluator
+  version: 1.0.0
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+  description: >-
+    Evaluates one already-acquired and normalized job against the approved Portfolio evidence.
+    The response contains one shared requirement-level fit/gap analysis used for both the fit
+    outcome and CV positioning. This action does not save a JAM job.
+servers:
+  - url: https://portfolio-shaning.vercel.app
+    description: Replace with the approved Portfolio Preview or Production host before importing the Action.
+paths:
+  /api/internal/job-fit/evaluate/v1:
+    post:
+      operationId: evaluateNormalizedJobFit
+      summary: Evaluate one normalized job once
+      security:
+        - evaluatorBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormalizedJobCandidate'
+      responses:
+        '200':
+          description: Persistable evaluated or insufficient-evidence result.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/EvaluatedResult'
+                  - $ref: '#/components/schemas/InsufficientEvidenceResult'
+        '400':
+          description: The normalized candidate contract is invalid.
+        '401':
+          description: The evaluator Bearer credential is missing or invalid.
+        '409':
+          description: The evaluation retry state is ambiguous and cannot be replayed.
+        '422':
+          description: The job is out of scope, invalid for analysis, or evaluation failed safely.
+        '429':
+          description: The evaluator quota is unavailable.
+        '503':
+          description: The evaluator model or backing service is unavailable.
+components:
+  securitySchemes:
+    evaluatorBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: API key
+  schemas:
+    NormalizedJobCandidate:
+      type: object
+      additionalProperties: false
+      required: [sourceDedupeKey, role, company, location, workModel, cleanedJobContent, conciseRoleSummary, responsibilities, requirements]
+      properties:
+        sourceDedupeKey: { type: string, minLength: 12, maxLength: 1000 }
+        contentHash:
+          type: string
+          pattern: '^[a-fA-F0-9]{32,128}$'
+          description: Optional legacy client value; the evaluator derives and uses its own hash from cleanedJobContent.
+        role: { type: string, minLength: 2, maxLength: 500 }
+        company: { type: string, minLength: 1, maxLength: 500 }
+        location: { type: [string, 'null'], maxLength: 160 }
+        workModel:
+          oneOf:
+            - { type: string, enum: [on-site, hybrid, remote, unknown] }
+            - { type: 'null' }
+        cleanedJobContent: { type: string, minLength: 240, maxLength: 12000 }
+        conciseRoleSummary: { type: string, minLength: 24, maxLength: 1200 }
+        responsibilities:
+          type: array
+          minItems: 1
+          maxItems: 80
+          items: { type: string, minLength: 18, maxLength: 1000 }
+        requirements:
+          type: array
+          minItems: 1
+          maxItems: 80
+          items: { type: string, minLength: 18, maxLength: 1000 }
+        preferredQualifications:
+          type: array
+          maxItems: 80
+          default: []
+          items: { type: string, minLength: 18, maxLength: 1000 }
+        language: { type: string, enum: [he, en, mixed], default: en }
+    RequirementAssessment:
+      type: object
+      additionalProperties: false
+      required: [requirement, source, importance, matchType, impact, evidenceConfidence, rationale, evidenceSourceIds]
+      properties:
+        requirement: { type: string }
+        source: { type: string, enum: [requirement, responsibility] }
+        importance: { type: string, enum: [must-have, core, supporting] }
+        matchType: { type: string, enum: [direct, semantic, transferable, partial, insufficient-evidence, real-gap] }
+        impact: { type: string, enum: [strength, gap, neutral] }
+        evidenceConfidence: { type: string, enum: [high, medium, low, insufficient] }
+        rationale: { type: string }
+        evidenceSourceIds: { type: array, items: { type: string } }
+    SharedResultFields:
+      type: object
+      required: [cvPositioningGuidance, rationale, evidenceConfidence, requirementAssessments, strengths, gaps]
+      properties:
+        cvPositioningGuidance: { type: string, minLength: 1 }
+        rationale: { type: string }
+        evidenceConfidence:
+          type: object
+          required: [level, rationale]
+          properties:
+            level: { type: string, enum: [high, medium, low, insufficient] }
+            rationale: { type: string }
+        requirementAssessments: { type: array, items: { $ref: '#/components/schemas/RequirementAssessment' } }
+        strengths: { type: array, items: { type: string } }
+        gaps: { type: array, items: { type: string } }
+    EvaluatedResult:
+      allOf:
+        - $ref: '#/components/schemas/SharedResultFields'
+        - type: object
+          required: [state, fitLabel, recommendedAction]
+          properties:
+            state: { type: string, const: ready }
+            fitLabel: { type: string, enum: [Strong, Good, Partial] }
+            recommendedAction: { type: string, enum: [APPLY, APPLY WITH POSITIONING, CONSIDER, LOW PRIORITY] }
+    InsufficientEvidenceResult:
+      allOf:
+        - $ref: '#/components/schemas/SharedResultFields'
+        - type: object
+          required: [state, reason, fitLabel, recommendedAction]
+          properties:
+            state: { type: string, const: insufficient-evidence }
+            reason: { type: string, const: insufficient-evidence }
+            fitLabel: { type: string, const: Insufficient Evidence }
+            recommendedAction: { type: 'null' }

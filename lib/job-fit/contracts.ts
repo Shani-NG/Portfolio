@@ -6,7 +6,7 @@ const structuredItem = z.string().trim().min(18).max(1_000);
 export const normalizedJobCandidateSchema = z
   .object({
     sourceDedupeKey: z.string().trim().min(12).max(1_000),
-    contentHash: z.string().trim().regex(/^[a-f0-9]{32,128}$/i),
+    contentHash: z.string().trim().regex(/^[a-f0-9]{32,128}$/i).optional(),
     role: z.string().trim().min(2).max(500),
     company: z.string().trim().min(1).max(500),
     location: z.string().trim().max(160).nullable(),
@@ -21,6 +21,7 @@ export const normalizedJobCandidateSchema = z
   .strict();
 
 export type NormalizedJobCandidate = z.infer<typeof normalizedJobCandidateSchema>;
+export type CanonicalNormalizedJobCandidate = Omit<NormalizedJobCandidate, "contentHash"> & { contentHash: string };
 
 export const jobFitActionSchema = z.enum(["APPLY", "APPLY WITH POSITIONING", "CONSIDER", "LOW PRIORITY"]);
 export const jobFitLabelSchema = z.enum(["Strong", "Good", "Partial", "Insufficient Evidence"]);
@@ -49,7 +50,19 @@ export type JobFitEvaluatorResponse =
       gaps: string[];
     }
   | {
-      state: "insufficient-evidence" | "rejected" | "quota-blocked" | "validation-failed" | "model-unavailable";
+      state: "insufficient-evidence";
+      reason: "insufficient-evidence";
+      fitLabel: "Insufficient Evidence";
+      recommendedAction: null;
+      cvPositioningGuidance: string;
+      rationale: string;
+      evidenceConfidence: { level: "high" | "medium" | "low" | "insufficient"; rationale: string };
+      requirementAssessments: JobFitRequirementAssessment[];
+      strengths: string[];
+      gaps: string[];
+    }
+  | {
+      state: "rejected" | "quota-blocked" | "validation-failed" | "model-unavailable";
       reason: string;
       rationale?: string;
       requirementAssessments?: JobFitRequirementAssessment[];

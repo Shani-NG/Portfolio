@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluationKeyForCandidate, prepareCanonicalJobFit, roleDraftFromNormalizedCandidate } from "./evaluate.ts";
+import type { QualitativeReportAnalysis } from "../role-fit/model/provider.ts";
+import type { JobFitRequirementAssessment } from "./contracts.ts";
+import { evaluationKeyForCandidate, guidanceFromAnalysis, prepareCanonicalJobFit, roleDraftFromNormalizedCandidate } from "./evaluate.ts";
 
 const candidate = {
   sourceDedupeKey: "company-example-product-lead-2026-08-19",
-  contentHash: "6d8792c279ced1271a5fc8af5eb4f6e8c7e1cc272bd463ac416f4b9f5e6e239b",
   role: "Senior Product Lead",
   company: "Example Co",
   location: "Tel Aviv",
@@ -41,5 +42,50 @@ test("Central Job-Fit validates sufficient normalized candidate data before mode
 
 test("Central Job-Fit derives a stable retry key from source identity and normalized content", () => {
   assert.equal(evaluationKeyForCandidate(candidate), evaluationKeyForCandidate({ ...candidate }));
-  assert.notEqual(evaluationKeyForCandidate(candidate), evaluationKeyForCandidate({ ...candidate, contentHash: "1".repeat(64) }));
+  assert.equal(evaluationKeyForCandidate(candidate), evaluationKeyForCandidate({ ...candidate, contentHash: "1".repeat(64) }));
+  assert.notEqual(evaluationKeyForCandidate(candidate), evaluationKeyForCandidate({ ...candidate, cleanedJobContent: `${candidate.cleanedJobContent} Additional verified responsibility.` }));
+});
+
+test("CV positioning reuses multiple strengths and gaps from the shared analysis without truncating the result", () => {
+  const analysis = {
+    fitLevel: "good",
+    fitRationale: "The role aligns with documented complex-system product and UX strategy work.",
+    evidenceConfidence: "medium",
+    evidenceConfidenceRationale: "Several central requirements are supported.",
+    skillsCoverageLabel: "Good coverage",
+    items: [],
+  } satisfies QualitativeReportAnalysis;
+  const assessments: JobFitRequirementAssessment[] = [
+    { requirement: "Product strategy", source: "requirement", importance: "must-have", matchType: "direct", impact: "strength", evidenceConfidence: "high", rationale: "Lead with the documented product-strategy decisions in complex operational systems.", evidenceSourceIds: ["project-a"] },
+    { requirement: "Cross-functional leadership", source: "responsibility", importance: "core", matchType: "semantic", impact: "strength", evidenceConfidence: "high", rationale: "Show the documented bridge between users, product, design, and engineering.", evidenceSourceIds: ["project-b"] },
+    { requirement: "Commercial ownership", source: "requirement", importance: "core", matchType: "partial", impact: "gap", evidenceConfidence: "medium", rationale: "Keep commercial ownership framed as adjacent rather than end-to-end revenue accountability.", evidenceSourceIds: ["project-c"] },
+    { requirement: "Enterprise sales", source: "requirement", importance: "supporting", matchType: "insufficient-evidence", impact: "gap", evidenceConfidence: "insufficient", rationale: "Enterprise sales ownership is not proven by the approved evidence.", evidenceSourceIds: [] },
+  ];
+
+  const guidance = guidanceFromAnalysis(analysis, assessments);
+  assert.match(guidance, /product-strategy decisions/);
+  assert.match(guidance, /bridge between users/);
+  assert.match(guidance, /commercial ownership/);
+  assert.match(guidance, /must not claim|Do not claim/i);
+  assert.match(guidance, /Enterprise sales ownership/);
+  assert.ok(guidance.length > 300);
+});
+
+test("insufficient-evidence positioning names what is unproven without inventing a strength", () => {
+  const analysis = {
+    fitLevel: "insufficient",
+    fitRationale: "The available portfolio evidence does not establish the role's central regulated-finance requirements.",
+    evidenceConfidence: "insufficient",
+    evidenceConfidenceRationale: "No approved evidence supports the central requirement.",
+    skillsCoverageLabel: "Insufficient evidence",
+    items: [],
+  } satisfies QualitativeReportAnalysis;
+  const assessments: JobFitRequirementAssessment[] = [
+    { requirement: "Regulated finance", source: "requirement", importance: "must-have", matchType: "insufficient-evidence", impact: "gap", evidenceConfidence: "insufficient", rationale: "Regulated-finance ownership is not proven by the approved evidence.", evidenceSourceIds: [] },
+  ];
+
+  const guidance = guidanceFromAnalysis(analysis, assessments);
+  assert.match(guidance, /Do not position the CV as a proven fit/);
+  assert.match(guidance, /Regulated-finance ownership is not proven/);
+  assert.doesNotMatch(guidance, /verified experience:/i);
 });

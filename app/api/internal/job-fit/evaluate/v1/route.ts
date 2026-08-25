@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   const evaluationKey = evaluationKeyForCandidate(parsed.data);
   const cached = getCachedJobFitEvaluation(evaluationKey);
-  if (cached) return NextResponse.json(cached, { status: cached.state === "ready" ? 200 : 422 });
+  if (cached) return NextResponse.json(cached, { status: isPersistableEvaluation(cached.state) ? 200 : 422 });
 
   const quota = await reserveJobEvaluatorSlot(evaluationKey);
   if (!quota.ok) {
@@ -35,5 +35,9 @@ export async function POST(request: Request) {
   }
   const result = await evaluateJobFitOnce(evaluationKey, () => evaluateCanonicalJobFit(parsed.data));
   await recordJobEvaluatorCompletion(evaluationKey, result.state);
-  return NextResponse.json(result, { status: result.state === "ready" ? 200 : 422 });
+  return NextResponse.json(result, { status: isPersistableEvaluation(result.state) ? 200 : 422 });
+}
+
+function isPersistableEvaluation(state: string) {
+  return state === "ready" || state === "insufficient-evidence";
 }
