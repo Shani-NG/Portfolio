@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { buildPortfolioAgentPrompt } from "../prompts/assembly.ts";
 import { getGoogleAiStudioModel } from "../runtime/policy.ts";
-import type { QualitativeReportAnalysis, RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult } from "./provider.ts";
+import type { QualitativeReportAnalysis, RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult, RoleFitProviderFailure } from "./provider.ts";
 
 type GeminiCandidate = {
   content?: {
@@ -22,7 +22,13 @@ function extractJson(text: string): unknown {
 
 type GeminiCallResult =
   | { ok: true; model: string; data: GeminiResponse }
-  | { ok: false; model: string; detail: string };
+  | {
+      ok: false;
+      model: string;
+      detail: string;
+      providerStatus?: number;
+      retryAfterSeconds?: number;
+    };
 
 const qualitativeReportAnalysisSchema = z
   .object({
@@ -98,6 +104,44 @@ async function readProviderError(response: Response): Promise<string> {
   }
 }
 
+function readRetryAfterSeconds(response: Response): number | undefined {
+  const value = response.headers.get("Retry-After")?.trim();
+  if (!value) return undefined;
+
+  if (/^\d+$/.test(value)) {
+    const seconds = Number(value);
+    return Number.isSafeInteger(seconds) && seconds >= 0 && seconds <= 3600 ? seconds : undefined;
+  }
+
+  const retryAt = Date.parse(value);
+  if (!Number.isFinite(retryAt)) return undefined;
+  const seconds = Math.ceil((retryAt - Date.now()) / 1000);
+  return seconds >= 0 && seconds <= 3600 ? seconds : undefined;
+}
+
+function roleFitProviderFailure(response: Extract<GeminiCallResult, { ok: false }>): Omit<RoleFitProviderFailure, "provider"> {
+  if (response.providerStatus === 429) {
+    return {
+      ok: false,
+      model: response.model,
+      error: "rate-limited",
+      safeMessageKey: "model.provider_rate_limited",
+      providerStatus: 429,
+      retryable: true,
+      ...(response.retryAfterSeconds !== undefined ? { retryAfterSeconds: response.retryAfterSeconds } : {}),
+    };
+  }
+
+  return {
+    ok: false,
+    model: response.model,
+    error: "provider-error",
+    safeMessageKey: "model.google_ai_studio_provider_error",
+    detail: response.detail,
+    ...(response.providerStatus !== undefined ? { providerStatus: response.providerStatus } : {}),
+  };
+}
+
 async function generateGeminiContent(input: {
   apiKey: string;
   models: string[];
@@ -150,10 +194,13 @@ async function generateGeminiContent(input: {
       }
     }
 
+    const retryAfterSeconds = response.status === 429 ? readRetryAfterSeconds(response) : undefined;
     lastError = {
       ok: false,
       model,
       detail: await readProviderError(response),
+      providerStatus: response.status,
+      ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
     };
 
     if (response.status !== 400 && response.status !== 404) break;
@@ -257,12 +304,8 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
 
       if (!response.ok) {
         return {
-          ok: false,
           provider: "gemini",
-          model: response.model,
-          error: "provider-error",
-          safeMessageKey: "model.google_ai_studio_provider_error",
-          detail: response.detail,
+          ...roleFitProviderFailure(response),
         };
       }
 
@@ -356,12 +399,8 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
       for (let attempt = 0; attempt < 2; attempt += 1) {
         if (!response.ok) {
           return {
-            ok: false,
             provider: "gemini",
-            model: response.model,
-            error: "provider-error",
-            safeMessageKey: "model.google_ai_studio_provider_error",
-            detail: response.detail,
+            ...roleFitProviderFailure(response),
           };
         }
 

@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
+import { createReportProviderFailureContract } from "@/lib/role-fit/model/failure-contract";
 import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
@@ -246,12 +247,16 @@ export async function POST(request: Request) {
 
   if (!modelResult.ok) {
     const failedModelResult = modelResult;
+    const failureContract = createReportProviderFailureContract(failedModelResult);
     console.error("[role-fit-report] model generation failed", {
       traceId,
       provider: failedModelResult.provider,
       model: failedModelResult.model,
       error: failedModelResult.error,
-      detail: failedModelResult.detail,
+      providerStatus: failedModelResult.providerStatus,
+      retryable: failedModelResult.retryable ?? false,
+      retryAfterSeconds: failedModelResult.retryAfterSeconds,
+      ...(failedModelResult.error === "invalid-output" ? { diagnostic: failedModelResult.detail } : {}),
     });
     after(() =>
       logRoleFitEvent({
@@ -266,23 +271,14 @@ export async function POST(request: Request) {
           error: failedModelResult.error,
           provider: failedModelResult.provider,
           safeMessageKey: failedModelResult.safeMessageKey,
-          diagnostic: failedModelResult.detail,
+          providerStatus: failedModelResult.providerStatus,
+          retryable: failedModelResult.retryable ?? false,
+          retryAfterSeconds: failedModelResult.retryAfterSeconds,
         },
       }),
     );
 
-    return NextResponse.json(
-      {
-        state: "model-unavailable",
-        provider: failedModelResult.provider,
-        model: failedModelResult.model,
-        error: failedModelResult.error,
-        safeMessageKey: failedModelResult.safeMessageKey,
-        safeMessage: "I couldn't generate the report this time. Your role details are still here. Please try again later.",
-        detail: failedModelResult.detail,
-      },
-      { status: 503 },
-    );
+    return NextResponse.json(failureContract.body, { status: failureContract.status });
   }
 
   let composition = composeReportUIPayload({
@@ -295,7 +291,7 @@ export async function POST(request: Request) {
   });
   const originalCompositionDiagnostic = composition.ok ? undefined : composition.diagnostic;
   let repairOutcome: CompositionRepairOutcome = "not-attempted";
-  let repairFailureCategory: "missing-configuration" | "provider-error" | "invalid-output" | undefined;
+  let repairFailureCategory: "missing-configuration" | "provider-error" | "rate-limited" | "invalid-output" | undefined;
 
   if (!composition.ok) {
     const representedLimitationRoleItemIndexes = getDeterministicLimitationRepresentation({

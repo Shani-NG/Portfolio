@@ -33,6 +33,18 @@ export type RoleFitModelInput = {
   conversationContext?: string;
 };
 
+export type RoleFitProviderFailure = {
+  ok: false;
+  provider: RoleFitModelProviderName;
+  model?: string;
+  error: "missing-configuration" | "provider-error" | "rate-limited" | "invalid-output";
+  safeMessageKey: string;
+  detail?: string;
+  providerStatus?: number;
+  retryable?: boolean;
+  retryAfterSeconds?: number;
+};
+
 export type RoleFitChatInput = {
   message: string;
   language: "he" | "en" | "mixed";
@@ -50,14 +62,7 @@ export type RoleFitModelResult =
       model: string;
       analysis: QualitativeReportAnalysis;
     }
-  | {
-      ok: false;
-      provider: RoleFitModelProviderName;
-      model?: string;
-      error: "missing-configuration" | "provider-error" | "invalid-output";
-      safeMessageKey: string;
-      detail?: string;
-    };
+  | RoleFitProviderFailure;
 
 export type RoleFitChatResult =
   | {
@@ -66,14 +71,7 @@ export type RoleFitChatResult =
       model: string;
       answer: string;
     }
-  | {
-      ok: false;
-      provider: RoleFitModelProviderName;
-      model?: string;
-      error: "missing-configuration" | "provider-error" | "invalid-output";
-      safeMessageKey: string;
-      detail?: string;
-    };
+  | RoleFitProviderFailure;
 
 export type RoleFitModelProvider = {
   name: RoleFitModelProviderName;

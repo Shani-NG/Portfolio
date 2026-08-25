@@ -120,6 +120,9 @@ describe("RoleFit Supabase runtime persistence", () => {
         provider: "google-ai-studio",
         model: "gemini-test",
         fitMode: "fit",
+        providerStatus: 429,
+        retryable: true,
+        retryAfterSeconds: 34,
         safeMessageKey: "model.invalid_output",
         rawRoleText: "must-not-persist",
         companyName: "must-not-persist",
@@ -128,7 +131,14 @@ describe("RoleFit Supabase runtime persistence", () => {
 
     assert.deepEqual(result, { ok: true });
     assert.equal(requests[0]?.url, "https://example.supabase.co/rest/v1/rpc/persist_rolefit_runtime_event");
-    assert.deepEqual(requests[0]?.body.p_details, { provider: "google-ai-studio", model: "gemini-test", fitMode: "fit" });
+    assert.deepEqual(requests[0]?.body.p_details, {
+      provider: "google-ai-studio",
+      model: "gemini-test",
+      fitMode: "fit",
+      providerStatus: 429,
+      retryable: true,
+      retryAfterSeconds: 34,
+    });
     assert.equal(requests[0]?.body.p_error_code, "model.invalid_output");
     assert.equal("safeMessageKey" in (requests[0]?.body.p_details ?? {}), false);
     assert.equal(requests[0]?.body.p_session_id, "session_abc");

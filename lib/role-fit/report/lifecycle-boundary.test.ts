@@ -46,6 +46,26 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(eligibility, /completedReportCount >= 2/);
   });
 
+  test("keeps retryable provider failures before persistence while preserving the pending role flow", async () => {
+    const page = await readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8");
+    const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
+    const providerFailure = route.indexOf("createReportProviderFailureContract(failedModelResult)");
+    const persistence = route.indexOf("const persistence = await persistCompletedReport");
+    const failedRequestBranch = page.slice(
+      page.indexOf('if (!response.ok || result.state !== "ready")'),
+      page.indexOf("const parsedReport = reportUIPayloadSchema.safeParse"),
+    );
+
+    assert.ok(providerFailure >= 0);
+    assert.ok(persistence > providerFailure);
+    assert.match(route, /return NextResponse\.json\(failureContract\.body, \{ status: failureContract\.status \}\)/);
+    assert.match(failedRequestBranch, /state: isNoReport \? "general-qa" : "recoverable-error"/);
+    assert.match(failedRequestBranch, /pendingReportId: isNoReport \? null : reportId/);
+    assert.match(failedRequestBranch, /pendingReportConfirmation: isNoReport \? false : !missingField/);
+    assert.doesNotMatch(failedRequestBranch, /activeRoleDraft\s*:/);
+    assert.doesNotMatch(failedRequestBranch, /completedReportCount\s*:/);
+  });
+
   test("treats no-report as a non-error lifecycle result without a completed-report increment", async () => {
     const page = await readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8");
 

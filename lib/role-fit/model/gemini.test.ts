@@ -145,6 +145,39 @@ describe("Gemini chat completion guard", () => {
     assert.equal(retryConfig.maxOutputTokens, 5000);
   });
 
+  it("classifies HTTP 429 as a retryable rate limit and preserves safe Retry-After metadata", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      error: { message: "raw quota detail that must not be exposed" },
+    }), {
+      status: 429,
+      statusText: "Too Many Requests",
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": "34",
+      },
+    });
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Director UX/UI",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Lead UX strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.error, "rate-limited");
+    assert.equal(result.safeMessageKey, "model.provider_rate_limited");
+    assert.equal(result.providerStatus, 429);
+    assert.equal(result.retryable, true);
+    assert.equal(result.retryAfterSeconds, 34);
+    assert.equal(result.detail, undefined);
+  });
+
   it("repairs one schema-invalid report response before failing the request", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
