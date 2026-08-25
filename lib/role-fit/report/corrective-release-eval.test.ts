@@ -95,7 +95,7 @@ describe("Role Fit corrective release deterministic eval", () => {
       assert.equal(composition.ok, true);
       if (!composition.ok) return;
       assert.equal(composition.report.overallFitVisual.mode, "fit");
-      assert.equal(composition.report.overallFitVisual.mode === "fit" && composition.report.overallFitVisual.level, "partial");
+      assert.equal(composition.report.overallFitVisual.mode === "fit" && composition.report.overallFitVisual.level, "good");
       assert.equal(composition.report.requirementMapping.items[0]?.clusterIds.length, 1);
       assert.equal(composition.report.requirementMapping.items[1]?.matchType, "insufficient-evidence");
       assert.notEqual(composition.report.requirementMapping.items[1]?.matchType, "real-gap");

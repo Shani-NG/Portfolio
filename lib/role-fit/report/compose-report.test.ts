@@ -91,7 +91,7 @@ describe("stable qualitative fit", () => {
   });
 
   it("uses a qualitative limitation to resolve partial fit without a numeric score", () => {
-    const limited = analysis({ fitLevel: "partial", items: [item(0, "partial", "gap")] });
+    const limited = analysis({ fitLevel: "partial", items: [item(0), item(1, "partial", "gap")] });
     assert.equal(resolveStableFitLevel(limited), "partial");
   });
 });
@@ -372,7 +372,7 @@ describe("Task C evidence and report integrity", () => {
     assert.deepEqual(limitedAnalysis, originalAnalysis);
     assert.equal(result.report.overallFitVisual.mode, "fit");
     if (result.report.overallFitVisual.mode !== "fit") return;
-    assert.equal(result.report.overallFitVisual.level, "partial");
+    assert.equal(result.report.overallFitVisual.level, "good");
     assert.equal(result.report.requirementMapping.items[1]?.matchType, "insufficient-evidence");
     assert.equal(result.report.requirementMapping.items[1]?.impact, "neutral");
     assert.deepEqual(result.report.requirementMapping.items[1]?.clusterIds, []);

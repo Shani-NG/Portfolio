@@ -53,15 +53,26 @@ export function resolveStableFitLevel(analysis: QualitativeReportAnalysis): Qual
   const supportedStrengths = analysis.items.filter((item) =>
     positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.evidenceSourceIds.length > 0,
   );
-  const limitations = analysis.items.filter((item) => gapMatchTypes.has(item.matchType));
-  const evidencedLimitation = limitations.some((item) =>
-    item.matchType === "real-gap" || (item.matchType === "partial" && item.evidenceSourceIds.length > 0),
-  );
-  if (evidencedLimitation) return "partial";
   if (supportedStrengths.length === 0) return "insufficient";
-  if (limitations.length > 0) return "partial";
 
   const centralItems = analysis.items.filter((item) => item.importance !== "supporting");
+  const centralSupportedStrengths = centralItems.filter((item) =>
+    positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.evidenceSourceIds.length > 0,
+  );
+  const materialCentralLimitations = centralItems.filter((item) =>
+    item.matchType === "real-gap" || item.matchType === "partial",
+  );
+  const centralInsufficientEvidence = centralItems.filter((item) => item.matchType === "insufficient-evidence");
+  const limitations = analysis.items.filter((item) => gapMatchTypes.has(item.matchType));
+
+  if (centralItems.length > 0 && centralSupportedStrengths.length === 0) return "partial";
+  if (materialCentralLimitations.length > 0) return "partial";
+  if (centralInsufficientEvidence.length > 1) return "partial";
+  if (
+    limitations.length > 0
+    && (analysis.evidenceConfidence === "low" || analysis.evidenceConfidence === "insufficient")
+  ) return "partial";
+
   const hasStrongCentralCoverage = centralItems.length > 0 && centralItems.every((item) =>
     (item.matchType === "direct" || item.matchType === "semantic")
     && item.impact === "strength"
