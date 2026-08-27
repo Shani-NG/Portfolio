@@ -316,7 +316,11 @@ export async function POST(request: Request) {
         provider: modelResult.provider,
         model: modelResult.model,
         error: modelResult.error,
-        answer: "The Role Fit Agent is not available right now. Please try again later.",
+        answer: modelResult.safeMessageKey === "model.chat_temporary_capacity"
+          ? parsedRequest.data.language === "he" || parsedRequest.data.language === "mixed"
+            ? "סוכנת RoleFit עמוסה זמנית כרגע. כדאי לנסות שוב בעוד מספר דקות."
+            : "The RoleFit Agent is temporarily busy. Please try again in a few minutes."
+          : "The Role Fit Agent is not available right now. Please try again later.",
         safeMessageKey: modelResult.safeMessageKey,
         detail: modelResult.detail,
       }
