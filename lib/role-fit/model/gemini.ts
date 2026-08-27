@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { buildPortfolioAgentPrompt } from "../prompts/assembly.ts";
-import { getGoogleAiStudioModel } from "../runtime/policy.ts";
+import { getGoogleAiStudioChatFallbackModel, getGoogleAiStudioModel } from "../runtime/policy.ts";
 import type { QualitativeReportAnalysis, RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult, RoleFitProviderFailure } from "./provider.ts";
 
 type GeminiCandidate = {
@@ -139,6 +139,23 @@ function roleFitProviderFailure(response: Extract<GeminiCallResult, { ok: false 
     safeMessageKey: "model.google_ai_studio_provider_error",
     detail: response.detail,
     ...(response.providerStatus !== undefined ? { providerStatus: response.providerStatus } : {}),
+  };
+}
+
+function isTransientChatFailure(response: Extract<GeminiCallResult, { ok: false }>): boolean {
+  if (response.providerStatus === 429 || response.providerStatus === 503) return true;
+  return response.detail === "provider-request:timeout" || response.detail === "provider-request:network-error";
+}
+
+function chatTemporaryCapacityFailure(response: Extract<GeminiCallResult, { ok: false }>): Omit<RoleFitProviderFailure, "provider"> {
+  return {
+    ok: false,
+    model: response.model,
+    error: response.providerStatus === 429 ? "rate-limited" : "provider-error",
+    safeMessageKey: "model.chat_temporary_capacity",
+    ...(response.providerStatus !== undefined ? { providerStatus: response.providerStatus } : {}),
+    retryable: true,
+    ...(response.retryAfterSeconds !== undefined ? { retryAfterSeconds: response.retryAfterSeconds } : {}),
   };
 }
 
@@ -303,9 +320,40 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
       });
 
       if (!response.ok) {
+        const fallbackModel = getGoogleAiStudioChatFallbackModel(model);
+        const normalizedPrimaryModel = normalizeGeminiModel(model);
+        const normalizedFallbackModel = fallbackModel ? normalizeGeminiModel(fallbackModel) : undefined;
+
+        if (fallbackModel && normalizedFallbackModel !== normalizedPrimaryModel && isTransientChatFailure(response)) {
+          const fallbackResponse = await generateGeminiContent({
+            apiKey,
+            models: getCandidateModels(fallbackModel),
+            prompt,
+            maxOutputTokens: input.maxOutputTokens,
+            temperature: 0.25,
+            thinkingLevel: "low",
+          });
+
+          if (!fallbackResponse.ok) {
+            return {
+              provider: "gemini",
+              ...chatTemporaryCapacityFailure(fallbackResponse),
+            };
+          }
+
+          response = fallbackResponse;
+        } else {
+          return {
+            provider: "gemini",
+            ...roleFitProviderFailure(response),
+          };
+        }
+      }
+
+      if (!response.ok) {
         return {
           provider: "gemini",
-          ...roleFitProviderFailure(response),
+          ...chatTemporaryCapacityFailure(response),
         };
       }
 

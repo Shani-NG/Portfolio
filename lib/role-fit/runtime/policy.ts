@@ -28,3 +28,10 @@ export function getGoogleAiStudioModel(task: "chat" | "analysis"): string | unde
 
   return process.env.GOOGLE_AI_STUDIO_CHAT_MODEL ?? process.env.GOOGLE_AI_STUDIO_MODEL;
 }
+
+export function getGoogleAiStudioChatFallbackModel(primaryModel?: string): string | undefined {
+  const fallbackModel = process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL?.trim();
+  if (!fallbackModel) return undefined;
+  if (primaryModel && fallbackModel === primaryModel) return undefined;
+  return fallbackModel;
+}

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
 
-import { getGoogleAiStudioModel, getRoleFitPolicy } from "./policy.ts";
+import { getGoogleAiStudioChatFallbackModel, getGoogleAiStudioModel, getRoleFitPolicy } from "./policy.ts";
 
 const envKeys = [
   "GOOGLE_AI_STUDIO_MODEL",
   "GOOGLE_AI_STUDIO_CHAT_MODEL",
+  "GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL",
   "GOOGLE_AI_STUDIO_ANALYSIS_MODEL",
   "ROLE_FIT_MAX_MESSAGES_PER_SESSION",
   "ROLE_FIT_MAX_REPORTS_PER_SESSION",
@@ -62,5 +63,19 @@ describe("Role Fit runtime policy", () => {
 
     delete process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL;
     assert.equal(getGoogleAiStudioModel("analysis"), "gemini-fallback");
+  });
+
+  test("reads a distinct optional chat fallback model", () => {
+    delete process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL;
+    assert.equal(getGoogleAiStudioChatFallbackModel("gemini-primary"), undefined);
+
+    process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = "";
+    assert.equal(getGoogleAiStudioChatFallbackModel("gemini-primary"), undefined);
+
+    process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = "gemini-primary";
+    assert.equal(getGoogleAiStudioChatFallbackModel("gemini-primary"), undefined);
+
+    process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = "gemini-fallback";
+    assert.equal(getGoogleAiStudioChatFallbackModel("gemini-primary"), "gemini-fallback");
   });
 });

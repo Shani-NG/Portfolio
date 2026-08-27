@@ -5,6 +5,7 @@ import { completeChatAnswer, createGeminiRoleFitProvider } from "./gemini.ts";
 const originalFetch = globalThis.fetch;
 const originalApiKey = process.env.GEMINI_API_KEY;
 const originalChatModel = process.env.GOOGLE_AI_STUDIO_CHAT_MODEL;
+const originalChatFallbackModel = process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL;
 const originalAnalysisModel = process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL;
 
 afterEach(() => {
@@ -13,6 +14,8 @@ afterEach(() => {
   else process.env.GEMINI_API_KEY = originalApiKey;
   if (originalChatModel === undefined) delete process.env.GOOGLE_AI_STUDIO_CHAT_MODEL;
   else process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = originalChatModel;
+  if (originalChatFallbackModel === undefined) delete process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL;
+  else process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = originalChatFallbackModel;
   if (originalAnalysisModel === undefined) delete process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL;
   else process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = originalAnalysisModel;
 });
@@ -22,6 +25,12 @@ function geminiResponse(text: string, finishReason: string) {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function requestedModel(input: RequestInfo | URL): string {
+  const url = String(input);
+  const match = url.match(/\/models\/([^:]+):generateContent/);
+  return match ? decodeURIComponent(match[1]) : "unknown";
 }
 
 describe("Gemini chat completion guard", () => {
@@ -76,10 +85,11 @@ describe("Gemini chat completion guard", () => {
 
   it("passes a normal concise response through unchanged without retrying", async () => {
     process.env.GEMINI_API_KEY = "test-key";
-    process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3-flash-preview";
-    let requestCount = 0;
-    globalThis.fetch = async () => {
-      requestCount += 1;
+    process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3.5-flash-lite";
+    process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = "gemini-3.1-flash-lite";
+    const models: string[] = [];
+    globalThis.fetch = async (input) => {
+      models.push(requestedModel(input));
       return geminiResponse("What would you like to explore next?", "STOP");
     };
 
@@ -93,7 +103,157 @@ describe("Gemini chat completion guard", () => {
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.answer, "What would you like to explore next?");
-    assert.equal(requestCount, 1);
+    assert.deepEqual(models, ["gemini-3.5-flash-lite"]);
+  });
+
+  it("uses the chat fallback once for a primary 429 and preserves the same prompt context", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3.5-flash-lite";
+    process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = "gemini-3.1-flash-lite";
+    const requests: Array<{ model: string; body: Record<string, unknown> }> = [];
+    globalThis.fetch = async (input, init) => {
+      requests.push({
+        model: requestedModel(input),
+        body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+      });
+
+      return requests.length === 1
+        ? new Response(JSON.stringify({ error: { message: "quota" } }), { status: 429, statusText: "Too Many Requests" })
+        : geminiResponse("Fallback response is available now.", "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateChat({
+      message: "Answer about the active report.",
+      language: "en",
+      maxOutputTokens: 900,
+      approvedContext: "Approved profile context.",
+      mode: "report-follow-up",
+      runtimeState: "An existing validated report is active. Answer only about that report.",
+      conversationContext: "REPORT_CONTEXT: Fit is good.",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.model, "gemini-3.1-flash-lite");
+    assert.equal(result.answer, "Fallback response is available now.");
+    assert.deepEqual(requests.map((request) => request.model), ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]);
+    assert.deepEqual(requests[0]?.body, requests[1]?.body);
+    const prompt = String((requests[1]?.body.contents as Array<{ parts: Array<{ text: string }> }>)[0]?.parts[0]?.text);
+    assert.match(prompt, /REPORT_CONTEXT: Fit is good/);
+    assert.match(prompt, /existing validated report is active/i);
+  });
+
+  it("uses the chat fallback once for a primary 503 without retrying the primary model", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3.5-flash-lite";
+    process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = "gemini-3.1-flash-lite";
+    const models: string[] = [];
+    globalThis.fetch = async (input) => {
+      models.push(requestedModel(input));
+      return models.length === 1
+        ? new Response(JSON.stringify({ error: { message: "overloaded" } }), { status: 503, statusText: "Service Unavailable" })
+        : geminiResponse("Fallback handled the temporary provider load.", "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateChat({
+      message: "Can you answer?",
+      language: "en",
+      maxOutputTokens: 800,
+      approvedContext: "Approved profile context.",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.answer, "Fallback handled the temporary provider load.");
+    assert.deepEqual(models, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]);
+  });
+
+  it("returns the temporary-capacity failure only after both chat models fail", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3.5-flash-lite";
+    process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = "gemini-3.1-flash-lite";
+    const models: string[] = [];
+    globalThis.fetch = async (input) => {
+      models.push(requestedModel(input));
+      return new Response(JSON.stringify({ error: { message: "overloaded" } }), { status: 503, statusText: "Service Unavailable" });
+    };
+
+    const result = await createGeminiRoleFitProvider().generateChat({
+      message: "Can you answer?",
+      language: "en",
+      maxOutputTokens: 800,
+      approvedContext: "Approved profile context.",
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.safeMessageKey, "model.chat_temporary_capacity");
+    assert.equal(result.retryable, true);
+    assert.deepEqual(models, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]);
+  });
+
+  it("does not use chat fallback for credential failures", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3.5-flash-lite";
+    process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = "gemini-3.1-flash-lite";
+    const models: string[] = [];
+    globalThis.fetch = async (input) => {
+      models.push(requestedModel(input));
+      return new Response(JSON.stringify({ error: { message: "unauthorized" } }), { status: 401, statusText: "Unauthorized" });
+    };
+
+    const result = await createGeminiRoleFitProvider().generateChat({
+      message: "Can you answer?",
+      language: "en",
+      maxOutputTokens: 800,
+      approvedContext: "Approved profile context.",
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.safeMessageKey, "model.google_ai_studio_provider_error");
+    assert.deepEqual(models, ["gemini-3.5-flash-lite"]);
+  });
+
+  it("keeps report generation isolated from chat fallback models", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3.5-flash-lite";
+    process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = "gemini-3.1-flash-lite";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    const models: string[] = [];
+    const validAnalysis = JSON.stringify({
+      fitLevel: "good",
+      fitRationale: "Approved evidence supports the role context.",
+      evidenceConfidence: "high",
+      evidenceConfidenceRationale: "The assessment uses approved project evidence.",
+      skillsCoverageLabel: "Evidence-backed coverage",
+      items: [{
+        roleItemIndex: 0,
+        displayLabel: "Complex product strategy",
+        importance: "core",
+        matchType: "direct",
+        impact: "strength",
+        evidenceConfidence: "high",
+        shortRationale: "Approved evidence shows this capability.",
+        evidenceSourceIds: ["c4i"],
+      }],
+    });
+    globalThis.fetch = async (input) => {
+      models.push(requestedModel(input));
+      return geminiResponse(validAnalysis, "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(models, ["gemini-3.5-flash"]);
   });
 
   it("returns the complete sentence when a retry ends with a trailing fragment", async () => {
