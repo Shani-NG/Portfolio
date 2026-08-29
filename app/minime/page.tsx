@@ -3,7 +3,18 @@
 import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
-import { isReportConfirmationText, reportLimitAnswer, resolveConversationLanguage } from "@/lib/role-fit/conversation/behavior";
+import {
+  genericRecoverableErrorAnswer,
+  isHebrewLanguage,
+  isReportConfirmationText,
+  missingDetailsAnswer,
+  reportLimitAnswer,
+  reportLoadingAnswer,
+  reportReadyAnswer,
+  resolveConversationLanguage,
+  roleFileErrorAnswer,
+  roleSubmissionSetupAnswer,
+} from "@/lib/role-fit/conversation/behavior";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import { createReportId } from "@/lib/role-fit/identifiers";
 import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
@@ -30,33 +41,41 @@ type ReportFailureResult = {
   validation?: { missingFields?: string[] };
 };
 
-function reportFailureMessage(result: ReportFailureResult): string {
+function reportFailureMessage(result: ReportFailureResult, language: RoleFitLiveSession["activeLanguage"]): string {
+  const useHebrew = isHebrewLanguage(language);
+
   if (result.state === "validation-failed") {
     const missingField = result.validation?.missingFields?.[0];
     return missingField
-      ? `The saved role is missing ${missingField}. Please add that detail in the chat before retrying.`
-      : "The saved role details are incomplete. Please add the requested detail in the chat before retrying.";
+      ? missingDetailsAnswer({ missingField: missingField as "company" | "title" | "responsibilities" | "requirements", language, repeatedInput: true })
+      : useHebrew
+        ? "פרטי המשרה עדיין אינם שלמים. אפשר להוסיף בשיחה את הפרט שביקשתי ואז לנסות שוב."
+        : "The role details are still incomplete. You can add the requested detail in the chat and then try again.";
   }
 
   if (result.state === "blocked") {
     return result.eligibility?.reason === "report-limit-reached"
-      ? "The report limit for this session has been reached."
-      : "The report cannot be generated until the role is complete and approved.";
+      ? reportLimitAnswer(language)
+      : useHebrew
+        ? "אפשר להכין את בדיקת ההתאמה רק לאחר שפרטי המשרה שלמים ומאושרים. אפשר לחזור לשיחה ולהשלים את הפרט החסר."
+        : "I can prepare the fit review only after the role details are complete and confirmed. You can return to the chat and add the missing detail.";
   }
 
   if (result.state === "no-report") {
     return result.eligibility?.reason === "insufficient-evidence"
-      ? "A completed report was not generated because the available approved evidence is insufficient."
-      : "A completed report was not generated because this role is outside the supported fit scope.";
+      ? useHebrew
+        ? "לא נוצר דוח מלא משום שאין כרגע מספיק מידע מאושר כדי לקבוע את ההתאמה בצורה אחראית."
+        : "A completed fit review was not created because there is not enough approved information to assess the role responsibly."
+      : useHebrew
+        ? "לא נוצר דוח משום שהתפקיד נמצא מחוץ לטווח שאפשר לבדוק באמצעות המידע המאושר בפורטפוליו."
+        : "A fit review was not created because this role is outside what the approved portfolio information can assess.";
   }
 
-  return result.safeMessage ?? "I couldn't generate the report this time. Your role details are still here. Please try again later.";
+  return result.safeMessage ?? genericRecoverableErrorAnswer(language);
 }
 
 function reportSuccessMessage(language: RoleFitLiveSession["activeLanguage"]) {
-  return language === "he"
-    ? "The report is ready in English. You can review it in the report area and keep asking questions here."
-    : "The report is ready. You can review it in the report area and keep asking questions here.";
+  return reportReadyAnswer(language);
 }
 
 function normalizeRepeatedInput(value: string) {
@@ -96,11 +115,17 @@ export default function RoleFitPage() {
     : liveSession.pendingReportConfirmation
       ? "Generate confirmed report"
       : "Generate report";
-  const errorHeading = errorContext === "conversation"
-    ? "Role Fit Agent is unavailable"
-    : errorContext === "validation"
-      ? "A few role details are still missing"
-      : "Report not generated";
+  const errorHeading = isHebrewLanguage(liveSession.activeLanguage)
+    ? errorContext === "conversation"
+      ? "סוכנת RoleFit אינה זמינה כרגע"
+      : errorContext === "validation"
+        ? "עדיין חסרים כמה פרטים על המשרה"
+        : "בדיקת ההתאמה לא נוצרה"
+    : errorContext === "conversation"
+      ? "Role Fit Agent is unavailable"
+      : errorContext === "validation"
+        ? "A few role details are still missing"
+        : "Fit review not created";
   const pageClassName = liveSplitCanvas
     ? `${styles.roleFitPage} ${styles.liveSplitPage}`
     : hasConversation
@@ -229,17 +254,20 @@ export default function RoleFitPage() {
       return;
     }
     if (!reportSession.pendingReportConfirmation || !hasRoleDraftContent(reportSession.activeRoleDraft)) {
-      const missingFieldGuidance = {
-        company: "The company name is still missing. Please enter the company name so I can complete the role details.",
-        title: "What is the role title? If there is no title, say so and I will offer a generic category.",
-        responsibilities: "The role responsibilities are still missing. Please paste the main responsibilities or expected outcomes.",
-        requirements: "The role requirements are still missing. Please paste the required skills, experience, or qualifications.",
-      } as const;
       const guidance = reportSession.pendingRoleField
-        ? missingFieldGuidance[reportSession.pendingRoleField]
+        ? missingDetailsAnswer({
+            missingField: reportSession.pendingRoleField,
+            language: reportSession.activeLanguage,
+            repeatedInput: true,
+          })
         : hasRoleDraftContent(reportSession.activeRoleDraft)
-          ? "To create the report, I still need:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\nYou can add them in one message."
-          : "Paste the role details or upload a text file to begin.";
+          ? missingDetailsAnswer({
+              missingField: "title",
+              missingFields: ["title", "responsibilities", "requirements"],
+              language: reportSession.activeLanguage,
+              repeatedInput: true,
+            })
+          : roleSubmissionSetupAnswer(reportSession.activeLanguage);
       appendLiveMessage({
         role: "agent",
         content: guidance,
@@ -279,11 +307,11 @@ export default function RoleFitPage() {
 
       const result = await response.json().catch(() => ({
         state: "malformed-output",
-        safeMessage: "I couldn't generate the report this time. Your role details are still here. Please try again later.",
+        safeMessage: genericRecoverableErrorAnswer(reportSession.activeLanguage),
       }));
 
       if (!response.ok || result.state !== "ready") {
-        const message = reportFailureMessage(result);
+        const message = reportFailureMessage(result, reportSession.activeLanguage);
         const missingField = result.validation?.missingFields?.[0] ?? null;
         const isNoReport = result.state === "no-report";
         setApiStatusMessage(message);
@@ -302,7 +330,7 @@ export default function RoleFitPage() {
 
       const parsedReport = reportUIPayloadSchema.safeParse(result.report ?? result.eligibility?.report);
       if (!parsedReport.success) {
-        const message = "I couldn't generate the report this time. Your role details are still here. Please try again later.";
+        const message = genericRecoverableErrorAnswer(reportSession.activeLanguage);
         setApiStatusMessage(message);
         setErrorContext("report");
         setIsAgentUnavailable(false);
@@ -315,7 +343,9 @@ export default function RoleFitPage() {
       const persisted = result.persistence === "persisted";
       const lifecycleMessage = persisted
         ? reportSuccessMessage(reportSession.activeLanguage)
-        : "The report is available to review, but its persistence is unavailable and it did not consume a completed-report allowance.";
+        : isHebrewLanguage(reportSession.activeLanguage)
+          ? "בדיקת ההתאמה זמינה לעיון, אבל לא נשמרה בסשן ולכן לא נספרה כאחד משני הדוחות."
+          : "The fit review is available now, but it was not saved in the session and did not count toward the two-report limit.";
       setErrorContext(null);
       setIsAgentUnavailable(false);
       setLiveReportState({
@@ -345,9 +375,13 @@ export default function RoleFitPage() {
       setActivePane("report");
     } catch (error) {
       const timedOut = error instanceof Error && error.name === "AbortError";
-      const message = timedOut
-        ? "I couldn't generate the report because it took too long. Your role details are still here. Please try again later."
-        : "I couldn't generate the report because the service is unavailable. Your role details are still here. Please try again later.";
+      const message = isHebrewLanguage(reportSession.activeLanguage)
+        ? timedOut
+          ? "העיבוד נמשך זמן רב מדי ולכן בדיקת ההתאמה לא הושלמה. פרטי המשרה עדיין כאן, ואפשר לנסות שוב."
+          : "השירות אינו זמין כרגע ולכן בדיקת ההתאמה לא הושלמה. פרטי המשרה עדיין כאן, ואפשר לנסות שוב מאוחר יותר."
+        : timedOut
+          ? "The fit review took too long to complete. Your role details are still here, and you can try again."
+          : "The service is unavailable, so the fit review was not completed. Your role details are still here, and you can try again later.";
       setApiStatusMessage(message);
       setErrorContext("report");
       setIsAgentUnavailable(false);
@@ -430,11 +464,11 @@ export default function RoleFitPage() {
 
     const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
     if (!approvedRoleFileExtensions.has(extension)) {
-      appendLiveMessage({ role: "agent", content: "Please choose a TXT, Markdown, or CSV file." });
+      appendLiveMessage({ role: "agent", content: roleFileErrorAnswer("unsupported", liveSession.activeLanguage) });
       return;
     }
     if (file.size > maxRoleFileBytes) {
-      appendLiveMessage({ role: "agent", content: "The selected file is too large. Please upload a file smaller than 64 KB." });
+      appendLiveMessage({ role: "agent", content: roleFileErrorAnswer("too-large", liveSession.activeLanguage) });
       return;
     }
 
@@ -442,13 +476,13 @@ export default function RoleFitPage() {
       .then((fileText) => {
         const roleText = fileText.trim();
         if (!roleText) {
-          appendLiveMessage({ role: "agent", content: "The selected file is empty. Please choose a text file with the role details." });
+          appendLiveMessage({ role: "agent", content: roleFileErrorAnswer("empty", liveSession.activeLanguage) });
           return;
         }
         return submitLiveMessage(`Uploaded file: ${file.name}\n\n${roleText}`);
       })
       .catch(() => {
-        appendLiveMessage({ role: "agent", content: "I could not read that file. Please choose a TXT, Markdown, or CSV file." });
+        appendLiveMessage({ role: "agent", content: roleFileErrorAnswer("unreadable", liveSession.activeLanguage) });
       });
   }
 
@@ -601,13 +635,13 @@ export default function RoleFitPage() {
                     <div className={styles.genBar} />
                     <div className={styles.genBar} />
                   </div>
-                  <p>Analyzing job requirements & matching Evidence Cards...</p>
+                  <p>{reportLoadingAnswer(liveSession.activeLanguage)}</p>
                 </div>
               ) : liveSession.state === "recoverable-error" && !activeReport ? (
                 <div className={styles.errorState} id="role-fit-error" role="alert">
                   <span className={styles.msi} aria-hidden="true">error</span>
                   <h2>{errorHeading}</h2>
-                  <p>{apiStatusMessage || "I couldn't complete this request. Please try again later."}</p>
+                  <p>{apiStatusMessage || genericRecoverableErrorAnswer(liveSession.activeLanguage)}</p>
                 </div>
               ) : (
                 activeReport ? (
