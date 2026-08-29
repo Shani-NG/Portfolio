@@ -139,7 +139,7 @@ describe("Role Fit runtime conversation contract", () => {
       readFile(join(process.cwd(), "app", "api", "role-fit", "report", "route.ts"), "utf8"),
     ]);
 
-    assert.match(page, /Report not generated/);
+    assert.match(page, /Fit review not created/);
     assert.match(page, /A few role details are still missing/);
     assert.match(reportRoute, /Your role details are still here/);
     assert.doesNotMatch(reportRoute, /status: 502/);
@@ -155,9 +155,13 @@ describe("Role Fit runtime conversation contract", () => {
   });
 
   it("requests English report generation even when the conversation is Hebrew", async () => {
-    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+    const [page, behavior] = await Promise.all([
+      readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8"),
+      readFile(join(process.cwd(), "lib", "role-fit", "conversation", "behavior.ts"), "utf8"),
+    ]);
 
     assert.match(page, /language: "en"/);
-    assert.match(page, /The report is ready in English/);
+    assert.match(page, /reportReadyAnswer\(language\)/);
+    assert.match(behavior, /בדיקת ההתאמה מוכנה באנגלית/);
   });
 });

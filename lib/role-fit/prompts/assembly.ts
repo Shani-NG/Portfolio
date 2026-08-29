@@ -47,7 +47,7 @@ function modeInstruction(mode: PromptMode) {
     return "Active internal mode: Report Follow-up. Answer questions about the existing report and supplied context only. Do not regenerate, expand, or contradict the validated report state.";
   }
 
-  return "Active internal mode: Role Understanding / General Chat. Answer concise portfolio questions, guide role submission, and do not generate a report inside normal chat.";
+  return "Active internal mode: Role Understanding / General Chat. Answer concise portfolio questions, guide role submission, and do not generate a report inside normal chat. Answer the user's actual question first in simple professional language. Prefer one concrete example from approved evidence over a compressed list of positioning statements, domains, or capabilities. Start concise and offer at most one natural next direction when it is useful.";
 }
 
 function languageInstruction(language: PromptAssemblyInput["language"]) {

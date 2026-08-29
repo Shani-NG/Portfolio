@@ -20,18 +20,18 @@ export function resolveConversationLanguage(message: string, currentLanguage: Co
 
 function fieldQuestion(field: ConversationRoleField | undefined, language: "he" | "en" | "mixed") {
   if (isHebrewLanguage(language)) {
-    if (field === "title") return "מה שם המשרה?";
-    if (field === "responsibilities") return "מהם תחומי האחריות או התוצאות המרכזיות של המשרה?";
-    if (field === "requirements") return "מהן הדרישות או הכישורים המרכזיים למשרה?";
-    if (field === "company") return "מה שם החברה?";
-    return "איזה פרט מרכזי חסר במשרה?";
+    if (field === "title") return "איך נקראת המשרה? אם אין לה שם רשמי, אפשר גם לתאר בקצרה איזה סוג תפקיד זה.";
+    if (field === "responsibilities") return "אני מבינה את הדרישות, אבל עדיין לא ברור לי מה האדם בתפקיד יהיה אמור להוביל בפועל. אפשר לשתף את שניים או שלושה תחומי האחריות המרכזיים?";
+    if (field === "requirements") return "יש לי כבר את שם התפקיד ואת תחומי האחריות. כדי להבין מה החברה מחפשת באמת, חסרות לי עכשיו הדרישות המרכזיות — למשל הניסיון או היכולות החשובים לתפקיד. אפשר להדביק אותן כאן?";
+    if (field === "company") return "מה שם החברה, אם הוא מופיע במשרה? אם השם לא ידוע, אפשר להמשיך גם בלעדיו.";
+    return "קיבלתי חלק מתיאור המשרה. איזה פרט מרכזי נוסף יעזור להשלים את התמונה?";
   }
 
-  if (field === "title") return "What is the role title?";
-  if (field === "responsibilities") return "What are the role's main responsibilities or expected outcomes?";
-  if (field === "requirements") return "What are the role's main requirements or qualifications?";
-  if (field === "company") return "What is the company name?";
-  return "What key role detail is still missing?";
+  if (field === "title") return "What is the role called? If it has no formal title, you can briefly describe the type of role instead.";
+  if (field === "responsibilities") return "I understand the requirements, but I still need to know what the person in this role would be expected to lead. Can you share the two or three main responsibilities?";
+  if (field === "requirements") return "I already have the role title and responsibilities. To understand what the company is really looking for, I still need the core requirements—such as the experience or capabilities that matter most. Can you paste them here?";
+  if (field === "company") return "What is the company name, if it appears in the job description? If it is not known, we can continue without it.";
+  return "I have part of the job description. What other key detail would help complete the picture?";
 }
 
 export function isReportConfirmationText(value: string) {
@@ -67,20 +67,22 @@ export function missingDetailsAnswer(input: {
 }) {
   const fields = [...new Set(input.missingFields ?? (input.missingField ? [input.missingField] : []))];
   if (fields.length > 1) {
-    const heading = isHebrewLanguage(input.language) ? "כדי ליצור את הדוח חסרים:" : "To create the report, I still need:";
-    const action = isHebrewLanguage(input.language) ? "אפשר להוסיף את הפרטים בהודעה אחת." : "You can add them in one message.";
+    const heading = isHebrewLanguage(input.language)
+      ? "קיבלתי חלק מתיאור המשרה. כדי לבדוק אותה בצורה אחראית, חסרים לי עדיין:"
+      : "I have part of the job description. To assess it responsibly, I still need:";
+    const action = isHebrewLanguage(input.language)
+      ? "אפשר לשלוח את הפרטים יחד, גם בקיצור ובניסוח חופשי."
+      : "You can send the details together, briefly and in your own words.";
     return `${heading}\n${fields.map((field) => `- ${fieldLabel(field, input.language)}`).join("\n")}\n${action}`;
   }
 
-  const question = fieldQuestion(fields[0] ?? input.missingField, input.language);
-  if (!input.repeatedInput) return question;
-  return isHebrewLanguage(input.language) ? `הפרט הזה עדיין חסר: ${question}` : `That detail is still missing: ${question}`;
+  return fieldQuestion(fields[0] ?? input.missingField, input.language);
 }
 
 export function genericRoleTitleAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
-    ? "איזה סוג תפקיד זה?\n- UX\n- Strategy\n- Innovation\n- AI\nאבנה מהבחירה שם משרה גנרי."
-    : "What type of role is it?\n- UX\n- Strategy\n- Innovation\n- AI\nI will use the selection as a generic role title.";
+    ? "אם אין למשרה שם ברור, אפשר לסווג אותה לפי הכיוון המרכזי שלה:\n- UX או Product Design\n- Strategy\n- Innovation\n- AI או AI Product\nזה רק יעזור לי לשמור על ההקשר — זה לא יקבע מראש את תוצאת ההתאמה."
+    : "If the role does not have a clear title, we can keep the context by identifying its main direction:\n- UX or Product Design\n- Strategy\n- Innovation\n- AI or AI Product\nThis only helps frame the role; it does not determine the fit result.";
 }
 
 export function clarificationLimitAnswer(language: "he" | "en" | "mixed") {
@@ -89,26 +91,44 @@ export function clarificationLimitAnswer(language: "he" | "en" | "mixed") {
     : "I still do not have enough information to complete the role. You can paste the full job description when ready.";
 }
 
-export function readyForReportAnswer(input: { title: string; companyName?: string; language: "he" | "en" | "mixed"; repeatedInput: boolean }) {
+function conciseResponsibilities(values: string[] | undefined, language: "he" | "en" | "mixed") {
+  const items = (values ?? [])
+    .map((value) => value.replace(/\s+/g, " ").trim().replace(/[.;,]+$/u, "").slice(0, 140))
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (items.length === 0) return "";
+  return items.join(isHebrewLanguage(language) ? " ו־" : " and ");
+}
+
+export function readyForReportAnswer(input: {
+  title: string;
+  companyName?: string;
+  responsibilities?: string[];
+  language: "he" | "en" | "mixed";
+  repeatedInput: boolean;
+}) {
+  const responsibilities = conciseResponsibilities(input.responsibilities, input.language);
+
   if (isHebrewLanguage(input.language)) {
-    const roleLabel = input.title ? ` עבור ${input.title}` : "";
+    const opening = input.repeatedInput ? "התמונה עדיין מספיק ברורה לי." : "עכשיו התמונה מספיק ברורה לי.";
+    const roleLabel = input.title ? `זו משרת ${input.title}` : "זהו התפקיד שתיארת";
     const companyLabel = input.companyName ? ` ב־${input.companyName}` : "";
-    return input.repeatedInput
-      ? `יש לי כבר את כל הפרטים${roleLabel}${companyLabel}. להפיק את הדוח?`
-      : `יש לי את כל מה שאני צריכה כדי להפיק דוח${roleLabel}${companyLabel}. שנמשיך?`;
+    const focusLabel = responsibilities ? `, עם דגש על ${responsibilities}` : "";
+    return `${opening} ממה שהבנתי, ${roleLabel}${companyLabel}${focusLabel}. אם זה מתאר נכון את התפקיד, אפשר שאכין את בדיקת ההתאמה. אם משהו לא מדויק, אפשר לתקן אותו לפני שאמשיך.`;
   }
 
-  const roleLabel = input.title ? ` for ${input.title}` : "";
+  const opening = input.repeatedInput ? "I still have a clear enough picture." : "I have a clear enough picture now.";
+  const roleLabel = input.title ? `this is a ${input.title} position` : "this is the role you described";
   const companyLabel = input.companyName ? ` at ${input.companyName}` : "";
-  return input.repeatedInput
-    ? `I already have all the role details${roleLabel}${companyLabel}. Shall I generate the report?`
-    : `I have everything I need to generate a report${roleLabel}${companyLabel}. Shall we continue?`;
+  const focusLabel = responsibilities ? `, focused mainly on ${responsibilities}` : "";
+  return `${opening} As I understand it, ${roleLabel}${companyLabel}${focusLabel}. If that is accurate, I can prepare the fit review. If anything is off, you can correct it before I continue.`;
 }
 
 export function roleSubmissionSetupAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
-    ? "מעולה, אפשר להעלות קובץ או להדביק כאן את טקסט המשרה, ואני אקח את זה משם."
-    : "You can upload a file or paste the role text here, and I’ll take it from there.";
+    ? "אפשר להעלות קובץ או להדביק כאן את תיאור המשרה. אין צורך לסדר אותו במיוחד — אני אעבור עליו ואבין מה חשוב בתפקיד."
+    : "You can upload a file or paste the job description here. It does not need to be specially formatted—I’ll work out what matters in the role.";
 }
 
 export function existingReportAnswer(language: "he" | "en" | "mixed") {
@@ -119,8 +139,42 @@ export function existingReportAnswer(language: "he" | "en" | "mixed") {
 
 export function reportLimitAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
-    ? "מצטערת, לא ניתן ליצור דוח נוסף כרגע. הדוח הקיים נשאר זמין, ואפשר להמשיך לשאול אותי שאלות על המשרה הזו או על משרות אחרות."
-    : "Sorry, I can’t create another report right now. Your existing report remains available, and you can keep asking me questions about this role or other roles.";
+    ? "כבר יצרנו שני דוחות בסשן הזה, ולכן לא אכין כרגע דוח נוסף. אפשר להמשיך לשאול אותי על הדוחות הקיימים, לבדוק נקודת חוזק או פער, ליצור קשר עם שני, או לחזור בסשן חדש."
+    : "Two reports have already been created in this session, so I will not generate another one right now. You can continue asking about the existing reports, explore a strength or gap, contact Shani, or return in a new session.";
+}
+
+export function reportLoadingAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "אני עוברת עכשיו על דרישות התפקיד ומשווה אותן לניסיון הרלוונטי שלי."
+    : "I’m reviewing the role requirements and comparing them with the relevant experience documented in the portfolio.";
+}
+
+export function reportReadyAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "בדיקת ההתאמה מוכנה באנגלית. אפשר להתחיל מהתמונה הכללית, או לשאול אותי על דרישה, נקודת חוזק או פער מסוים."
+    : "The fit review is ready. You can start with the overall picture, or ask me about a specific requirement, strength, or gap.";
+}
+
+export type RoleFileError = "unsupported" | "too-large" | "empty" | "unreadable";
+
+export function roleFileErrorAnswer(error: RoleFileError, language: "he" | "en" | "mixed") {
+  if (isHebrewLanguage(language)) {
+    if (error === "unsupported") return "הקובץ הזה אינו בפורמט שאני יכולה לקרוא כרגע. אפשר להעלות TXT, Markdown או CSV, או פשוט להדביק כאן את הטקסט של המשרה.";
+    if (error === "too-large") return "הקובץ גדול מדי לעיבוד כאן. אפשר להעלות גרסה קטנה מ־64 KB, או להדביק את תיאור התפקיד, תחומי האחריות והדרישות.";
+    if (error === "empty") return "הקובץ ריק. אפשר לבחור קובץ טקסט אחר או להדביק כאן את תוכן המשרה.";
+    return "לא הצלחתי לקרוא את הקובץ. אפשר לנסות קובץ טקסט אחר או להדביק כאן את תוכן המשרה.";
+  }
+
+  if (error === "unsupported") return "I can’t read this file format right now. You can upload a TXT, Markdown, or CSV file, or paste the job description here.";
+  if (error === "too-large") return "This file is too large to process here. You can upload a version smaller than 64 KB, or paste the role description, responsibilities, and requirements.";
+  if (error === "empty") return "This file is empty. You can choose another text file or paste the job description here.";
+  return "I couldn’t read this file. You can try another text file or paste the job description here.";
+}
+
+export function genericRecoverableErrorAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "משהו השתבש בזמן עיבוד הבקשה. פרטי המשרה עדיין כאן, ואפשר לנסות שוב עכשיו או לשלוח מחדש רק את החלק האחרון."
+    : "Something went wrong while processing the request. Your role details are still here, and you can try again now or resend only the last part.";
 }
 
 export function looksLikeRoleSubmissionSetup(message: string) {

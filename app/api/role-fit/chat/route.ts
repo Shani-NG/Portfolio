@@ -233,6 +233,7 @@ export async function POST(request: Request) {
         answer: readyForReportAnswer({
           title,
           companyName,
+          responsibilities: validation.roleDraft.responsibilities.map((responsibility) => responsibility.originalValue),
           language: parsedRequest.data.language,
           repeatedInput: parsedRequest.data.repeatedInput,
         }),

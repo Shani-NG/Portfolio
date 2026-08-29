@@ -1,7 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { existingReportAnswer, genericRoleTitleAnswer, isReportConfirmationText, missingDetailsAnswer, readyForReportAnswer, reportLimitAnswer, resolveConversationLanguage, roleSubmissionSetupAnswer } from "./behavior.ts";
+import {
+  existingReportAnswer,
+  genericRecoverableErrorAnswer,
+  genericRoleTitleAnswer,
+  isReportConfirmationText,
+  missingDetailsAnswer,
+  readyForReportAnswer,
+  reportLimitAnswer,
+  reportLoadingAnswer,
+  reportReadyAnswer,
+  resolveConversationLanguage,
+  roleFileErrorAnswer,
+  roleSubmissionSetupAnswer,
+} from "./behavior.ts";
 
 describe("Role Fit conversation behavior", () => {
   it("keeps a Hebrew conversation in Hebrew when an English JD is pasted", () => {
@@ -14,9 +27,10 @@ describe("Role Fit conversation behavior", () => {
     assert.equal(resolveConversationLanguage("אפשר להמשיך בעברית?", "en"), "he");
   });
 
-  it("asks one focused clarification and shortens repeated-input copy", () => {
-    assert.equal(missingDetailsAnswer({ missingField: "responsibilities", language: "en", repeatedInput: false }), "What are the role's main responsibilities or expected outcomes?");
-    assert.match(missingDetailsAnswer({ missingField: "requirements", language: "he", repeatedInput: true }), /^הפרט הזה עדיין חסר:/);
+  it("asks one focused clarification without exposing field-validation language", () => {
+    assert.match(missingDetailsAnswer({ missingField: "responsibilities", language: "en", repeatedInput: false }), /what the person in this role would be expected to lead/i);
+    assert.match(missingDetailsAnswer({ missingField: "requirements", language: "he", repeatedInput: true }), /כדי להבין מה החברה מחפשת באמת/);
+    assert.doesNotMatch(missingDetailsAnswer({ missingField: "requirements", language: "he", repeatedInput: true }), /הפרט הזה עדיין חסר/);
   });
 
   it("lists multiple missing details as short scannable bullets", () => {
@@ -27,13 +41,24 @@ describe("Role Fit conversation behavior", () => {
         language: "en",
         repeatedInput: false,
       }),
-      "To create the report, I still need:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\nYou can add them in one message.",
+      "I have part of the job description. To assess it responsibly, I still need:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\nYou can send the details together, briefly and in your own words.",
+    );
+
+    assert.match(
+      missingDetailsAnswer({
+        missingField: "title",
+        missingFields: ["title", "responsibilities", "requirements"],
+        language: "he",
+        repeatedInput: false,
+      }),
+      /^קיבלתי חלק מתיאור המשרה/,
     );
   });
 
   it("offers approved generic title categories after a no-title answer", () => {
     const answer = genericRoleTitleAnswer("en");
-    assert.match(answer, /- UX\n- Strategy\n- Innovation\n- AI/);
+    assert.match(answer, /- UX or Product Design\n- Strategy\n- Innovation\n- AI or AI Product/);
+    assert.match(answer, /does not determine the fit result/);
   });
 
   it("accepts short confirmations with normal punctuation", () => {
@@ -47,16 +72,44 @@ describe("Role Fit conversation behavior", () => {
   });
 
   it("requests explicit report confirmation after role completion", () => {
-    const answer = readyForReportAnswer({ title: "Senior Product Designer", companyName: "Acme", language: "he", repeatedInput: false });
+    const answer = readyForReportAnswer({
+      title: "Senior Product Designer",
+      companyName: "Acme",
+      responsibilities: ["Lead product discovery", "Collaborate with engineering"],
+      language: "he",
+      repeatedInput: false,
+    });
     assert.match(answer, /Senior Product Designer/);
-    assert.match(answer, /שנמשיך\?$/);
+    assert.match(answer, /Lead product discovery/);
+    assert.match(answer, /אפשר שאכין את בדיקת ההתאמה/);
+    assert.match(answer, /אפשר לתקן אותו לפני שאמשיך/);
+    assert.doesNotMatch(answer, /התאמה חזקה|התאמה טובה|פער|נקודת חוזק/);
     assert.doesNotMatch(answer, /[“”„"]/);
   });
 
   it("provides contextual deterministic copy without generic chatbot filler", () => {
-    assert.match(roleSubmissionSetupAnswer("he"), /להעלות קובץ או להדביק/);
+    assert.match(roleSubmissionSetupAnswer("he"), /אין צורך לסדר אותו במיוחד/);
+    assert.match(roleSubmissionSetupAnswer("en"), /does not need to be specially formatted/);
     assert.match(existingReportAnswer("en"), /active report/);
-    assert.match(reportLimitAnswer("en"), /existing report remains available/);
-    assert.match(reportLimitAnswer("en"), /this role or other roles/);
+    assert.match(reportLimitAnswer("en"), /Two reports have already been created/);
+    assert.match(reportLimitAnswer("he"), /שני דוחות/);
+    assert.doesNotMatch(reportLimitAnswer("en"), /sorry/i);
+  });
+
+  it("keeps report transition copy conversational and free of internal terminology", () => {
+    assert.match(reportLoadingAnswer("he"), /דרישות התפקיד/);
+    assert.match(reportLoadingAnswer("en"), /relevant experience documented in the portfolio/);
+    assert.doesNotMatch(reportLoadingAnswer("en"), /Evidence Cards|payload|persistence/i);
+    assert.match(reportReadyAnswer("he"), /בדיקת ההתאמה מוכנה/);
+    assert.match(reportReadyAnswer("en"), /specific requirement, strength, or gap/);
+  });
+
+  it("provides a practical recovery path for file and generic errors in both languages", () => {
+    assert.match(roleFileErrorAnswer("unsupported", "he"), /TXT, Markdown או CSV/);
+    assert.match(roleFileErrorAnswer("too-large", "en"), /smaller than 64 KB/);
+    assert.match(roleFileErrorAnswer("empty", "he"), /הקובץ ריק/);
+    assert.match(roleFileErrorAnswer("unreadable", "en"), /paste the job description/);
+    assert.match(genericRecoverableErrorAnswer("he"), /פרטי המשרה עדיין כאן/);
+    assert.match(genericRecoverableErrorAnswer("en"), /resend only the last part/);
   });
 });
