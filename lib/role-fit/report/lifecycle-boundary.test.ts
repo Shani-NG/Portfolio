@@ -29,7 +29,7 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(page, /const persisted = result\.persistence === "persisted"/);
     assert.match(page, /typeof result\.completedReportCount === "number"/);
     assert.match(page, /: reportSession\.completedReportCount,/);
-    assert.match(page, /The report is available to review, but its persistence is unavailable/);
+    assert.match(page, /The fit review is available now, but it was not saved in the session/);
   });
 
   test("keeps the two-report public lifecycle independent from internal Job Automation quota", async () => {
