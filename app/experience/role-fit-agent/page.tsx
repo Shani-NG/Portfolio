@@ -68,6 +68,14 @@ const phases: Array<{
   },
 ];
 
+const decisionChanges = [
+  { topic: "Agent structure", before: "Several visible agents", after: "One agent with governed modes" },
+  { topic: "Fit output", before: "Numeric compatibility score", after: "Qualitative evidence-backed report" },
+  { topic: "System authority", before: "Model controls workflow", after: "Application controls deterministic rules" },
+  { topic: "Evidence strategy", before: "Broad portfolio summaries", after: "Approved evidence with stable anchors" },
+  { topic: "Role storage", before: "Persist raw role descriptions", after: "Retain minimal derived structures" },
+] as const;
+
 function ToolGlyph({ type }: { type: ToolType }) {
   if (type === "claude" || type === "gpt" || type === "supabase" || type === "manus" || type === "vscode") {
     const mark = { claude: "C", gpt: "GPT", supabase: "S", manus: "M", vscode: "VS" }[type];
@@ -252,7 +260,7 @@ export default function RoleFitAgentCaseStudyPage() {
         <div className={styles.wrap}>
           <div className={`${styles.processHeading} ${styles.reveal}`}><div><p className={styles.eyebrow}><MaterialIcon name="route" />The Process</p><h2 className={styles.sectionTitle} id="process-title">From hiring friction to a governed AI product.</h2></div><p className={styles.sectionSubtitle}>Each stage resolved a different product risk.</p></div>
           <div className={styles.phaseList}>
-            {phases.map((phase) => <details className={`${styles.phase} ${styles.reveal}`} id={phase.id} key={phase.id} open={phase.id === "technical-architecture"}>
+            {phases.map((phase) => <details className={`${styles.phase} ${styles.reveal}`} id={phase.id} key={phase.id}>
               <summary id={phase.id === "product-framing" ? "mvp-scope" : undefined}>
                 <span className={styles.phaseNumber}>{phase.number}</span>
                 <span className={styles.phaseTitle}><small>{phase.label}</small><h3>{phase.title}</h3><p>{phase.subtitle}</p></span>
@@ -265,11 +273,16 @@ export default function RoleFitAgentCaseStudyPage() {
           <div className={`${styles.decisionEvolution} ${styles.reveal}`} id="decision-evolution">
             <p className={styles.eyebrow}><MaterialIcon name="route" />Decision Evolution</p><h3>The product improved through clarified boundaries.</h3>
             <div className={styles.decisionRows}>
-              <div><strong>Agent structure</strong><span>Several visible agents</span><MaterialIcon name="arrow_forward" /><span>One agent with governed modes</span></div>
-              <div><strong>Fit output</strong><span>Numeric compatibility score</span><MaterialIcon name="arrow_forward" /><span>Qualitative evidence-backed report</span></div>
-              <div><strong>System authority</strong><span>Model controls workflow</span><MaterialIcon name="arrow_forward" /><span>Application controls deterministic rules</span></div>
-              <div><strong>Evidence strategy</strong><span>Broad portfolio summaries</span><MaterialIcon name="arrow_forward" /><span>Approved evidence with stable anchors</span></div>
-              <div><strong>Role storage</strong><span>Persist raw role descriptions</span><MaterialIcon name="arrow_forward" /><span>Retain minimal derived structures</span></div>
+              {decisionChanges.map((change) => <article className={styles.decisionCard} key={change.topic}>
+                <div className={`${styles.decisionState} ${styles.decisionBefore}`}>
+                  <span className={styles.decisionLabel}>Before</span>
+                  <p><strong>{change.topic}:</strong> {change.before}</p>
+                </div>
+                <div className={`${styles.decisionState} ${styles.decisionAfter}`}>
+                  <span className={styles.decisionLabel}>After</span>
+                  <p>{change.after}</p>
+                </div>
+              </article>)}
             </div>
           </div>
         </div>

@@ -102,11 +102,18 @@
 .decisionEvolution { margin-top: clamp(3rem, 7vw, 5rem); padding-top: clamp(2rem, 5vw, 4rem); border-top: 1px solid var(--ds-color-border-subtle); }
 .decisionEvolution h3 { max-width: 24ch; margin: 0; font-size: clamp(2rem, 4vw, 3.6rem); line-height: 1.05; letter-spacing: -.04em; }
 .decisionRows { display: grid; gap: var(--ds-space-sm); margin-top: var(--ds-space-xl); }
-.decisionRows > div { display: grid; grid-template-columns: .65fr 1fr auto 1fr; align-items: center; gap: var(--ds-space-lg); min-height: 5.5rem; padding: var(--ds-space-md) var(--ds-space-lg); border: 1px solid var(--ds-color-border-subtle); border-radius: var(--ds-radius-md); background: var(--ds-color-surface); }
-.decisionRows strong { font-size: .8rem; }
-.decisionRows span { color: var(--ds-color-text-secondary); font-size: .82rem; line-height: 1.4; }
-.decisionRows span:last-child { color: var(--ds-color-text-primary); }
-.decisionRows :global(.material-symbols-rounded) { color: var(--ds-color-success); }
+.decisionCard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: clamp(1rem, 3vw, 2.75rem); min-height: 5.5rem; padding: clamp(1.2rem, 2.5vw, 1.75rem); border: 1px solid var(--ds-color-border-subtle); border-radius: var(--ds-radius-md); background: var(--ds-color-surface); transition: background-color var(--ds-duration-fast) var(--ds-ease-standard), box-shadow var(--ds-duration-fast) var(--ds-ease-standard), transform var(--ds-duration-fast) var(--ds-ease-standard); }
+.decisionState { min-width: 0; }
+.decisionLabel { display: block; font-size: .68rem; font-weight: var(--ds-type-weight-semibold); letter-spacing: .09em; text-transform: uppercase; }
+.decisionBefore .decisionLabel { color: var(--ds-color-action-primary); }
+.decisionAfter .decisionLabel { color: var(--ds-color-success); }
+.decisionState p { margin: var(--ds-space-sm) 0 0; color: var(--ds-color-text-secondary); font-size: .86rem; line-height: 1.5; overflow-wrap: anywhere; }
+.decisionState strong { color: var(--ds-color-text-primary); font-weight: var(--ds-type-weight-semibold); }
+.decisionAfter p { color: var(--ds-color-text-primary); }
+
+@media (hover: hover) {
+  .decisionCard:hover { background: color-mix(in srgb, var(--ds-color-surface) 84%, var(--ds-color-success)); box-shadow: 0 0 1.8rem color-mix(in srgb, var(--ds-color-success) 14%, transparent); transform: translateY(-.1rem); }
+}
 
 .outcomeSection { overflow: clip; background: radial-gradient(circle at 75% 35%, color-mix(in srgb, var(--ds-color-action-primary) 13%, transparent), transparent 29rem), radial-gradient(circle at 30% 80%, color-mix(in srgb, var(--ds-color-success) 8%, transparent), transparent 23rem); }
 .outcomeGrid { display: grid; grid-template-columns: minmax(0, .86fr) minmax(22rem, 1.14fr); align-items: center; gap: clamp(3rem, 8vw, 8rem); }
@@ -115,14 +122,15 @@
 .outcomePoints :global(.material-symbols-rounded) { color: var(--ds-color-success); font-size: 1.25rem; }
 .outcomePoints strong { display: block; }
 .outcomePoints span { display: block; margin-top: var(--ds-space-xs); color: var(--ds-color-text-secondary); font-size: .85rem; line-height: 1.45; }
-.ctaPanel { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--ds-space-xl); margin-top: clamp(3rem, 7vw, 5rem); padding: clamp(1.5rem, 4vw, 2.5rem); border: 1px solid color-mix(in srgb, var(--ds-color-action-primary) 34%, var(--ds-color-border-subtle)); border-radius: var(--ds-radius-xl); background: linear-gradient(120deg, color-mix(in srgb, var(--ds-color-action-primary) 12%, transparent), color-mix(in srgb, var(--ds-color-success) 5%, transparent)), var(--ds-color-surface-raised); }
+.ctaPanel { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--ds-space-xl); margin-top: clamp(3rem, 7vw, 5rem); padding: clamp(1.5rem, 4vw, 2.5rem); border: 1px solid color-mix(in srgb, var(--ds-color-action-primary) 34%, var(--ds-color-border-subtle)); border-radius: var(--ds-radius-xl); background: linear-gradient(120deg, color-mix(in srgb, var(--ds-color-action-primary) 12%, transparent), color-mix(in srgb, var(--ds-color-success) 5%, transparent)), var(--ds-color-surface-raised); }
+.ctaPanel > div { min-width: 0; }
 .ctaPanel h3 { margin: 0; font-size: clamp(1.6rem, 3.2vw, 2.75rem); letter-spacing: -.03em; }
 .ctaPanel p { margin: var(--ds-space-sm) 0 0; color: var(--ds-color-text-secondary); line-height: 1.5; }
 .buildMetrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--ds-space-sm); margin-top: var(--ds-space-xl); }
 .buildMetrics article { display: grid; min-height: 9.5rem; align-content: center; gap: var(--ds-space-sm); padding: var(--ds-space-md); border: 1px solid var(--ds-color-border-subtle); border-radius: var(--ds-radius-md); background: rgba(255, 255, 255, .025); text-align: center; }
 .buildMetrics strong { color: var(--ds-color-action-primary); font-size: clamp(2.2rem, 5vw, 4rem); line-height: 1; }
 .buildMetrics span { margin: 0; color: var(--ds-color-text-secondary); font-size: var(--ds-type-body-14-size); line-height: 1.45; }
-.button { display: inline-flex; min-height: 3.25rem; align-items: center; justify-content: center; gap: var(--ds-space-sm); padding-inline: 1.4rem; border: 1px solid var(--ds-color-action-primary); border-radius: 999px; color: var(--ds-color-action-primary-hover); background: transparent; font-size: var(--ds-type-label-14-size); font-weight: var(--ds-type-weight-semibold); text-decoration: none; white-space: nowrap; transition: transform var(--ds-duration-fast) var(--ds-ease-standard), background-color var(--ds-duration-fast) var(--ds-ease-standard); }
+.button { display: inline-flex; min-height: 3.25rem; align-items: center; justify-self: start; justify-content: center; gap: var(--ds-space-sm); padding-inline: 1.4rem; border: 1px solid var(--ds-color-action-primary); border-radius: 999px; color: var(--ds-color-action-primary-hover); background: transparent; font-size: var(--ds-type-label-14-size); font-weight: var(--ds-type-weight-semibold); text-decoration: none; white-space: nowrap; transition: transform var(--ds-duration-fast) var(--ds-ease-standard), background-color var(--ds-duration-fast) var(--ds-ease-standard); }
 .button:hover { color: var(--ds-color-action-primary-text); background: var(--ds-color-action-primary-hover); transform: translateY(-2px); }
 .button:focus-visible { outline: 0; box-shadow: var(--ds-shadow-focus); }
 
@@ -130,5 +138,5 @@
 .revealed { opacity: 1; transform: none; }
 
 @media (max-width: 72rem) { .problemLayout, .processHeading, .outcomeGrid { grid-template-columns: 1fr; } .layers { grid-template-columns: 1fr; } .layer { min-height: 0; } .phase summary { grid-template-columns: auto minmax(0, 1fr) auto; } .summaryTools { grid-column: 2 / 3; } .phaseAction { grid-column: 3; grid-row: 1 / span 2; } .phaseDetail { grid-template-columns: 1fr; } .buildMetrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 48rem) { .display { font-size: clamp(3rem, 16vw, 4.8rem); } .sectionTitle { font-size: clamp(2.35rem, 12vw, 3.7rem); } .hero { min-height: 90svh; } .hero::after { background: linear-gradient(90deg, rgba(11, 13, 18, .95), rgba(11, 13, 18, .58)), linear-gradient(0deg, rgba(11, 13, 18, .86), transparent 45%); } .phase summary { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 0; } .phaseNumber { width: 2.5rem; height: 2.5rem; } .summaryTools { grid-column: 1 / -1; padding-left: 3.35rem; } .phaseAction { width: 2.25rem; height: 2.25rem; } .frameFlow, .validationFlow { grid-template-columns: 1fr; } .evidenceFlow { grid-template-columns: 1fr; } .flowArrow { transform: rotate(90deg); text-align: center; } .runtimeTop, .runtimeModes { grid-template-columns: 1fr; } .decisionRows > div { grid-template-columns: 1fr; gap: var(--ds-space-xs); } .decisionRows :global(.material-symbols-rounded) { transform: rotate(90deg); } .ctaPanel { grid-template-columns: 1fr; } .button { width: 100%; } .buildMetrics { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .phase, .phaseAction, .button, .anchorNav a { transition-duration: .01ms !important; } .phase[open] .phasePanel { animation-duration: .01ms !important; } .button:hover { transform: none; } }
+@media (max-width: 48rem) { .display { font-size: clamp(3rem, 16vw, 4.8rem); } .sectionTitle { font-size: clamp(2.35rem, 12vw, 3.7rem); } .hero { min-height: 90svh; } .hero::after { background: linear-gradient(90deg, rgba(11, 13, 18, .95), rgba(11, 13, 18, .58)), linear-gradient(0deg, rgba(11, 13, 18, .86), transparent 45%); } .phase summary { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 0; } .phaseNumber { width: 2.5rem; height: 2.5rem; } .summaryTools { grid-column: 1 / -1; padding-left: 3.35rem; } .phaseAction { width: 2.25rem; height: 2.25rem; } .frameFlow, .validationFlow { grid-template-columns: 1fr; } .evidenceFlow { grid-template-columns: 1fr; } .flowArrow { transform: rotate(90deg); text-align: center; } .runtimeTop, .runtimeModes { grid-template-columns: 1fr; } .decisionCard { grid-template-columns: 1fr; gap: var(--ds-space-lg); } .ctaPanel { grid-template-columns: 1fr; } .button { width: 100%; } .buildMetrics { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .phase, .phaseAction, .decisionCard, .button, .anchorNav a { transition-duration: .01ms !important; } .phase[open] .phasePanel { animation-duration: .01ms !important; } .decisionCard:hover, .button:hover { transform: none; } }
