@@ -241,7 +241,7 @@ export default function RoleFitAgentCaseStudyPage() {
       <section className={styles.section} id="opportunity" aria-labelledby="opportunity-title">
         <div className={`${styles.wrap} ${styles.problemLayout}`}>
           <div className={styles.reveal}><p className={styles.eyebrow}><MaterialIcon name="hub" />The Opportunity</p><h2 className={styles.sectionTitle} id="opportunity-title">A portfolio can show the work. It rarely explains the fit.</h2></div>
-          <div className={`${styles.problemCopy} ${styles.reveal}`}><p>Recruiters and design leaders must scan multiple projects, interpret unfamiliar domains, infer transferable capabilities and decide which evidence matters. The opportunity was not to build another résumé chatbot. It was to create a decision-support experience that could answer one practical question:</p><blockquote>What can this candidate bring to this role—and what evidence supports that conclusion?</blockquote></div>
+          <div className={`${styles.problemCopy} ${styles.reveal}`}><p>Recruiters and design leaders must scan multiple projects, interpret unfamiliar domains, infer transferable capabilities and decide which evidence matters. The opportunity was not to build another résumé chatbot. It was to create a decision-support experience that could answer one practical question:</p><blockquote>What can this candidate bring to this role, and what evidence supports that conclusion?</blockquote></div>
         </div>
       </section>
 
@@ -260,7 +260,7 @@ export default function RoleFitAgentCaseStudyPage() {
         <div className={styles.wrap}>
           <div className={`${styles.processHeading} ${styles.reveal}`}><div><p className={styles.eyebrow}><MaterialIcon name="route" />The Process</p><h2 className={styles.sectionTitle} id="process-title">From hiring friction to a governed AI product.</h2></div><p className={styles.sectionSubtitle}>Each stage resolved a different product risk.</p></div>
           <div className={styles.phaseList}>
-            {phases.map((phase) => <details className={`${styles.phase} ${styles.reveal}`} id={phase.id} key={phase.id}>
+            {phases.map((phase) => <details className={`${styles.phase} ${styles.reveal}`} id={phase.id} key={phase.id} open={phase.id === "technical-architecture"}>
               <summary id={phase.id === "product-framing" ? "mvp-scope" : undefined}>
                 <span className={styles.phaseNumber}>{phase.number}</span>
                 <span className={styles.phaseTitle}><small>{phase.label}</small><h3>{phase.title}</h3><p>{phase.subtitle}</p></span>

@@ -79,6 +79,12 @@ export function missingDetailsAnswer(input: {
   return fieldQuestion(fields[0] ?? input.missingField, input.language);
 }
 
+export function previouslyProvidedTitleAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "יכול להיות שהכותרת לא נקלטה מההדבקה הקודמת. שאר פרטי המשרה עדיין אצלי. שלחי רק את שם המשרה כפי שהוא מופיע בשורה הראשונה, ואני אחבר אותו לתיאור שכבר קיבלתי."
+    : "The title may not have been captured from the previous paste. I still have the rest of the role details. Send just the role title as it appears in the first line, and I’ll connect it to the description I already have.";
+}
+
 export function genericRoleTitleAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
     ? "אם אין למשרה שם ברור, אפשר לסווג אותה לפי הכיוון המרכזי שלה:\n- UX או Product Design\n- Strategy\n- Innovation\n- AI או AI Product\nזה רק יעזור לי לשמור על ההקשר — זה לא יקבע מראש את תוצאת ההתאמה."
@@ -145,8 +151,14 @@ export function reportLimitAnswer(language: "he" | "en" | "mixed") {
 
 export function reportLoadingAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
-    ? "אני עוברת עכשיו על דרישות התפקיד ומשווה אותן לניסיון הרלוונטי שלי."
-    : "I’m reviewing the role requirements and comparing them with the relevant experience documented in the portfolio.";
+    ? "מתחילה ליצור את הדוח...\nזה ייקח לי כמה רגעים לחבר בין דרישות המשרה לניסיון ולפרויקטים הרלוונטיים."
+    : "Starting the report...\nThis will take me a few moments to connect the role requirements with the relevant experience and projects.";
+}
+
+export function reportRetryableFailureAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "לא הצלחתי להשלים את הדוח הפעם. פרטי המשרה עדיין כאן, ואפשר לנסות שוב בלי להדביק אותם מחדש."
+    : "I couldn’t finish the report this time. The role details are still here, so you can try again without pasting them again.";
 }
 
 export function reportReadyAnswer(language: "he" | "en" | "mixed") {

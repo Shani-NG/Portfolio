@@ -16,7 +16,7 @@ export type ReportProviderFailureContract = {
   };
 };
 
-const temporaryProviderMessage = "The analysis service is temporarily busy. Your job details are saved. Try generating the report again shortly.";
+const temporaryProviderMessage = "I couldn’t finish the report this time. The role details are still here, so you can try again without pasting them again.";
 const genericProviderMessage = "I couldn't generate the report this time. Your role details are still here. Please try again later.";
 
 export function createReportProviderFailureContract(failure: RoleFitProviderFailure): ReportProviderFailureContract {
@@ -32,6 +32,23 @@ export function createReportProviderFailureContract(failure: RoleFitProviderFail
         safeMessage: temporaryProviderMessage,
         retryable: true,
         providerStatus: 429,
+        ...(failure.retryAfterSeconds !== undefined ? { retryAfterSeconds: failure.retryAfterSeconds } : {}),
+      },
+    };
+  }
+
+  if (failure.retryable) {
+    return {
+      status: 503,
+      body: {
+        state: "provider-retryable",
+        provider: failure.provider,
+        ...(failure.model ? { model: failure.model } : {}),
+        error: failure.error,
+        safeMessageKey: failure.safeMessageKey,
+        safeMessage: temporaryProviderMessage,
+        retryable: true,
+        ...(failure.providerStatus !== undefined ? { providerStatus: failure.providerStatus } : {}),
         ...(failure.retryAfterSeconds !== undefined ? { retryAfterSeconds: failure.retryAfterSeconds } : {}),
       },
     };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyRoleDraftCorrection, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeRoleTitleClarification, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
+import { applyRoleDraftCorrection, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, isPlausibleRoleTitle, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeRoleTitleClarification, referencesPreviouslyProvidedTitle, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -43,6 +43,27 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(draft.responsibilities.length, 1);
     assert.equal(draft.requirements.length, 1);
     assert.equal(draft.preferredQualifications.length, 1);
+  });
+
+  it("recognizes Hebrew gender-hyphen role titles at the start of a pasted JD", () => {
+    const roleText = [
+      "יועץ-ת מוביל-ה לתחום ה-AI About the job התפקיד כולל הובלת תחום הבינה המלאכותית וזיהוי צרכים עסקיים.",
+      "תחומי אחריות: הובלת יוזמות AI מקצה לקצה; איסוף והגדרת Use Cases בעלי ערך עסקי גבוה",
+      "דרישות התפקיד (חובה): ניסיון בהובלת פרויקטים דיגיטליים או טכנולוגיים; ניסיון בפיתוח או יישום פתרונות AI ואוטומציה",
+    ].join("\n");
+
+    const result = validateRoleText({
+      conversationId: "conv_he_title",
+      traceId: "trace_he_title",
+      roleText,
+      detectedLanguage: "he",
+    });
+
+    assert.equal(isPlausibleRoleTitle("יועץ-ת מוביל-ה לתחום ה-AI"), true);
+    assert.equal(extractStandaloneRoleTitle("יועץ-ת מוביל-ה לתחום ה-AI"), "יועץ-ת מוביל-ה לתחום ה-AI");
+    assert.equal(result.roleDraft.title?.originalValue, "יועץ-ת מוביל-ה לתחום ה-AI");
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.deepEqual(result.missingFields, []);
   });
 
   it("extracts required experience, location, and work model from the role context", () => {
@@ -266,6 +287,27 @@ describe("Role Fit pasted job understanding", () => {
 
     assert.equal(completedValidation.parseStatus, "valid-complete");
     assert.equal(completedValidation.roleDraft.title?.originalValue, "Senior UX Strategist");
+  });
+
+  it("keeps existing responsibilities and requirements when a later title clarification completes the draft", () => {
+    const details = createRoleDraftFromText([
+      "תחומי אחריות: הובלת יוזמות AI ביחידה מקצה לקצה; תכנון ויישום workflows לתהליכים עסקיים",
+      "דרישות: ניסיון בהובלת פרויקטים דיגיטליים; ניסיון בפיתוח או יישום פתרונות AI ואוטומציה",
+    ].join("\n"));
+
+    const completedRole = mergeRoleDraftClarification(details, "title", "יועץ-ת מוביל-ה לתחום ה-AI");
+    const result = validateStructuredRoleDraft({
+      conversationId: "conv_he_title_late",
+      traceId: "trace_he_title_late",
+      roleDraft: completedRole,
+      detectedLanguage: "he",
+    });
+
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.equal(result.roleDraft.title?.originalValue, "יועץ-ת מוביל-ה לתחום ה-AI");
+    assert.equal(result.roleDraft.responsibilities.length, details.responsibilities.length);
+    assert.equal(result.roleDraft.requirements.length, details.requirements.length);
+    assert.equal(referencesPreviouslyProvidedTitle("שם המשרה כתוב בשורה הראשונה"), true);
   });
 
   it("does not classify a normal conversational question as a standalone title", () => {

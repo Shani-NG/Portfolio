@@ -11,6 +11,7 @@ import {
   reportLimitAnswer,
   reportLoadingAnswer,
   reportReadyAnswer,
+  reportRetryableFailureAnswer,
   resolveConversationLanguage,
   roleFileErrorAnswer,
   roleSubmissionSetupAnswer,
@@ -37,12 +38,17 @@ const approvedRoleFileExtensions = new Set(["txt", "md", "csv"]);
 type ReportFailureResult = {
   state?: string;
   safeMessage?: string;
+  retryable?: boolean;
   eligibility?: { reason?: string };
   validation?: { missingFields?: string[] };
 };
 
 function reportFailureMessage(result: ReportFailureResult, language: RoleFitLiveSession["activeLanguage"]): string {
   const useHebrew = isHebrewLanguage(language);
+
+  if (result.retryable) {
+    return reportRetryableFailureAnswer(language);
+  }
 
   if (result.state === "validation-failed") {
     const missingField = result.validation?.missingFields?.[0];
@@ -100,7 +106,6 @@ export default function RoleFitPage() {
   const pageRef = useRef<HTMLElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
   const roleFileInputRef = useRef<HTMLInputElement>(null);
-  const reportLimitReached = liveSession.completedReportCount >= 2;
   const activeReport = liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined;
   const hasLiveReport = Boolean(activeReport);
   const liveSplitCanvas = liveSession.state === "generating-report"
@@ -108,10 +113,8 @@ export default function RoleFitPage() {
     || (liveSession.state === "recoverable-error" && (Boolean(activeReport) || errorContext === "report" || errorContext === "validation"));
   const splitCanvas = liveSplitCanvas;
   const hasConversation = liveSession.messages.length > 0 || liveSession.state !== "initial";
-  const reportActionLabel = reportLimitReached
-    ? "Sorry, that is it for now. You are welcome to contact me."
-    : hasLiveReport
-      ? "Show report"
+  const reportActionLabel = hasLiveReport
+    ? "Show report"
     : liveSession.pendingReportConfirmation
       ? "Generate confirmed report"
       : "Generate report";
@@ -242,12 +245,6 @@ export default function RoleFitPage() {
   async function requestReport(sessionOverride?: RoleFitLiveSession) {
     const reportSession = sessionOverride ?? liveSession;
 
-    if (reportSession.completedReportCount >= 2) {
-      appendLiveMessage({ role: "agent", content: reportLimitAnswer(reportSession.activeLanguage) });
-      syncLiveSession({ state: reportSession.reportPayload ? "report-ready" : "general-qa", pendingReportConfirmation: false });
-      setActivePane("chat");
-      return;
-    }
     if (reportRequestInFlightRef.current || isAgentUnavailable) return;
     if (reportSession.reportPayload) {
       syncLiveSession({ state: "report-ready" });
@@ -487,13 +484,6 @@ export default function RoleFitPage() {
   }
 
   function startNewAnalysis() {
-    if (liveSession.completedReportCount >= 2) {
-      appendLiveMessage({ role: "agent", content: reportLimitAnswer(liveSession.activeLanguage) });
-      syncLiveSession({ state: liveSession.reportPayload ? "report-ready" : "general-qa", pendingReportConfirmation: false });
-      setActivePane("chat");
-      return;
-    }
-
     const nextSession = resetRoleFitAnalysis();
     setLiveSession(nextSession);
     setLiveReportState(null);

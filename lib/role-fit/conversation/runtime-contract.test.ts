@@ -65,6 +65,20 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(route, /roleDraft: validation\.roleDraft/);
   });
 
+  it("keeps title clarification grounded in the existing role draft when the previous title was not captured", async () => {
+    const route = await readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8");
+    const branch = route.slice(
+      route.indexOf('pendingRoleField === "title" && referencesPreviouslyProvidedTitle'),
+      route.indexOf('pendingRoleField === "title" && isNoRoleTitleAnswer'),
+    );
+
+    assert.match(route, /referencesPreviouslyProvidedTitle\(parsedRequest\.data\.message\)/);
+    assert.match(branch, /previouslyProvidedTitleAnswer\(parsedRequest\.data\.language\)/);
+    assert.match(branch, /roleDraft: roleContext\.roleDraft/);
+    assert.match(branch, /pendingField: "title"/);
+    assert.doesNotMatch(branch, /createRoleDraftFromText|conversationContext/);
+  });
+
   it("opens a real file input instead of sending an upload chat message", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
 

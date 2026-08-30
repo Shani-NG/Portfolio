@@ -66,6 +66,24 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.doesNotMatch(failedRequestBranch, /completedReportCount\s*:/);
   });
 
+  test("keeps report-limit blocks distinct from retryable provider failures", async () => {
+    const [page, route] = await Promise.all([
+      readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8"),
+      readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8"),
+    ]);
+    const serverLimitBlock = route.slice(
+      route.indexOf("if (completedReportCount >= policy.maxReportsPerSession)"),
+      route.indexOf("if (!parsedRequest.data.approved)"),
+    );
+
+    assert.match(serverLimitBlock, /eventName: "report\.limit_blocked"/);
+    assert.match(serverLimitBlock, /status: 429/);
+    assert.match(serverLimitBlock, /state: "blocked"/);
+    assert.doesNotMatch(serverLimitBlock, /provider\.generateReport|model generation failed|retryable/);
+    assert.doesNotMatch(page, /completedReportCount >= 2/);
+    assert.match(page, /reportRetryableFailureAnswer\(language\)/);
+  });
+
   test("treats no-report as a non-error lifecycle result without a completed-report increment", async () => {
     const page = await readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8");
 

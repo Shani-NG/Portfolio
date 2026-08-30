@@ -119,9 +119,10 @@ const setupInstructionSignal = /\b(upload|paste|provide|send|share|attach|going 
 const hebrewSetupInstructionSignal = /^(?:אני|היי|שלום|רוצה|אפשר|צריך|צריכה|תודה)\b/;
 const conversationalQuestionSignal = /^(?:what|how|why|who|where|when|which|can|could|would|should|do|does|did|is|are|tell me|explain)\b/i;
 const hebrewConversationalQuestionSignal = /^(?:מה|איך|למה|מי|איפה|מתי|האם|איזה|איזו|אפשר|תוכלי|את יכולה|ספרי|הסבירי|תסבירי)(?:\s|$)/;
-const hebrewRoleTitleSignal = /(?:^|\s)(?:מנהל(?:ת)?|מעצב(?:ת)?|חוקר(?:ת)?|אסטרטג(?:ית)?|מוביל(?:ת)?|ראש(?:ת)?|מהנדס(?:ת)?|מפתח(?:ת)?|אנליסט(?:ית)?|יועץ|יועצת|רכז|רכזת|ארכיטקט(?:ית)?|מומחה|מומחית|דירקטור(?:ית)?|סמנכ["״]ל)(?:\s|$)/;
+const hebrewRoleTitleSignal = /(?:^|\s)(?:מנהל(?:ת|[-־]ת)?|מעצב(?:ת|[-־]ת)?|חוקר(?:ת|[-־]ת)?|אסטרטג(?:ית|[-־]ית)?|מוביל(?:ת|[-־]ה)?|ראש(?:ת|[-־]ת)?|מהנדס(?:ת|[-־]ת)?|מפתח(?:ת|[-־]ת)?|אנליסט(?:ית|[-־]ית)?|יועץ(?:[-־]ת)?|יועצת|רכז(?:ת|[-־]ת)?|ארכיטקט(?:ית|[-־]ית)?|מומחה(?:[-־]ית)?|מומחית|דירקטור(?:ית|[-־]ית)?|סמנכ["״]ל)(?:\s|$)/;
 const standaloneTitleLabel = /^(?:job title|title|role|שם המשרה|תפקיד)\s*:\s*(.+)$/i;
 const roleFieldLabelSignal = /^(?:company|organization|title|job title|role|description|responsibilities|requirements|qualifications|skills|location|job location|חברה|ארגון|תפקיד|שם המשרה|תיאור|תיאור המשרה|תחומי אחריות|אחריות|דרישות|כישורים נדרשים)\s*:/i;
+const priorTitleReferenceSignal = /(?:שם\s+המשרה|הכותרת|התפקיד).{0,50}(?:כתוב|כתובה|הופיע|הופיעה|נמצא|נמצאת|שורה\s+ראשונה|למעלה|בהתחלה)|(?:כתוב|כתובה|הופיע|הופיעה|נמצא|נמצאת).{0,50}(?:שורה\s+ראשונה|למעלה|בהתחלה)|\b(?:title|role)\b.{0,50}\b(?:first line|above|previous|already|pasted)\b|\b(?:first line|above|previous|already pasted)\b.{0,50}\b(?:title|role)\b/i;
 
 function hasStrongTitleLexiconMatch(value: string) {
   return findLexiconMatches({ text: value, language: "mixed" })
@@ -159,9 +160,16 @@ function isKnownSectionHeading(value: string) {
   return normalizedHeadingEntries.some(({ label }) => label.toLowerCase() === normalized);
 }
 
+function startsWithPlausibleTitleBeforeHeading(value: string) {
+  const normalized = normalizeRoleText(value);
+  const firstHeadingIndex = normalized.search(headingPattern);
+  if (firstHeadingIndex <= 0) return false;
+  return isPlausibleRoleTitle(normalized.slice(0, firstHeadingIndex).trim());
+}
+
 function isRoleBoundaryLine(value: string) {
   const line = value.trim();
-  return roleFieldLabelSignal.test(line) || isKnownSectionHeading(line) || isPlausibleRoleTitle(line);
+  return roleFieldLabelSignal.test(line) || isKnownSectionHeading(line) || isPlausibleRoleTitle(line) || startsWithPlausibleTitleBeforeHeading(line);
 }
 
 export function extractRoleContent(message: string): string {
@@ -223,6 +231,10 @@ const genericRoleTitles = new Map([
 export function isNoRoleTitleAnswer(value: string): boolean {
   return /^(?:no|none|no title|there is no title|it has no title|unknown|not specified)$/i.test(value.trim())
     || /^(?:אין|אין שם|אין כותרת|אין שם משרה|לא צוין|לא ידוע)$/.test(value.trim());
+}
+
+export function referencesPreviouslyProvidedTitle(value: string): boolean {
+  return priorTitleReferenceSignal.test(value.trim());
 }
 
 export function normalizeRoleTitleClarification(value: string): string {

@@ -338,6 +338,72 @@ describe("Gemini chat completion guard", () => {
     assert.equal(result.detail, undefined);
   });
 
+  it("classifies report transport failures without a provider status as retryable", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
+    globalThis.fetch = (async () => { throw new Error("network down"); }) as typeof fetch;
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Director UX/UI",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Lead UX strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.error, "provider-error");
+    assert.equal(result.providerStatus, undefined);
+    assert.equal(result.retryable, true);
+  });
+
+  it("classifies provider 503 report failures as retryable without using a fallback model", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    const models: string[] = [];
+    globalThis.fetch = (async (input) => {
+      models.push(requestedModel(input));
+      return new Response(JSON.stringify({ error: { message: "overloaded" } }), { status: 503, statusText: "Service Unavailable" });
+    }) as typeof fetch;
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Director UX/UI",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Lead UX strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.providerStatus, 503);
+    assert.equal(result.retryable, true);
+    assert.deepEqual(models, ["gemini-3.5-flash"]);
+  });
+
+  it("keeps permanent report provider errors non-retryable", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    globalThis.fetch = (async () => new Response(JSON.stringify({ error: { message: "unauthorized" } }), { status: 401, statusText: "Unauthorized" })) as typeof fetch;
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Director UX/UI",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Lead UX strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.providerStatus, 401);
+    assert.equal(result.retryable, undefined);
+  });
+
   it("repairs one schema-invalid report response before failing the request", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
