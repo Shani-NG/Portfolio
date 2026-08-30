@@ -23,10 +23,36 @@ describe("report provider failure contract", () => {
       model: "gemini-3-flash-preview",
       error: "rate-limited",
       safeMessageKey: "model.provider_rate_limited",
-      safeMessage: "The analysis service is temporarily busy. Your job details are saved. Try generating the report again shortly.",
+      safeMessage: "I couldn’t finish the report this time. The role details are still here, so you can try again without pasting them again.",
       retryable: true,
       providerStatus: 429,
       retryAfterSeconds: 34,
+    });
+    assert.equal("detail" in contract.body, false);
+  });
+
+  it("returns a retryable 503 contract for transient report provider failures", () => {
+    const contract = createReportProviderFailureContract({
+      ok: false,
+      provider: "gemini",
+      model: "gemini-3.5-flash",
+      error: "provider-error",
+      safeMessageKey: "model.google_ai_studio_provider_error",
+      providerStatus: 503,
+      retryable: true,
+      detail: "raw upstream response",
+    });
+
+    assert.equal(contract.status, 503);
+    assert.deepEqual(contract.body, {
+      state: "provider-retryable",
+      provider: "gemini",
+      model: "gemini-3.5-flash",
+      error: "provider-error",
+      safeMessageKey: "model.google_ai_studio_provider_error",
+      safeMessage: "I couldn’t finish the report this time. The role details are still here, so you can try again without pasting them again.",
+      retryable: true,
+      providerStatus: 503,
     });
     assert.equal("detail" in contract.body, false);
   });

@@ -7,10 +7,12 @@ import {
   genericRoleTitleAnswer,
   isReportConfirmationText,
   missingDetailsAnswer,
+  previouslyProvidedTitleAnswer,
   readyForReportAnswer,
   reportLimitAnswer,
   reportLoadingAnswer,
   reportReadyAnswer,
+  reportRetryableFailureAnswer,
   resolveConversationLanguage,
   roleFileErrorAnswer,
   roleSubmissionSetupAnswer,
@@ -97,8 +99,8 @@ describe("Role Fit conversation behavior", () => {
   });
 
   it("keeps report transition copy conversational and free of internal terminology", () => {
-    assert.match(reportLoadingAnswer("he"), /דרישות התפקיד/);
-    assert.match(reportLoadingAnswer("en"), /relevant experience documented in the portfolio/);
+    assert.match(reportLoadingAnswer("he"), /מתחילה ליצור את הדוח/);
+    assert.match(reportLoadingAnswer("en"), /Starting the report/);
     assert.doesNotMatch(reportLoadingAnswer("en"), /Evidence Cards|payload|persistence/i);
     assert.match(reportReadyAnswer("he"), /בדיקת ההתאמה מוכנה/);
     assert.match(reportReadyAnswer("en"), /specific requirement, strength, or gap/);
@@ -111,5 +113,15 @@ describe("Role Fit conversation behavior", () => {
     assert.match(roleFileErrorAnswer("unreadable", "en"), /paste the job description/);
     assert.match(genericRecoverableErrorAnswer("he"), /פרטי המשרה עדיין כאן/);
     assert.match(genericRecoverableErrorAnswer("en"), /resend only the last part/);
+    assert.match(reportRetryableFailureAnswer("he"), /בלי להדביק אותם מחדש/);
+    assert.match(reportRetryableFailureAnswer("en"), /without pasting them again/);
+  });
+
+  it("acknowledges an uncaptured previous title without implying the role draft was lost", () => {
+    assert.equal(
+      previouslyProvidedTitleAnswer("he"),
+      "יכול להיות שהכותרת לא נקלטה מההדבקה הקודמת. שאר פרטי המשרה עדיין אצלי. שלחי רק את שם המשרה כפי שהוא מופיע בשורה הראשונה, ואני אחבר אותו לתיאור שכבר קיבלתי.",
+    );
+    assert.match(previouslyProvidedTitleAnswer("en"), /I still have the rest of the role details/);
   });
 });

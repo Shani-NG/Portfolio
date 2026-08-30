@@ -12,6 +12,7 @@ import {
   looksLikeRoleSubmissionSetup,
   maxRoleClarificationAttempts,
   missingDetailsAnswer,
+  previouslyProvidedTitleAnswer,
   readyForReportAnswer,
   reportLimitAnswer,
   roleSubmissionSetupAnswer,
@@ -29,6 +30,7 @@ import {
   looksLikeReportIntent,
   mergeRoleDraftClarification,
   mergeStructuredRoleDraft,
+  referencesPreviouslyProvidedTitle,
   serializeRoleDraftForBoundary,
   shouldValidateRoleCollectionMessage,
   shouldTreatAsRoleClarification,
@@ -119,7 +121,7 @@ export async function POST(request: Request) {
   const { conversationId, sessionId } = parsedRequest.data;
 
   if (
-    parsedRequest.data.completedReportCount >= 2
+    parsedRequest.data.completedReportCount >= policy.maxReportsPerSession
     && hasReportIntent
     && (!parsedRequest.data.reportContext || looksLikeNewReportRequest(parsedRequest.data.message))
   ) {
@@ -140,6 +142,17 @@ export async function POST(request: Request) {
   }
 
   if (roleContext && pendingRoleField && isFieldClarification && !isValidRoleClarificationAnswer(pendingRoleField, parsedRequest.data.message)) {
+    if (pendingRoleField === "title" && referencesPreviouslyProvidedTitle(parsedRequest.data.message)) {
+      return NextResponse.json({
+        state: "awaiting-role-completion",
+        answer: previouslyProvidedTitleAnswer(parsedRequest.data.language),
+        roleDraft: roleContext.roleDraft,
+        pendingField: "title",
+        clarificationExhausted: false,
+        safeMessageKey: "role.previous_title_not_captured",
+      });
+    }
+
     if (pendingRoleField === "title" && isNoRoleTitleAnswer(parsedRequest.data.message)) {
       return NextResponse.json({
         state: "awaiting-role-completion",

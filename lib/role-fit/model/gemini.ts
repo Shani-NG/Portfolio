@@ -119,7 +119,18 @@ function readRetryAfterSeconds(response: Response): number | undefined {
   return seconds >= 0 && seconds <= 3600 ? seconds : undefined;
 }
 
-function roleFitProviderFailure(response: Extract<GeminiCallResult, { ok: false }>): Omit<RoleFitProviderFailure, "provider"> {
+function isRetryableReportFailure(response: Extract<GeminiCallResult, { ok: false }>): boolean {
+  if (response.providerStatus === 503) return true;
+  if (response.providerStatus !== undefined) return false;
+  return response.detail === "provider-request:timeout"
+    || response.detail === "provider-request:network-error"
+    || response.detail === "Gemini request failed before a provider response was available.";
+}
+
+function roleFitProviderFailure(
+  response: Extract<GeminiCallResult, { ok: false }>,
+  options: { reportRetryableTransportFailure?: boolean } = {},
+): Omit<RoleFitProviderFailure, "provider"> {
   if (response.providerStatus === 429) {
     return {
       ok: false,
@@ -132,6 +143,7 @@ function roleFitProviderFailure(response: Extract<GeminiCallResult, { ok: false 
     };
   }
 
+  const retryable = options.reportRetryableTransportFailure && isRetryableReportFailure(response);
   return {
     ok: false,
     model: response.model,
@@ -139,6 +151,7 @@ function roleFitProviderFailure(response: Extract<GeminiCallResult, { ok: false 
     safeMessageKey: "model.google_ai_studio_provider_error",
     detail: response.detail,
     ...(response.providerStatus !== undefined ? { providerStatus: response.providerStatus } : {}),
+    ...(retryable ? { retryable: true } : {}),
   };
 }
 
@@ -448,7 +461,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         if (!response.ok) {
           return {
             provider: "gemini",
-            ...roleFitProviderFailure(response),
+            ...roleFitProviderFailure(response, { reportRetryableTransportFailure: true }),
           };
         }
 
