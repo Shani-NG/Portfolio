@@ -123,9 +123,20 @@ describe("RoleFit Supabase runtime persistence", () => {
         providerStatus: 429,
         retryable: true,
         retryAfterSeconds: 34,
+        attemptPhase: "schema-repair",
+        repairTriggerCategory: "max_tokens",
+        providerElapsedMs: 45001,
+        failureCategory: "provider_timeout",
+        finishReason: "MAX_TOKENS",
+        responseBodyPresent: false,
+        promptTokenCount: 1200,
+        outputTokenCount: 340,
+        totalTokenCount: 1540,
         safeMessageKey: "model.invalid_output",
         rawRoleText: "must-not-persist",
         companyName: "must-not-persist",
+        prompt: "must-not-persist",
+        evidence: "must-not-persist",
       },
     });
 
@@ -138,6 +149,15 @@ describe("RoleFit Supabase runtime persistence", () => {
       providerStatus: 429,
       retryable: true,
       retryAfterSeconds: 34,
+      attemptPhase: "schema-repair",
+      repairTriggerCategory: "max_tokens",
+      providerElapsedMs: 45001,
+      failureCategory: "provider_timeout",
+      finishReason: "MAX_TOKENS",
+      responseBodyPresent: false,
+      promptTokenCount: 1200,
+      outputTokenCount: 340,
+      totalTokenCount: 1540,
     });
     assert.equal(requests[0]?.body.p_error_code, "model.invalid_output");
     assert.equal("safeMessageKey" in (requests[0]?.body.p_details ?? {}), false);

@@ -9,6 +9,7 @@ import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evi
 import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
 import { createCompositionFailureMetadata, type CompositionRepairOutcome } from "@/lib/role-fit/report/composition-observability";
+import type { RoleFitProviderFailure } from "@/lib/role-fit/model/provider";
 import {
   constrainRepairAnalysis,
   getDeterministicLimitationRepresentation,
@@ -41,8 +42,34 @@ const requestSchema = z
   })
   .strict();
 
+const roleFitReportAnalysisMaxOutputTokens = 4_000;
+
+function resolveRoleFitReportAnalysisMaxOutputTokens(policyMaxOutputTokens: number) {
+  return Math.max(policyMaxOutputTokens, roleFitReportAnalysisMaxOutputTokens);
+}
+
+function safeProviderDiagnostics(failure: RoleFitProviderFailure) {
+  const diagnostics = failure.diagnostics;
+  if (!diagnostics) return {};
+
+  return {
+    ...(diagnostics.attemptPhase ? { attemptPhase: diagnostics.attemptPhase } : {}),
+    ...(diagnostics.repairTriggerCategory ? { repairTriggerCategory: diagnostics.repairTriggerCategory } : {}),
+    ...(diagnostics.elapsedMs !== undefined ? { providerElapsedMs: diagnostics.elapsedMs } : {}),
+    ...(diagnostics.failureCategory ? { failureCategory: diagnostics.failureCategory } : {}),
+    ...(diagnostics.finishReason ? { finishReason: diagnostics.finishReason } : {}),
+    ...(diagnostics.providerStatus !== undefined ? { providerStatus: diagnostics.providerStatus } : {}),
+    ...(diagnostics.retryAfterSeconds !== undefined ? { retryAfterSeconds: diagnostics.retryAfterSeconds } : {}),
+    ...(diagnostics.responseBodyPresent !== undefined ? { responseBodyPresent: diagnostics.responseBodyPresent } : {}),
+    ...(diagnostics.promptTokenCount !== undefined ? { promptTokenCount: diagnostics.promptTokenCount } : {}),
+    ...(diagnostics.outputTokenCount !== undefined ? { outputTokenCount: diagnostics.outputTokenCount } : {}),
+    ...(diagnostics.totalTokenCount !== undefined ? { totalTokenCount: diagnostics.totalTokenCount } : {}),
+  };
+}
+
 export async function POST(request: Request) {
   const policy = getRoleFitPolicy();
+  const reportAnalysisMaxOutputTokens = resolveRoleFitReportAnalysisMaxOutputTokens(policy.maxOutputTokens);
   const parsedRequest = requestSchema.safeParse(await request.json().catch(() => null));
   const startedAt = Date.now();
 
@@ -240,7 +267,7 @@ export async function POST(request: Request) {
     roleText: boundedRoleText,
     language: parsedRequest.data.language,
     task: "analysis",
-    maxOutputTokens: policy.maxOutputTokens,
+    maxOutputTokens: reportAnalysisMaxOutputTokens,
     runtimeState: JSON.stringify({ validation, roleItems }),
     approvedEvidence: approvedEvidence.promptContext,
   });
@@ -256,6 +283,7 @@ export async function POST(request: Request) {
       providerStatus: failedModelResult.providerStatus,
       retryable: failedModelResult.retryable ?? false,
       retryAfterSeconds: failedModelResult.retryAfterSeconds,
+      ...safeProviderDiagnostics(failedModelResult),
       ...(failedModelResult.error === "invalid-output" ? { diagnostic: failedModelResult.detail } : {}),
     });
     after(() =>
@@ -274,6 +302,7 @@ export async function POST(request: Request) {
           providerStatus: failedModelResult.providerStatus,
           retryable: failedModelResult.retryable ?? false,
           retryAfterSeconds: failedModelResult.retryAfterSeconds,
+          ...safeProviderDiagnostics(failedModelResult),
         },
       }),
     );
@@ -317,7 +346,7 @@ export async function POST(request: Request) {
       roleText: boundedRoleText,
       language: parsedRequest.data.language,
       task: "analysis",
-      maxOutputTokens: policy.maxOutputTokens,
+      maxOutputTokens: reportAnalysisMaxOutputTokens,
       runtimeState: JSON.stringify({
         validation,
         roleItems,
@@ -327,6 +356,7 @@ export async function POST(request: Request) {
         },
       }),
       approvedEvidence: approvedEvidence.promptContext,
+      diagnosticAttemptPhase: "composition-repair",
     });
 
     if (repairResult.ok) {

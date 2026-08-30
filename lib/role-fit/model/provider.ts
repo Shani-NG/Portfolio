@@ -28,6 +28,7 @@ export type RoleFitModelInput = {
   task: "chat" | "analysis";
   maxOutputTokens: number;
   mode?: "fit-analysis" | "report-follow-up";
+  diagnosticAttemptPhase?: "initial-analysis" | "composition-repair";
   runtimeState?: string;
   approvedEvidence?: string;
   conversationContext?: string;
@@ -43,6 +44,19 @@ export type RoleFitProviderFailure = {
   providerStatus?: number;
   retryable?: boolean;
   retryAfterSeconds?: number;
+  diagnostics?: {
+    attemptPhase?: "initial-analysis" | "schema-repair" | "composition-repair";
+    repairTriggerCategory?: "max_tokens" | "empty_response" | "invalid_json" | "schema_invalid" | "invalid_role_index" | "duplicate_role_index";
+    elapsedMs?: number;
+    failureCategory?: "provider_timeout" | "network_failure" | "provider_http_503" | "provider_http_429" | "max_tokens" | "invalid_json" | "schema_invalid" | "empty_response" | "invalid_role_index" | "duplicate_role_index" | "unknown_transport_failure";
+    finishReason?: string;
+    providerStatus?: number;
+    retryAfterSeconds?: number;
+    responseBodyPresent?: boolean;
+    promptTokenCount?: number;
+    outputTokenCount?: number;
+    totalTokenCount?: number;
+  };
 };
 
 export type RoleFitChatInput = {

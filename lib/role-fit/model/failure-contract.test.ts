@@ -41,6 +41,13 @@ describe("report provider failure contract", () => {
       providerStatus: 503,
       retryable: true,
       detail: "raw upstream response",
+      diagnostics: {
+        attemptPhase: "schema-repair",
+        repairTriggerCategory: "max_tokens",
+        elapsedMs: 45000,
+        failureCategory: "provider_timeout",
+        responseBodyPresent: false,
+      },
     });
 
     assert.equal(contract.status, 503);
@@ -55,6 +62,7 @@ describe("report provider failure contract", () => {
       providerStatus: 503,
     });
     assert.equal("detail" in contract.body, false);
+    assert.equal("diagnostics" in contract.body, false);
   });
 
   it("does not expose raw provider detail for other provider failures", () => {
