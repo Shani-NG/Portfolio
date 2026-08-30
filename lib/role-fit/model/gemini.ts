@@ -12,7 +12,17 @@ type GeminiCandidate = {
 
 type GeminiResponse = {
   candidates?: GeminiCandidate[];
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
 };
+
+type ReportDiagnosticMetadata = NonNullable<RoleFitProviderFailure["diagnostics"]>;
+type GeminiJsonSchema = Record<string, unknown>;
+
+const reportSchemaRepairMaxOutputTokens = 5_000;
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim();
@@ -21,13 +31,14 @@ function extractJson(text: string): unknown {
 }
 
 type GeminiCallResult =
-  | { ok: true; model: string; data: GeminiResponse }
+  | { ok: true; model: string; data: GeminiResponse; diagnostics?: ReportDiagnosticMetadata }
   | {
       ok: false;
       model: string;
       detail: string;
       providerStatus?: number;
       retryAfterSeconds?: number;
+      diagnostics?: ReportDiagnosticMetadata;
     };
 
 const qualitativeReportAnalysisSchema = z
@@ -61,7 +72,64 @@ const qualitativeReportAnalysisSchema = z
   })
   .strict();
 
-const reportAnalysisJsonSchema = JSON.stringify(z.toJSONSchema(qualitativeReportAnalysisSchema));
+const canonicalReportAnalysisJsonSchema = z.toJSONSchema(qualitativeReportAnalysisSchema);
+const reportAnalysisJsonSchema = JSON.stringify(canonicalReportAnalysisJsonSchema);
+
+const geminiSchemaKeywordAllowlist = new Set([
+  "$anchor",
+  "$defs",
+  "$id",
+  "$ref",
+  "additionalProperties",
+  "anyOf",
+  "description",
+  "enum",
+  "format",
+  "items",
+  "maxItems",
+  "maximum",
+  "minItems",
+  "minimum",
+  "oneOf",
+  "prefixItems",
+  "properties",
+  "propertyOrdering",
+  "required",
+  "title",
+  "type",
+]);
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function sanitizeJsonSchemaForGemini(value: unknown, parentKeyword?: string): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeJsonSchemaForGemini(entry, parentKeyword));
+  }
+
+  if (!isPlainObject(value)) return value;
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (parentKeyword === "properties" || parentKeyword === "$defs") {
+      sanitized[key] = sanitizeJsonSchemaForGemini(entry);
+      continue;
+    }
+
+    if (!geminiSchemaKeywordAllowlist.has(key)) continue;
+    sanitized[key] = sanitizeJsonSchemaForGemini(entry, key);
+  }
+
+  return sanitized;
+}
+
+function createGeminiJsonSchema(schema: unknown): GeminiJsonSchema {
+  const sanitized = sanitizeJsonSchemaForGemini(schema);
+  return isPlainObject(sanitized) ? sanitized : {};
+}
+
+const geminiReportAnalysisJsonSchema = createGeminiJsonSchema(canonicalReportAnalysisJsonSchema);
 
 function normalizeGeminiModel(model: string): string {
   return model.replace(/^models\//, "");
@@ -93,11 +161,12 @@ function getRoleIndexConstraint(runtimeState: string | undefined) {
   }
 }
 
-async function readProviderError(response: Response): Promise<string> {
+function readProviderError(response: Response, body: string): string {
   const fallback = `${response.status} ${response.statusText}`;
+  if (!body.trim()) return fallback;
 
   try {
-    const data = (await response.json()) as { error?: { message?: string } };
+    const data = JSON.parse(body) as { error?: { message?: string } };
     return data.error?.message ? `${fallback}: ${data.error.message}` : fallback;
   } catch {
     return fallback;
@@ -119,6 +188,27 @@ function readRetryAfterSeconds(response: Response): number | undefined {
   return seconds >= 0 && seconds <= 3600 ? seconds : undefined;
 }
 
+function safeTokenCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function usageDiagnostics(response: GeminiResponse): ReportDiagnosticMetadata {
+  return {
+    ...(safeTokenCount(response.usageMetadata?.promptTokenCount) !== undefined ? { promptTokenCount: response.usageMetadata?.promptTokenCount } : {}),
+    ...(safeTokenCount(response.usageMetadata?.candidatesTokenCount) !== undefined ? { outputTokenCount: response.usageMetadata?.candidatesTokenCount } : {}),
+    ...(safeTokenCount(response.usageMetadata?.totalTokenCount) !== undefined ? { totalTokenCount: response.usageMetadata?.totalTokenCount } : {}),
+  };
+}
+
+function providerFailureCategory(response: Extract<GeminiCallResult, { ok: false }>): ReportDiagnosticMetadata["failureCategory"] | undefined {
+  if (response.providerStatus === 429) return "provider_http_429";
+  if (response.providerStatus === 503) return "provider_http_503";
+  if (response.detail === "provider-request:timeout") return "provider_timeout";
+  if (response.detail === "provider-request:network-error") return "network_failure";
+  if (response.detail === "Gemini request failed before a provider response was available.") return "unknown_transport_failure";
+  return response.diagnostics?.failureCategory;
+}
+
 function isRetryableReportFailure(response: Extract<GeminiCallResult, { ok: false }>): boolean {
   if (response.providerStatus === 503) return true;
   if (response.providerStatus !== undefined) return false;
@@ -131,6 +221,13 @@ function roleFitProviderFailure(
   response: Extract<GeminiCallResult, { ok: false }>,
   options: { reportRetryableTransportFailure?: boolean } = {},
 ): Omit<RoleFitProviderFailure, "provider"> {
+  const diagnostics = {
+    ...response.diagnostics,
+    ...(providerFailureCategory(response) ? { failureCategory: providerFailureCategory(response) } : {}),
+    ...(response.providerStatus !== undefined ? { providerStatus: response.providerStatus } : {}),
+    ...(response.retryAfterSeconds !== undefined ? { retryAfterSeconds: response.retryAfterSeconds } : {}),
+  };
+
   if (response.providerStatus === 429) {
     return {
       ok: false,
@@ -140,6 +237,7 @@ function roleFitProviderFailure(
       providerStatus: 429,
       retryable: true,
       ...(response.retryAfterSeconds !== undefined ? { retryAfterSeconds: response.retryAfterSeconds } : {}),
+      diagnostics,
     };
   }
 
@@ -152,6 +250,7 @@ function roleFitProviderFailure(
     detail: response.detail,
     ...(response.providerStatus !== undefined ? { providerStatus: response.providerStatus } : {}),
     ...(retryable ? { retryable: true } : {}),
+    ...(Object.keys(diagnostics).length ? { diagnostics } : {}),
   };
 }
 
@@ -179,12 +278,20 @@ async function generateGeminiContent(input: {
   maxOutputTokens: number;
   temperature: number;
   responseMimeType?: "application/json";
+  responseJsonSchema?: GeminiJsonSchema;
   thinkingLevel?: "minimal" | "low" | "medium" | "high";
+  attemptPhase?: ReportDiagnosticMetadata["attemptPhase"];
+  repairTriggerCategory?: ReportDiagnosticMetadata["repairTriggerCategory"];
 }): Promise<GeminiCallResult> {
   let lastError: GeminiCallResult | undefined;
 
   for (const model of input.models) {
     let response: Response;
+    const startedAt = Date.now();
+    const baseDiagnostics = {
+      ...(input.attemptPhase ? { attemptPhase: input.attemptPhase } : {}),
+      ...(input.repairTriggerCategory ? { repairTriggerCategory: input.repairTriggerCategory } : {}),
+    } satisfies ReportDiagnosticMetadata;
 
     try {
       response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${input.apiKey}`, {
@@ -196,6 +303,7 @@ async function generateGeminiContent(input: {
             maxOutputTokens: input.maxOutputTokens,
             temperature: input.temperature,
             ...(input.responseMimeType ? { responseMimeType: input.responseMimeType } : {}),
+            ...(input.responseJsonSchema ? { responseJsonSchema: input.responseJsonSchema } : {}),
             ...(input.thinkingLevel && model.startsWith("gemini-3")
               ? { thinkingConfig: { thinkingLevel: input.thinkingLevel } }
               : {}),
@@ -209,28 +317,70 @@ async function generateGeminiContent(input: {
         ok: false,
         model,
         detail: isTimeout ? "provider-request:timeout" : "provider-request:network-error",
+        diagnostics: {
+          ...baseDiagnostics,
+          elapsedMs: Date.now() - startedAt,
+          failureCategory: isTimeout ? "provider_timeout" : "network_failure",
+          responseBodyPresent: false,
+        },
       };
     }
 
+    const elapsedMs = Date.now() - startedAt;
+    const responseBody = await response.text().catch(() => "");
+    const responseBodyPresent = responseBody.trim().length > 0;
+
     if (response.ok) {
       try {
+        const data = JSON.parse(responseBody) as GeminiResponse;
         return {
           ok: true,
           model,
-          data: (await response.json()) as GeminiResponse,
+          data,
+          diagnostics: {
+            ...baseDiagnostics,
+            elapsedMs,
+            responseBodyPresent,
+            ...usageDiagnostics(data),
+          },
         };
       } catch {
-        return { ok: false, model, detail: "provider-response:invalid-json" };
+        return {
+          ok: false,
+          model,
+          detail: "provider-response:invalid-json",
+          diagnostics: {
+            ...baseDiagnostics,
+            elapsedMs,
+            failureCategory: "invalid_json",
+            responseBodyPresent,
+          },
+        };
       }
     }
 
     const retryAfterSeconds = response.status === 429 ? readRetryAfterSeconds(response) : undefined;
+    const failureCategory = providerFailureCategory({
+      ok: false,
+      model,
+      detail: "",
+      providerStatus: response.status,
+      ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+    });
     lastError = {
       ok: false,
       model,
-      detail: await readProviderError(response),
+      detail: readProviderError(response, responseBody),
       providerStatus: response.status,
       ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      diagnostics: {
+        ...baseDiagnostics,
+        elapsedMs,
+        ...(failureCategory ? { failureCategory } : {}),
+        providerStatus: response.status,
+        ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+        responseBodyPresent,
+      },
     };
 
     if (response.status !== 400 && response.status !== 404) break;
@@ -240,6 +390,12 @@ async function generateGeminiContent(input: {
     ok: false,
     model: input.models[0] ?? "unknown",
     detail: "Gemini request failed before a provider response was available.",
+    diagnostics: {
+      ...(input.attemptPhase ? { attemptPhase: input.attemptPhase } : {}),
+      ...(input.repairTriggerCategory ? { repairTriggerCategory: input.repairTriggerCategory } : {}),
+      failureCategory: "unknown_transport_failure",
+      responseBodyPresent: false,
+    },
   };
 }
 
@@ -249,6 +405,21 @@ function candidateText(response: GeminiResponse): string {
 
 function candidateFinishReason(response: GeminiResponse): string {
   return response.candidates?.[0]?.finishReason ?? "FINISH_REASON_UNSPECIFIED";
+}
+
+function repairTriggerCategoryFromDiagnostic(detail: string): ReportDiagnosticMetadata["repairTriggerCategory"] {
+  if (detail === "qualitative-analysis-finish-reason:MAX_TOKENS") return "max_tokens";
+  if (detail === "qualitative-analysis-output:empty") return "empty_response";
+  if (detail === "qualitative-analysis-json:invalid-json") return "invalid_json";
+  if (detail.startsWith("qualitative-analysis-schema:")) return "schema_invalid";
+  if (detail.startsWith("qualitative-analysis-role-index:")) return "invalid_role_index";
+  return "schema_invalid";
+}
+
+function failureCategoryFromRepairTrigger(
+  category: ReportDiagnosticMetadata["repairTriggerCategory"],
+): ReportDiagnosticMetadata["failureCategory"] {
+  return category;
 }
 
 export function completeChatAnswer(answer: string): string | null {
@@ -427,6 +598,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         userInput: input.roleText,
       });
       const roleIndexConstraint = getRoleIndexConstraint(input.runtimeState);
+      const initialAttemptPhase = input.diagnosticAttemptPhase ?? "initial-analysis";
 
       const reportPrompt = [
         prompt,
@@ -452,10 +624,14 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         maxOutputTokens: input.maxOutputTokens,
         temperature: 0,
         responseMimeType: "application/json",
+        responseJsonSchema: geminiReportAnalysisJsonSchema,
         thinkingLevel: "minimal",
+        attemptPhase: initialAttemptPhase,
       });
 
       let invalidDetail = "qualitative-analysis:unknown";
+      let repairTriggerCategory: ReportDiagnosticMetadata["repairTriggerCategory"] = "schema_invalid";
+      let lastResponseDiagnostics: ReportDiagnosticMetadata | undefined;
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
         if (!response.ok) {
@@ -467,11 +643,20 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
 
         const finishReason = candidateFinishReason(response.data);
         const text = candidateText(response.data);
+        lastResponseDiagnostics = {
+          ...response.diagnostics,
+          finishReason,
+          ...(response.diagnostics?.promptTokenCount !== undefined ? { promptTokenCount: response.diagnostics.promptTokenCount } : {}),
+          ...(response.diagnostics?.outputTokenCount !== undefined ? { outputTokenCount: response.diagnostics.outputTokenCount } : {}),
+          ...(response.diagnostics?.totalTokenCount !== undefined ? { totalTokenCount: response.diagnostics.totalTokenCount } : {}),
+        };
 
         if (finishReason === "MAX_TOKENS") {
           invalidDetail = "qualitative-analysis-finish-reason:MAX_TOKENS";
+          repairTriggerCategory = "max_tokens";
         } else if (!text) {
           invalidDetail = "qualitative-analysis-output:empty";
+          repairTriggerCategory = "empty_response";
         } else {
           try {
             const parsed = qualitativeReportAnalysisSchema.safeParse(extractJson(text));
@@ -485,11 +670,14 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
                 return { ok: true, provider: "gemini", model: response.model, analysis: parsed.data satisfies QualitativeReportAnalysis };
               }
               invalidDetail = `qualitative-analysis-role-index:allowed=${roleIndexConstraint?.allowedIndexes.join(",") ?? "runtime"};received=${indexes.join(",")}`;
+              repairTriggerCategory = hasInvalidIndex ? "invalid_role_index" : "duplicate_role_index";
             } else {
               invalidDetail = `qualitative-analysis-schema:${safeSchemaDiagnostic(parsed.error)}`;
+              repairTriggerCategory = "schema_invalid";
             }
           } catch {
             invalidDetail = "qualitative-analysis-json:invalid-json";
+            repairTriggerCategory = "invalid_json";
           }
         }
 
@@ -503,6 +691,14 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
               ? "model.google_ai_studio_empty_output"
               : "model.google_ai_studio_invalid_report_payload",
             detail: invalidDetail,
+            diagnostics: {
+              ...lastResponseDiagnostics,
+              attemptPhase: "schema-repair",
+              repairTriggerCategory,
+              failureCategory: failureCategoryFromRepairTrigger(repairTriggerCategory),
+              finishReason,
+              responseBodyPresent: Boolean(text),
+            },
           };
         }
 
@@ -510,10 +706,13 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           apiKey,
           models: getCandidateModels(model),
           prompt: `${reportPrompt}\n\nThe previous output was invalid (${invalidDetail}). Return one corrected, complete JSON object that satisfies the exact schema. Keep each rationale concise and do not add fields.`,
-          maxOutputTokens: Math.max(input.maxOutputTokens * 2, 4000),
+          maxOutputTokens: Math.min(Math.max(input.maxOutputTokens * 2, 4000), reportSchemaRepairMaxOutputTokens),
           temperature: 0,
           responseMimeType: "application/json",
+          responseJsonSchema: geminiReportAnalysisJsonSchema,
           thinkingLevel: "minimal",
+          attemptPhase: "schema-repair",
+          repairTriggerCategory,
         });
       }
 
@@ -524,6 +723,11 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         error: "invalid-output",
         safeMessageKey: "model.google_ai_studio_invalid_report_payload",
         detail: invalidDetail,
+        diagnostics: {
+          attemptPhase: "schema-repair",
+          repairTriggerCategory: repairTriggerCategoryFromDiagnostic(invalidDetail),
+          failureCategory: failureCategoryFromRepairTrigger(repairTriggerCategoryFromDiagnostic(invalidDetail)),
+        },
       };
 
     },
