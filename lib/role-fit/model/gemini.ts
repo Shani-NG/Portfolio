@@ -673,6 +673,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
       let invalidDetail = "qualitative-analysis:unknown";
       let repairTriggerCategory: ReportDiagnosticMetadata["repairTriggerCategory"] = "schema_invalid";
       let lastResponseDiagnostics: ReportDiagnosticMetadata | undefined;
+      let providerElapsedMs = response.diagnostics?.elapsedMs ?? 0;
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
         if (!response.ok) {
@@ -708,7 +709,13 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
                 : false;
               const hasDuplicateIndex = new Set(indexes).size !== indexes.length;
               if (!hasInvalidIndex && !hasDuplicateIndex) {
-                return { ok: true, provider: "gemini", model: response.model, analysis: parsed.data satisfies QualitativeReportAnalysis };
+                return {
+                  ok: true,
+                  provider: "gemini",
+                  model: response.model,
+                  analysis: parsed.data satisfies QualitativeReportAnalysis,
+                  diagnostics: { providerElapsedMs, schemaRepairUsed: attempt > 0 },
+                };
               }
               invalidDetail = `qualitative-analysis-role-index:allowed=${roleIndexConstraint?.allowedIndexes.join(",") ?? "runtime"};received=${indexes.join(",")}`;
               repairTriggerCategory = hasInvalidIndex ? "invalid_role_index" : "duplicate_role_index";
@@ -755,6 +762,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           attemptPhase: "schema-repair",
           repairTriggerCategory,
         });
+        providerElapsedMs += response.diagnostics?.elapsedMs ?? 0;
       }
 
       return {

@@ -272,6 +272,8 @@ export async function POST(request: Request) {
     runtimeState: JSON.stringify({ validation, roleItems }),
     approvedEvidence: approvedEvidence.promptContext,
   });
+  let providerElapsedMs = modelResult.ok ? modelResult.diagnostics.providerElapsedMs : 0;
+  let schemaRepairUsed = modelResult.ok ? modelResult.diagnostics.schemaRepairUsed : false;
 
   if (!modelResult.ok) {
     const failedModelResult = modelResult;
@@ -361,6 +363,8 @@ export async function POST(request: Request) {
     });
 
     if (repairResult.ok) {
+      providerElapsedMs += repairResult.diagnostics.providerElapsedMs;
+      schemaRepairUsed ||= repairResult.diagnostics.schemaRepairUsed;
       const constrainedRepairAnalysis = constrainRepairAnalysis({
         original: modelResult.analysis,
         repaired: repairResult.analysis,
@@ -439,6 +443,17 @@ export async function POST(request: Request) {
   });
   const reportId = report.reportId;
   const roleFamily = inferRoleFamily(canonicalRoleTitle);
+
+  console.info("[role-fit-report] report completed", {
+    traceId,
+    provider: modelResult.provider,
+    model: modelResult.model,
+    status: "success",
+    providerElapsedMs,
+    totalReportRouteElapsedMs: Date.now() - startedAt,
+    schemaRepairUsed,
+    compositionRepairUsed: repairOutcome !== "not-attempted",
+  });
 
   if (eligibility.state === "no-report") {
     after(() => {

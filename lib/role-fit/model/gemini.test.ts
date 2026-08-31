@@ -308,6 +308,9 @@ describe("Gemini chat completion guard", () => {
     });
 
     assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(typeof result.diagnostics.providerElapsedMs, "number");
+    assert.equal(result.diagnostics.schemaRepairUsed, false);
     assert.deepEqual(models, ["gemini-3.5-flash"]);
   });
 

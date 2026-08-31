@@ -91,6 +91,10 @@ export type RoleFitModelResult =
       provider: RoleFitModelProviderName;
       model: string;
       analysis: QualitativeReportAnalysis;
+      diagnostics: {
+        providerElapsedMs: number;
+        schemaRepairUsed: boolean;
+      };
     }
   | RoleFitProviderFailure;
 
