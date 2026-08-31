@@ -90,8 +90,8 @@ describe("stable qualitative fit", () => {
     assert.equal(resolveStableFitLevel(goodClaim), "strong");
   });
 
-  it("uses a qualitative limitation to resolve partial fit without a numeric score", () => {
-    const limited = analysis({ fitLevel: "partial", items: [item(0), item(1, "partial", "gap")] });
+  it("uses multiple qualitative limitations to resolve partial fit without a numeric score", () => {
+    const limited = analysis({ fitLevel: "partial", items: [item(0), item(1, "partial", "gap"), item(2, "partial", "gap")] });
     assert.equal(resolveStableFitLevel(limited), "partial");
   });
 });

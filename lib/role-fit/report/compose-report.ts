@@ -59,14 +59,14 @@ export function resolveStableFitLevel(analysis: QualitativeReportAnalysis): Qual
   const centralSupportedStrengths = centralItems.filter((item) =>
     positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.evidenceSourceIds.length > 0,
   );
-  const materialCentralLimitations = centralItems.filter((item) =>
-    item.matchType === "real-gap" || item.matchType === "partial",
-  );
+  const materialCentralRealGaps = centralItems.filter((item) => item.matchType === "real-gap");
+  const centralPartialLimitations = centralItems.filter((item) => item.matchType === "partial");
   const centralInsufficientEvidence = centralItems.filter((item) => item.matchType === "insufficient-evidence");
   const limitations = analysis.items.filter((item) => gapMatchTypes.has(item.matchType));
 
   if (centralItems.length > 0 && centralSupportedStrengths.length === 0) return "partial";
-  if (materialCentralLimitations.length > 0) return "partial";
+  if (materialCentralRealGaps.length > 0) return "partial";
+  if (centralPartialLimitations.length > 1) return "partial";
   if (centralInsufficientEvidence.length > 1) return "partial";
   if (
     limitations.length > 0

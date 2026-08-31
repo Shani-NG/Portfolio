@@ -99,6 +99,21 @@ describe("deterministic three-level Overall Fit calibration", () => {
     ])), "partial");
   });
 
+  it("does not let one central partial limitation mechanically force Partial", () => {
+    assert.equal(resolveStableFitLevel(analysis([
+      ...strongCore(),
+      item({ roleItemIndex: 3, importance: "core", matchType: "partial" }),
+    ])), "good");
+  });
+
+  it("uses Partial for two central partial limitations", () => {
+    assert.equal(resolveStableFitLevel(analysis([
+      ...strongCore(),
+      item({ roleItemIndex: 3, importance: "core", matchType: "partial" }),
+      item({ roleItemIndex: 4, importance: "must-have", matchType: "partial" }),
+    ])), "partial");
+  });
+
   it("uses Partial for multiple important insufficient-evidence requirements", () => {
     assert.equal(resolveStableFitLevel(analysis([
       ...strongCore(),
@@ -147,7 +162,7 @@ describe("deterministic three-level Overall Fit calibration", () => {
     assert.equal(resolveStableFitLevel(analysis([
       item({ roleItemIndex: 0, importance: "core", matchType: "transferable" }),
       item({ roleItemIndex: 1, importance: "core", matchType: "partial" }),
-      item({ roleItemIndex: 2, importance: "must-have", matchType: "insufficient-evidence" }),
+      item({ roleItemIndex: 2, importance: "must-have", matchType: "partial" }),
     ], "medium")), "partial");
   });
 
