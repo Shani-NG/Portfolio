@@ -77,6 +77,7 @@ async function loadApprovedConversationContext() {
 }
 
 export async function POST(request: Request) {
+  const routeStartedAt = Date.now();
   const policy = getRoleFitPolicy();
   const parsedRequest = requestSchema.safeParse(await request.json().catch(() => null));
 
@@ -305,6 +306,13 @@ export async function POST(request: Request) {
     mode: parsedRequest.data.reportContext ? "report-follow-up" : "general-chat",
     runtimeState: parsedRequest.data.reportContext ? "An existing validated report is active. Answer only about that report." : undefined,
     conversationContext: [parsedRequest.data.conversationContext, parsedRequest.data.reportContext].filter(Boolean).join("\n\n"),
+  });
+
+  console.info("[rolefit-chat-latency]", {
+    traceId,
+    mode: parsedRequest.data.reportContext ? "report-follow-up" : "general-chat",
+    ...modelResult.diagnostics,
+    totalChatRouteElapsedMs: Date.now() - routeStartedAt,
   });
 
   if (!modelResult.ok) {

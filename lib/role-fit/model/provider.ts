@@ -70,6 +70,21 @@ export type RoleFitChatInput = {
   conversationContext?: string;
 };
 
+export type RoleFitChatDiagnostics = {
+  primaryModel?: string;
+  primaryElapsedMs?: number;
+  primaryOutcome: "success" | "timeout" | "429" | "503" | "network" | "max-tokens" | "empty" | "provider-error";
+  fallbackUsed: boolean;
+  fallbackModel?: string;
+  fallbackElapsedMs?: number;
+  fallbackOutcome?: "success" | "timeout" | "429" | "503" | "network" | "max-tokens" | "empty" | "provider-error";
+  retryOccurred: boolean;
+  retryReason?: "max-tokens" | "empty";
+  retryElapsedMs?: number;
+  retryOutcome?: "success" | "timeout" | "429" | "503" | "network" | "max-tokens" | "empty" | "provider-error";
+  totalProviderElapsedMs: number;
+};
+
 export type RoleFitModelResult =
   | {
       ok: true;
@@ -85,8 +100,9 @@ export type RoleFitChatResult =
       provider: RoleFitModelProviderName;
       model: string;
       answer: string;
+      diagnostics?: RoleFitChatDiagnostics;
     }
-  | RoleFitProviderFailure;
+  | (Omit<RoleFitProviderFailure, "diagnostics"> & { diagnostics?: RoleFitChatDiagnostics });
 
 export type RoleFitModelProvider = {
   name: RoleFitModelProviderName;

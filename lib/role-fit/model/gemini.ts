@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { buildPortfolioAgentPrompt } from "../prompts/assembly.ts";
 import { getGoogleAiStudioChatFallbackModel, getGoogleAiStudioModel } from "../runtime/policy.ts";
-import type { QualitativeReportAnalysis, RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult, RoleFitProviderFailure } from "./provider.ts";
+import type { QualitativeReportAnalysis, RoleFitChatDiagnostics, RoleFitChatInput, RoleFitChatResult, RoleFitModelInput, RoleFitModelProvider, RoleFitModelResult, RoleFitProviderFailure } from "./provider.ts";
 
 type GeminiCandidate = {
   content?: {
@@ -399,6 +399,11 @@ async function generateGeminiContent(input: {
   };
 }
 
+function withoutReportDiagnostics(result: Omit<RoleFitProviderFailure, "provider">): Omit<RoleFitProviderFailure, "provider" | "diagnostics"> {
+  const { diagnostics: _diagnostics, ...failure } = result;
+  return failure;
+}
+
 function candidateText(response: GeminiResponse): string {
   return response.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim() ?? "";
 }
@@ -468,21 +473,46 @@ function safeChatFallback(language: RoleFitChatInput["language"]): string {
   return "I could not complete a reliable answer just now. Please try again, and I will preserve the conversation context.";
 }
 
+function chatAttemptOutcome(response: GeminiCallResult): RoleFitChatDiagnostics["primaryOutcome"] {
+  if (!response.ok) {
+    if (response.providerStatus === 429) return "429";
+    if (response.providerStatus === 503) return "503";
+    if (response.detail === "provider-request:timeout") return "timeout";
+    if (response.detail === "provider-request:network-error") return "network";
+    return "provider-error";
+  }
+
+  if (candidateFinishReason(response.data) === "MAX_TOKENS") return "max-tokens";
+  return completeChatAnswer(candidateText(response.data)) ? "success" : "empty";
+}
+
 export function createGeminiRoleFitProvider(): RoleFitModelProvider {
   return {
     name: "gemini",
     async generateChat(input: RoleFitChatInput): Promise<RoleFitChatResult> {
+      const providerStartedAt = Date.now();
       const apiKey = process.env.GOOGLE_AI_STUDIO_API_KEY ?? process.env.GEMINI_API_KEY;
       const model = getGoogleAiStudioModel("chat");
+      const diagnostics: RoleFitChatDiagnostics = {
+        primaryModel: model,
+        primaryOutcome: "provider-error",
+        fallbackUsed: false,
+        retryOccurred: false,
+        totalProviderElapsedMs: 0,
+      };
+      const finish = <T extends RoleFitChatResult>(result: T): T => {
+        diagnostics.totalProviderElapsedMs = Date.now() - providerStartedAt;
+        return { ...result, diagnostics } as T;
+      };
 
       if (!apiKey || !model) {
-        return {
+        return finish({
           ok: false,
           provider: "gemini",
           model,
           error: "missing-configuration",
           safeMessageKey: "model.google_ai_studio_missing_configuration",
-        };
+        });
       }
 
       const prompt = buildPortfolioAgentPrompt({
@@ -503,12 +533,17 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         thinkingLevel: "low",
       });
 
+      diagnostics.primaryElapsedMs = response.diagnostics?.elapsedMs;
+      diagnostics.primaryOutcome = chatAttemptOutcome(response);
+
       if (!response.ok) {
         const fallbackModel = getGoogleAiStudioChatFallbackModel(model);
         const normalizedPrimaryModel = normalizeGeminiModel(model);
         const normalizedFallbackModel = fallbackModel ? normalizeGeminiModel(fallbackModel) : undefined;
 
         if (fallbackModel && normalizedFallbackModel !== normalizedPrimaryModel && isTransientChatFailure(response)) {
+          diagnostics.fallbackUsed = true;
+          diagnostics.fallbackModel = fallbackModel;
           const fallbackResponse = await generateGeminiContent({
             apiKey,
             models: getCandidateModels(fallbackModel),
@@ -517,28 +552,30 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
             temperature: 0.25,
             thinkingLevel: "low",
           });
+          diagnostics.fallbackElapsedMs = fallbackResponse.diagnostics?.elapsedMs;
+          diagnostics.fallbackOutcome = chatAttemptOutcome(fallbackResponse);
 
           if (!fallbackResponse.ok) {
-            return {
+            return finish({
               provider: "gemini",
-              ...chatTemporaryCapacityFailure(fallbackResponse),
-            };
+              ...withoutReportDiagnostics(chatTemporaryCapacityFailure(fallbackResponse)),
+            });
           }
 
           response = fallbackResponse;
         } else {
-          return {
+          return finish({
             provider: "gemini",
-            ...roleFitProviderFailure(response),
-          };
+            ...withoutReportDiagnostics(roleFitProviderFailure(response)),
+          });
         }
       }
 
       if (!response.ok) {
-        return {
+        return finish({
           provider: "gemini",
-          ...chatTemporaryCapacityFailure(response),
-        };
+          ...withoutReportDiagnostics(chatTemporaryCapacityFailure(response)),
+        });
       }
 
       let rawAnswer = candidateText(response.data);
@@ -546,6 +583,8 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
       const shouldRetry = candidateFinishReason(response.data) === "MAX_TOKENS" || !answer;
 
       if (shouldRetry) {
+        diagnostics.retryOccurred = true;
+        diagnostics.retryReason = candidateFinishReason(response.data) === "MAX_TOKENS" ? "max-tokens" : "empty";
         const retry = await generateGeminiContent({
           apiKey,
           models: getCandidateModels(model),
@@ -554,9 +593,11 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           temperature: 0.2,
           thinkingLevel: "low",
         });
+        diagnostics.retryElapsedMs = retry.diagnostics?.elapsedMs;
+        diagnostics.retryOutcome = chatAttemptOutcome(retry);
 
         if (!retry.ok) {
-          return { ok: true, provider: "gemini", model: response.model, answer: safeChatFallback(input.language) };
+          return finish({ ok: true, provider: "gemini", model: response.model, answer: safeChatFallback(input.language) });
         }
 
         response = retry;
@@ -565,15 +606,15 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
       }
 
       if (!answer) {
-        return { ok: true, provider: "gemini", model: response.model, answer: safeChatFallback(input.language) };
+        return finish({ ok: true, provider: "gemini", model: response.model, answer: safeChatFallback(input.language) });
       }
 
-      return {
+      return finish({
         ok: true,
         provider: "gemini",
         model: response.model,
         answer,
-      };
+      });
     },
     async generateReport(input: RoleFitModelInput): Promise<RoleFitModelResult> {
       const apiKey = process.env.GOOGLE_AI_STUDIO_API_KEY ?? process.env.GEMINI_API_KEY;
