@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
+import { loadApprovedEvidence } from "../knowledge/load-approved-evidence.ts";
+import { getRoleAnalysisItems } from "../report/compose-report.ts";
+import { serializeRoleDraftForBoundary, validateRoleText } from "../server/role-understanding.ts";
 import { completeChatAnswer, createGeminiRoleFitProvider } from "./gemini.ts";
 
 const originalFetch = globalThis.fetch;
@@ -400,6 +403,65 @@ describe("Gemini chat completion guard", () => {
     const prompt = requestPrompt(requests[0] ?? {});
     assert.match(prompt, /Exact qualitative analysis JSON Schema:/);
     assert.match(prompt, /"minLength":1/);
+  });
+
+  it("keeps the maximum five-item compact inference package within the static budget without closing the evidence ladder", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
+    const fixture = [
+      "Title: Senior UX Strategist",
+      "Responsibilities: Lead product discovery and align stakeholders",
+      "Requirements: Complex-system UX strategy; Cross-functional product alignment; Evidence-based decisions; Conversation design; Privacy-aware product architecture",
+    ].join("\n");
+    const validation = validateRoleText({
+      conversationId: "static_packing_test",
+      traceId: "static_packing_test",
+      roleText: fixture,
+      detectedLanguage: "en",
+    });
+    const roleText = serializeRoleDraftForBoundary(validation.roleDraft);
+    const roleItems = getRoleAnalysisItems(validation.roleDraft).slice(0, 5);
+    const evidence = await loadApprovedEvidence(roleText, roleItems);
+    let request: Record<string, unknown> | undefined;
+    globalThis.fetch = async (_input, init) => {
+      request = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return geminiResponse(validReportAnalysis(0), "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText,
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 4_000,
+      runtimeState: JSON.stringify({ validation, roleItems }),
+      approvedEvidence: evidence.promptContext,
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(request);
+    const prompt = requestPrompt(request);
+    const estimatedInputTokens = Math.ceil(prompt.length / 4);
+    const compactSourceIds = [...prompt.matchAll(/^EVIDENCE_ID: ([^\s|]+)/gm)].map((match) => match[1]);
+    const candidateCounts = [...prompt.matchAll(/^ROLE_ITEM_CANDIDATE_SOURCE_IDS: (.+)$/gm)].map((match) =>
+      match[1] === "none" ? 0 : match[1]!.split(", ").length,
+    );
+    const richSourceIds = [...prompt.matchAll(/^### APPROVED_SOURCE_ID: ([^\s]+)/gm)].map((match) => match[1]);
+    const projectTitles = new Set([...prompt.matchAll(/\| PROJECT: ([^|\n]+)/g)].map((match) => match[1]?.trim()));
+
+    assert.equal(roleItems.length, 5);
+    assert.ok(estimatedInputTokens >= 10_000 && estimatedInputTokens <= 12_000, `estimated ${estimatedInputTokens} input tokens`);
+    assert.ok(compactSourceIds.length <= 12);
+    assert.deepEqual(candidateCounts, [4, 5, 5, 2, 5]);
+    assert.equal(richSourceIds.length, 4);
+    assert.ok(projectTitles.size >= 4);
+    assert.match(prompt, /transferable capabilities, limitations, and ownership boundaries/);
+    assert.match(prompt, /Any exact EVIDENCE_ID in the compact approved index may support any role item/);
+    assert.match(prompt, /EVIDENCE_ID: cv/);
+    assert.match(prompt, /direct case study, semantic\/contextual case study, transferable case study, legitimate reuse, CV fallback, then insufficient evidence/);
+    for (const sourceId of [...compactSourceIds, ...richSourceIds]) {
+      assert.ok(evidence.sources.some((source) => source.id === sourceId), sourceId);
+    }
+    assert.ok((evidence.candidatesByRoleItem?.[0]?.candidates.length ?? 0) > candidateCounts[0]!);
   });
 
   it("uses the same native schema for schema repair and caps repair output at 5000", async () => {

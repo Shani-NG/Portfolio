@@ -338,6 +338,12 @@ function compactText(value: string | undefined, maxChars: number) {
   return value?.replace(/\s+/g, " ").trim().slice(0, maxChars) ?? "";
 }
 
+const normalCompactCaseCandidateCount = 3;
+const maximumCompactSourceCount = 12;
+const selectiveRichContextCharacterBudget = 4_800;
+const caseStudyExcerptCharacterLimit = 650;
+const cvExcerptCharacterLimit = 700;
+
 function compactCatalogSource(source: ApprovedEvidenceSource) {
   const resolution = source.sourceType === "case-study"
     ? resolveApprovedEvidenceDestination({
@@ -351,28 +357,136 @@ function compactCatalogSource(source: ApprovedEvidenceSource) {
     `EVIDENCE_ID: ${source.id}`,
     `TYPE: ${source.sourceType}`,
     source.project ? `PROJECT: ${source.project.title}` : undefined,
-    `CLAIM: ${compactText(source.claim ?? source.content, 240)}`,
+    source.project?.anchorId ? `ANCHOR: ${source.project.anchorId}` : undefined,
+    source.project?.sectionAnchorId ? `SECTION_ANCHOR: ${source.project.sectionAnchorId}` : undefined,
+    `CLAIM: ${compactText(source.claim ?? source.content, 220)}`,
     source.capabilities?.length ? `CAPABILITIES: ${compactText(source.capabilities.join(", "), 180)}` : undefined,
-    source.limitations?.length ? `LIMITS: ${compactText(source.limitations.join(" "), 180)}` : undefined,
+    source.limitations?.length ? `LIMITS: ${compactText(source.limitations.join(" "), 140)}` : undefined,
+    source.ownershipLevel ? `OWNERSHIP: ${compactText(source.ownershipLevel, 100)}` : undefined,
     resolution ? `DESTINATION: ${resolution.destination.mode === "no-link" ? "invalid" : resolution.destination.dedupeKey}` : "DESTINATION: approved internal CV fallback",
   ].filter(Boolean).join(" | ");
 }
 
-function promptSource(source: ApprovedEvidenceSource) {
+function selectiveRichSource(source: ApprovedEvidenceSource) {
   const project = source.project;
   return [
     `### APPROVED_SOURCE_ID: ${source.id}`,
-    `Source label: ${source.label}`,
-    `Source type: ${source.sourceType}`,
-    `Approved public visibility: ${source.approvedPublicVisibility ? "public" : "approved internal knowledge"}`,
     project ? `Public project: ${project.title} (${project.slug})` : "Public project: none",
-    project?.anchorId ? `Best public anchor: ${project.anchorId}` : "Best public anchor: none",
-    source.claim ? `Evidence claim: ${source.claim}` : undefined,
-    source.capabilities?.length ? `Capabilities: ${source.capabilities.join(", ")}` : undefined,
-    source.limitations?.length ? `Limitations: ${source.limitations.join(" ")}` : undefined,
-    source.ownershipLevel ? `Ownership boundary: ${source.ownershipLevel}` : undefined,
-    source.content.slice(0, 1_800),
+    project?.anchorId ? `Canonical anchor: ${project.anchorId}` : undefined,
+    project?.sectionAnchorId ? `Canonical section anchor: ${project.sectionAnchorId}` : undefined,
+    source.claim ? `Evidence claim: ${compactText(source.claim, 360)}` : undefined,
+    source.capabilities?.length ? `Capabilities: ${compactText(source.capabilities.join(", "), 300)}` : undefined,
+    source.limitations?.length ? `Limitations: ${compactText(source.limitations.join(" "), 220)}` : undefined,
+    source.ownershipLevel ? `Ownership boundary: ${compactText(source.ownershipLevel, 180)}` : undefined,
+    `Selective excerpt: ${compactText(
+      source.content,
+      source.sourceType === "cv" ? cvExcerptCharacterLimit : caseStudyExcerptCharacterLimit,
+    )}`,
   ].filter(Boolean).join("\n");
+}
+
+type PackedCandidateSet = RequirementEvidenceCandidates;
+
+function packRequirementCandidates(
+  candidatesByRoleItem: RequirementEvidenceCandidates[],
+  sourceById: ReadonlyMap<string, ApprovedEvidenceSource>,
+) {
+  const packed = candidatesByRoleItem.map((candidateSet): PackedCandidateSet => ({ ...candidateSet, candidates: [] }));
+  const selectedSourceIds = new Set(
+    [...sourceById.values()].filter((source) => source.sourceType === "cv").map((source) => source.id),
+  );
+  const caseStudyCandidatesByRoleItem = candidatesByRoleItem.map((candidateSet) => candidateSet.candidates.filter(
+    (candidate) => sourceById.get(candidate.sourceId)?.sourceType === "case-study",
+  ));
+
+  // Fill the normal candidate target in ranked rounds so every role item keeps
+  // alternatives before the global source budget is used for deeper candidates.
+  for (let rank = 0; rank < normalCompactCaseCandidateCount; rank += 1) {
+    const round = caseStudyCandidatesByRoleItem
+      .map((candidates, roleItemIndex) => ({ candidate: candidates[rank], roleItemIndex }))
+      .filter((entry): entry is { candidate: RequirementEvidenceCandidates["candidates"][number]; roleItemIndex: number } => Boolean(entry.candidate))
+      .sort((left, right) => right.candidate.relevanceScore - left.candidate.relevanceScore || left.roleItemIndex - right.roleItemIndex);
+    for (const { candidate, roleItemIndex } of round) {
+      const addsSource = !selectedSourceIds.has(candidate.sourceId);
+      if (addsSource && selectedSourceIds.size >= maximumCompactSourceCount) continue;
+      packed[roleItemIndex]?.candidates.push(candidate);
+      selectedSourceIds.add(candidate.sourceId);
+    }
+  }
+
+  for (const [roleItemIndex, candidateSet] of candidatesByRoleItem.entries()) {
+    const cvCandidate = candidateSet.candidates.find((candidate) => sourceById.get(candidate.sourceId)?.sourceType === "cv");
+    if (cvCandidate) packed[roleItemIndex]?.candidates.push(cvCandidate);
+  }
+
+  // A tied fourth case-study candidate can preserve a materially different
+  // transferable or partial path. Keep it when it costs no new source, or when
+  // the bounded compact source budget still has room. Lower-ranked candidates
+  // remain in ApprovedEvidenceBundle.candidatesByRoleItem for composition.
+  for (const [roleItemIndex, candidateSet] of candidatesByRoleItem.entries()) {
+    const caseStudyCandidates = caseStudyCandidatesByRoleItem[roleItemIndex] ?? [];
+    const cutoff = caseStudyCandidates[normalCompactCaseCandidateCount - 1]?.relevanceScore;
+    if (cutoff === undefined) continue;
+
+    for (const candidate of caseStudyCandidates.slice(normalCompactCaseCandidateCount)) {
+      if (candidate.relevanceScore < cutoff) break;
+      const addsSource = !selectedSourceIds.has(candidate.sourceId);
+      if (addsSource && selectedSourceIds.size >= maximumCompactSourceCount) continue;
+      if (!packed[roleItemIndex]?.candidates.some((packedCandidate) => packedCandidate.sourceId === candidate.sourceId)) {
+        packed[roleItemIndex]?.candidates.push(candidate);
+      }
+      selectedSourceIds.add(candidate.sourceId);
+    }
+  }
+
+  return { packed, selectedSourceIds };
+}
+
+function selectRichSources(
+  packedCandidates: PackedCandidateSet[],
+  sourceById: ReadonlyMap<string, ApprovedEvidenceSource>,
+) {
+  const topSourceCoverage = new Map<string, { coverage: number; relevance: number; firstRoleItemIndex: number }>();
+  for (const candidateSet of packedCandidates) {
+    const topCaseStudy = candidateSet.candidates.find(
+      (candidate) => sourceById.get(candidate.sourceId)?.sourceType === "case-study",
+    );
+    if (!topCaseStudy) continue;
+    const current = topSourceCoverage.get(topCaseStudy.sourceId);
+    topSourceCoverage.set(topCaseStudy.sourceId, {
+      coverage: (current?.coverage ?? 0) + 1,
+      relevance: (current?.relevance ?? 0) + topCaseStudy.relevanceScore,
+      firstRoleItemIndex: current?.firstRoleItemIndex ?? candidateSet.roleItemIndex,
+    });
+  }
+
+  const caseStudySources = [...topSourceCoverage.entries()]
+    .map(([sourceId, metrics]) => ({ source: sourceById.get(sourceId), metrics }))
+    .filter((entry): entry is { source: ApprovedEvidenceSource; metrics: { coverage: number; relevance: number; firstRoleItemIndex: number } } => Boolean(entry.source))
+    .sort((left, right) => {
+      if (left.metrics.coverage !== right.metrics.coverage) return right.metrics.coverage - left.metrics.coverage;
+      const leftBoundaryContext = Number(Boolean(left.source.limitations?.length || left.source.ownershipLevel));
+      const rightBoundaryContext = Number(Boolean(right.source.limitations?.length || right.source.ownershipLevel));
+      if (leftBoundaryContext !== rightBoundaryContext) return rightBoundaryContext - leftBoundaryContext;
+      if (left.metrics.relevance !== right.metrics.relevance) return right.metrics.relevance - left.metrics.relevance;
+      return left.metrics.firstRoleItemIndex - right.metrics.firstRoleItemIndex || left.source.id.localeCompare(right.source.id);
+    })
+    .map((entry) => entry.source);
+  const cvSource = [...sourceById.values()].find((source) => source.sourceType === "cv");
+  const cvBlock = cvSource ? selectiveRichSource(cvSource) : "";
+  const reservedCvSeparator = cvBlock ? 7 : 0;
+  let remainingBudget = Math.max(0, selectiveRichContextCharacterBudget - cvBlock.length - reservedCvSeparator);
+  const selectedCaseStudies: ApprovedEvidenceSource[] = [];
+
+  for (const source of caseStudySources) {
+    const block = selectiveRichSource(source);
+    const separatorCost = selectedCaseStudies.length > 0 ? 7 : 0;
+    if (block.length + separatorCost > remainingBudget) continue;
+    selectedCaseStudies.push(source);
+    remainingBudget -= block.length + separatorCost;
+  }
+
+  return [...selectedCaseStudies, ...(cvSource ? [cvSource] : [])];
 }
 
 export async function loadApprovedEvidence(roleText: string, roleItems?: EvidenceRoleItem[]) {
@@ -381,23 +495,25 @@ export async function loadApprovedEvidence(roleText: string, roleItems?: Evidenc
     ? roleItems
     : [{ originalText: roleText, source: "requirement" as const }];
   const candidatesByRoleItem = buildRequirementCandidates(effectiveRoleItems, catalog.sources);
-  const selectedIds = new Set(candidatesByRoleItem.flatMap((candidateSet) => candidateSet.candidates.map((candidate) => candidate.sourceId)));
-  const selected = catalog.sources.filter((source) => selectedIds.has(source.id) || source.sourceType === "cv");
-  const selectableCatalog = catalog.sources.filter((source) => source.sourceType === "case-study" || source.sourceType === "cv");
-  const candidateContract = candidatesByRoleItem.map((candidateSet) => [
+  const sourceById = new Map(catalog.sources.map((source) => [source.id, source]));
+  const { packed: packedCandidates, selectedSourceIds } = packRequirementCandidates(candidatesByRoleItem, sourceById);
+  const compactSources = catalog.sources.filter((source) => selectedSourceIds.has(source.id));
+  const richSources = selectRichSources(packedCandidates, sourceById);
+  const candidateContract = packedCandidates.map((candidateSet) => [
     `ROLE_ITEM_INDEX: ${candidateSet.roleItemIndex}`,
     `ROLE_ITEM_CANDIDATE_SOURCE_IDS: ${candidateSet.candidates.map((candidate) => candidate.sourceId).join(", ") || "none"}`,
-    "These IDs are ranked suggestions for this role item, not an authorization boundary. Any selected ID must still be an exact APPROVED_SOURCE_ID supplied in this context and truthfully support the requirement. The role/JD text is a requirement, never evidence.",
+    `ROLE_ITEM_CANDIDATE_RELEVANCE: ${candidateSet.candidates.map((candidate) => `${candidate.sourceId}=${candidate.relevanceScore}`).join(", ") || "none"}`,
+    "These IDs are ranked suggestions for this role item, not an authorization boundary. Any exact EVIDENCE_ID in the compact approved index may support any role item when it truthfully supports the underlying capability. The role/JD text is a requirement, never evidence.",
   ].join("\n")).join("\n\n");
 
   return {
     promptContext: [
       "## APPLICATION-BOUNDED REQUIREMENT EVIDENCE",
-      "## COMPLETE APPROVED EVIDENCE INDEX\nThis bounded index is the complete legal evidence universe for report selection. Use semantic meaning and documented capabilities; literal keyword identity is not required. An ID remains usable even when it is absent from a role item's ranked suggestions.\n\n"
-        + selectableCatalog.map(compactCatalogSource).join("\n"),
+      "## COMPACT APPROVED EVIDENCE INDEX\nThis bounded compact index is the complete evidence universe supplied for this inference package. Use semantic meaning, transferable capabilities, limitations, and ownership boundaries; literal keyword identity is not required. Any listed ID may truthfully support any role item even when another role item caused it to be included or it is absent from that item's ranked suggestions.\n\n"
+        + compactSources.map(compactCatalogSource).join("\n"),
       candidateContract,
-      "## RICH CONTEXT FOR STRONGEST CANDIDATES AND CV FALLBACK",
-      selected.map(promptSource).join("\n\n---\n\n"),
+      "## SELECTIVE RICH CONTEXT FOR SEMANTIC REASONING AND CV FALLBACK",
+      richSources.map(selectiveRichSource).join("\n\n---\n\n"),
     ].filter(Boolean).join("\n\n"),
     sources: catalog.sources,
     candidatesByRoleItem,

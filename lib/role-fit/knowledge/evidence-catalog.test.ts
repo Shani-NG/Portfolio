@@ -105,14 +105,40 @@ describe("validated canonical evidence catalog", () => {
     assert.equal(bundle.sources.some((source) => source.content.includes(hebrewRequirement)), false);
   });
 
-  it("exposes a bounded complete canonical index while keeping richer candidate context", async () => {
-    const bundle = await loadApprovedEvidence("product strategy", [{ originalText: "Lead product strategy", source: "requirement" }]);
-    const caseStudyIds = bundle.sources.filter((source) => source.sourceType === "case-study").map((source) => source.id);
+  it("keeps transferable dashboard and data-mapping evidence for a Power BI requirement without inventing a direct claim", async () => {
+    const requirement = "Build executive Power BI dashboards and translate operational data into decision-ready insights";
+    const bundle = await loadApprovedEvidence(requirement, [{ originalText: requirement, source: "requirement" }]);
+    const packedCandidateIds = bundle.promptContext
+      .match(/^ROLE_ITEM_CANDIDATE_SOURCE_IDS: (.+)$/m)?.[1]
+      ?.split(", ") ?? [];
 
-    assert.match(bundle.promptContext, /COMPLETE APPROVED EVIDENCE INDEX/);
-    assert.match(bundle.promptContext, /RICH CONTEXT FOR STRONGEST CANDIDATES AND CV FALLBACK/);
+    assert.ok(packedCandidateIds.includes("c4i:e-c4i-05"));
+    assert.ok(packedCandidateIds.includes("c4i:e-c4i-04"));
+    assert.match(bundle.promptContext, /dashboard strategy/);
+    assert.match(bundle.promptContext, /data mapping/);
+    assert.equal(
+      bundle.sources.some((source) => source.id !== "cv" && /Power BI/i.test([source.claim, source.capabilities?.join(" ")].filter(Boolean).join(" "))),
+      false,
+    );
+  });
+
+  it("packs a bounded traceable inference index while preserving the complete canonical bundle", async () => {
+    const bundle = await loadApprovedEvidence("product strategy", [{ originalText: "Lead product strategy", source: "requirement" }]);
+    const compactSourceIds = [...bundle.promptContext.matchAll(/^EVIDENCE_ID: ([^\s|]+)/gm)].map((match) => match[1]);
+    const richSourceIds = [...bundle.promptContext.matchAll(/^### APPROVED_SOURCE_ID: ([^\s]+)/gm)].map((match) => match[1]);
+
+    assert.equal(bundle.sources.filter((source) => source.sourceType === "case-study").length, 48);
+    assert.ok((bundle.candidatesByRoleItem?.[0]?.candidates.length ?? 0) > 3);
+    assert.match(bundle.promptContext, /COMPACT APPROVED EVIDENCE INDEX/);
+    assert.match(bundle.promptContext, /SELECTIVE RICH CONTEXT FOR SEMANTIC REASONING AND CV FALLBACK/);
     assert.match(bundle.promptContext, /EVIDENCE_ID: cv/);
-    for (const sourceId of caseStudyIds) assert.match(bundle.promptContext, new RegExp(`EVIDENCE_ID: ${sourceId}`));
-    assert.ok(bundle.promptContext.length < 45_000, `prompt context was ${bundle.promptContext.length} characters`);
+    assert.match(bundle.promptContext, /not an authorization boundary/);
+    assert.match(bundle.promptContext, /may truthfully support any role item/);
+    assert.ok(compactSourceIds.length > 1 && compactSourceIds.length <= 12);
+    assert.ok(richSourceIds.length > 0 && richSourceIds.length < compactSourceIds.length);
+    for (const sourceId of [...compactSourceIds, ...richSourceIds]) {
+      assert.ok(bundle.sources.some((source) => source.id === sourceId), sourceId);
+    }
+    assert.ok(bundle.promptContext.length < 12_000, `prompt context was ${bundle.promptContext.length} characters`);
   });
 });
