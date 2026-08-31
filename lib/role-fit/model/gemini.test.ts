@@ -10,6 +10,7 @@ const originalApiKey = process.env.GEMINI_API_KEY;
 const originalChatModel = process.env.GOOGLE_AI_STUDIO_CHAT_MODEL;
 const originalChatFallbackModel = process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL;
 const originalAnalysisModel = process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL;
+const originalReportModel = process.env.GOOGLE_AI_STUDIO_REPORT_MODEL;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -21,6 +22,8 @@ afterEach(() => {
   else process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL = originalChatFallbackModel;
   if (originalAnalysisModel === undefined) delete process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL;
   else process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = originalAnalysisModel;
+  if (originalReportModel === undefined) delete process.env.GOOGLE_AI_STUDIO_REPORT_MODEL;
+  else process.env.GOOGLE_AI_STUDIO_REPORT_MODEL = originalReportModel;
 });
 
 function geminiResponse(text: string, finishReason: string) {
@@ -367,7 +370,9 @@ describe("Gemini chat completion guard", () => {
     process.env.GEMINI_API_KEY = "test-key";
     process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
     const requests: Array<Record<string, unknown>> = [];
-    globalThis.fetch = async (_input, init) => {
+    const models: string[] = [];
+    globalThis.fetch = async (input, init) => {
+      models.push(requestedModel(input));
       requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
       return geminiResponse(validReportAnalysis(0), "STOP");
     };
@@ -376,6 +381,7 @@ describe("Gemini chat completion guard", () => {
       roleText: "Title: Senior UX Strategist",
       language: "en",
       task: "analysis",
+      modelOverride: "gemini-report",
       maxOutputTokens: 4000,
       approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
       runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
@@ -383,6 +389,7 @@ describe("Gemini chat completion guard", () => {
 
     assert.equal(result.ok, true);
     assert.equal(requests.length, 1);
+    assert.deepEqual(models, ["gemini-report"]);
     const config = requestGenerationConfig(requests[0] ?? {});
     assert.equal(config.responseMimeType, "application/json");
     assert.equal(config.maxOutputTokens, 4000);

@@ -577,7 +577,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
     },
     async generateReport(input: RoleFitModelInput): Promise<RoleFitModelResult> {
       const apiKey = process.env.GOOGLE_AI_STUDIO_API_KEY ?? process.env.GEMINI_API_KEY;
-      const model = getGoogleAiStudioModel(input.task);
+      const model = input.modelOverride ?? getGoogleAiStudioModel(input.task);
 
       if (!apiKey || !model) {
         return {

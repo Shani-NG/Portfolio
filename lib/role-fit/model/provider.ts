@@ -32,6 +32,7 @@ export type RoleFitModelInput = {
   runtimeState?: string;
   approvedEvidence?: string;
   conversationContext?: string;
+  modelOverride?: string;
 };
 
 export type RoleFitProviderFailure = {

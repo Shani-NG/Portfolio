@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
 
-import { getGoogleAiStudioChatFallbackModel, getGoogleAiStudioModel, getRoleFitPolicy } from "./policy.ts";
+import { getGoogleAiStudioChatFallbackModel, getGoogleAiStudioModel, getGoogleAiStudioReportModel, getRoleFitPolicy } from "./policy.ts";
 
 const envKeys = [
   "GOOGLE_AI_STUDIO_MODEL",
   "GOOGLE_AI_STUDIO_CHAT_MODEL",
   "GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL",
   "GOOGLE_AI_STUDIO_ANALYSIS_MODEL",
+  "GOOGLE_AI_STUDIO_REPORT_MODEL",
   "ROLE_FIT_MAX_MESSAGES_PER_SESSION",
   "ROLE_FIT_MAX_REPORTS_PER_SESSION",
   "ROLE_FIT_MAX_INPUT_CHARS",
@@ -63,6 +64,17 @@ describe("Role Fit runtime policy", () => {
 
     delete process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL;
     assert.equal(getGoogleAiStudioModel("analysis"), "gemini-fallback");
+  });
+
+  test("selects a dedicated report model and falls back to analysis", () => {
+    process.env.GOOGLE_AI_STUDIO_MODEL = "gemini-legacy";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-analysis";
+    process.env.GOOGLE_AI_STUDIO_REPORT_MODEL = "gemini-report";
+
+    assert.equal(getGoogleAiStudioReportModel(), "gemini-report");
+
+    delete process.env.GOOGLE_AI_STUDIO_REPORT_MODEL;
+    assert.equal(getGoogleAiStudioReportModel(), "gemini-analysis");
   });
 
   test("reads a distinct optional chat fallback model", () => {

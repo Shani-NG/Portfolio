@@ -29,6 +29,10 @@ export function getGoogleAiStudioModel(task: "chat" | "analysis"): string | unde
   return process.env.GOOGLE_AI_STUDIO_CHAT_MODEL ?? process.env.GOOGLE_AI_STUDIO_MODEL;
 }
 
+export function getGoogleAiStudioReportModel(): string | undefined {
+  return process.env.GOOGLE_AI_STUDIO_REPORT_MODEL ?? getGoogleAiStudioModel("analysis");
+}
+
 export function getGoogleAiStudioChatFallbackModel(primaryModel?: string): string | undefined {
   const fallbackModel = process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL?.trim();
   if (!fallbackModel) return undefined;

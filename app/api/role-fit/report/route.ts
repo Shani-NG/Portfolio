@@ -4,7 +4,7 @@ import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { createReportProviderFailureContract } from "@/lib/role-fit/model/failure-contract";
 import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
-import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
+import { getGoogleAiStudioReportModel, getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
 import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
@@ -267,6 +267,7 @@ export async function POST(request: Request) {
     roleText: boundedRoleText,
     language: parsedRequest.data.language,
     task: "analysis",
+    modelOverride: getGoogleAiStudioReportModel(),
     maxOutputTokens: reportAnalysisMaxOutputTokens,
     runtimeState: JSON.stringify({ validation, roleItems }),
     approvedEvidence: approvedEvidence.promptContext,
