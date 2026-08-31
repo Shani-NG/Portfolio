@@ -33,6 +33,55 @@ function requestedModel(input: RequestInfo | URL): string {
   return match ? decodeURIComponent(match[1]) : "unknown";
 }
 
+function validReportAnalysis(roleItemIndex = 0) {
+  return JSON.stringify({
+    fitLevel: "good",
+    fitRationale: "Approved evidence supports the role context.",
+    evidenceConfidence: "high",
+    evidenceConfidenceRationale: "The assessment uses approved project evidence.",
+    skillsCoverageLabel: "Evidence-backed coverage",
+    items: [{
+      roleItemIndex,
+      displayLabel: "Complex product strategy",
+      importance: "core",
+      matchType: "direct",
+      impact: "strength",
+      evidenceConfidence: "high",
+      shortRationale: "Approved evidence shows this capability.",
+      evidenceSourceIds: ["c4i"],
+    }],
+  });
+}
+
+function timeoutError() {
+  const error = new Error("provider timed out");
+  error.name = "TimeoutError";
+  return error;
+}
+
+function requestGenerationConfig(request: Record<string, unknown>) {
+  return request.generationConfig as Record<string, unknown>;
+}
+
+function requestPrompt(request: Record<string, unknown>) {
+  return String((request.contents as Array<{ parts: Array<{ text: string }> }>)[0]?.parts[0]?.text);
+}
+
+function collectSchemaKeywords(schema: unknown, parentKeyword?: string, keywords = new Set<string>()) {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return keywords;
+
+  for (const [key, value] of Object.entries(schema)) {
+    if (parentKeyword === "properties" || parentKeyword === "$defs") {
+      collectSchemaKeywords(value, undefined, keywords);
+    } else {
+      keywords.add(key);
+      collectSchemaKeywords(value, key, keywords);
+    }
+  }
+
+  return keywords;
+}
+
 describe("Gemini chat completion guard", () => {
   it("keeps only complete sentences and never returns a trailing fragment", () => {
     assert.equal(completeChatAnswer("First complete sentence. Second complete sentence. unfinished"), "First complete sentence. Second complete sentence.");
@@ -75,8 +124,8 @@ describe("Gemini chat completion guard", () => {
     if (!result.ok) return;
     assert.equal(result.answer, "שמחה שהצלחנו להתחבר. אני כאן כדי לעזור בשאלה הבאה.");
     assert.equal(requests.length, 2);
-    const firstConfig = requests[0]?.generationConfig as Record<string, unknown>;
-    const retryConfig = requests[1]?.generationConfig as Record<string, unknown>;
+    const firstConfig = requestGenerationConfig(requests[0] ?? {});
+    const retryConfig = requestGenerationConfig(requests[1] ?? {});
     assert.equal(firstConfig.responseMimeType, undefined);
     assert.deepEqual(firstConfig.thinkingConfig, { thinkingLevel: "low" });
     assert.equal(firstConfig.maxOutputTokens, 800);
@@ -296,13 +345,90 @@ describe("Gemini chat completion guard", () => {
     assert.equal(result.error, "invalid-output");
     assert.equal(result.detail, "qualitative-analysis-finish-reason:MAX_TOKENS");
     assert.equal(requests.length, 2);
-    const firstConfig = requests[0]?.generationConfig as Record<string, unknown>;
-    const retryConfig = requests[1]?.generationConfig as Record<string, unknown>;
+    const firstConfig = requestGenerationConfig(requests[0] ?? {});
+    const retryConfig = requestGenerationConfig(requests[1] ?? {});
     assert.equal(firstConfig.responseMimeType, "application/json");
+    assert.ok(firstConfig.responseJsonSchema);
     assert.deepEqual(firstConfig.thinkingConfig, { thinkingLevel: "minimal" });
     assert.equal(firstConfig.maxOutputTokens, 2500);
+    assert.ok(retryConfig.responseJsonSchema);
     assert.deepEqual(retryConfig.thinkingConfig, { thinkingLevel: "minimal" });
     assert.equal(retryConfig.maxOutputTokens, 5000);
+    assert.equal(result.diagnostics?.attemptPhase, "schema-repair");
+    assert.equal(result.diagnostics?.repairTriggerCategory, "max_tokens");
+    assert.equal(result.diagnostics?.failureCategory, "max_tokens");
+    assert.equal(result.diagnostics?.finishReason, "MAX_TOKENS");
+  });
+
+  it("sends a sanitized native Gemini schema while preserving the canonical prompt schema", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    const requests: Array<Record<string, unknown>> = [];
+    globalThis.fetch = async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return geminiResponse(validReportAnalysis(0), "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 4000,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(requests.length, 1);
+    const config = requestGenerationConfig(requests[0] ?? {});
+    assert.equal(config.responseMimeType, "application/json");
+    assert.equal(config.maxOutputTokens, 4000);
+    assert.ok(config.responseJsonSchema);
+
+    const schema = config.responseJsonSchema as Record<string, unknown>;
+    const keywords = collectSchemaKeywords(schema);
+    assert.equal(keywords.has("$schema"), false);
+    assert.equal(keywords.has("minLength"), false);
+    assert.equal(keywords.has("properties"), true);
+    assert.equal(keywords.has("required"), true);
+    assert.equal(keywords.has("additionalProperties"), true);
+
+    const topLevelProperties = schema.properties as Record<string, unknown>;
+    assert.ok(topLevelProperties.fitRationale);
+    assert.ok(topLevelProperties.items);
+
+    const prompt = requestPrompt(requests[0] ?? {});
+    assert.match(prompt, /Exact qualitative analysis JSON Schema:/);
+    assert.match(prompt, /"minLength":1/);
+  });
+
+  it("uses the same native schema for schema repair and caps repair output at 5000", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    const requests: Array<Record<string, unknown>> = [];
+    globalThis.fetch = async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return requests.length === 1
+        ? geminiResponse('{"fitLevel":"good"}', "STOP")
+        : geminiResponse(validReportAnalysis(0), "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 4000,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(requests.length, 2);
+    const firstConfig = requestGenerationConfig(requests[0] ?? {});
+    const repairConfig = requestGenerationConfig(requests[1] ?? {});
+    assert.equal(firstConfig.maxOutputTokens, 4000);
+    assert.equal(repairConfig.maxOutputTokens, 5000);
+    assert.deepEqual(repairConfig.responseJsonSchema, firstConfig.responseJsonSchema);
   });
 
   it("classifies HTTP 429 as a retryable rate limit and preserves safe Retry-After metadata", async () => {
@@ -336,6 +462,11 @@ describe("Gemini chat completion guard", () => {
     assert.equal(result.retryable, true);
     assert.equal(result.retryAfterSeconds, 34);
     assert.equal(result.detail, undefined);
+    assert.equal(result.diagnostics?.attemptPhase, "initial-analysis");
+    assert.equal(result.diagnostics?.failureCategory, "provider_http_429");
+    assert.equal(result.diagnostics?.providerStatus, 429);
+    assert.equal(result.diagnostics?.retryAfterSeconds, 34);
+    assert.equal(result.diagnostics?.responseBodyPresent, true);
   });
 
   it("classifies report transport failures without a provider status as retryable", async () => {
@@ -357,6 +488,9 @@ describe("Gemini chat completion guard", () => {
     assert.equal(result.error, "provider-error");
     assert.equal(result.providerStatus, undefined);
     assert.equal(result.retryable, true);
+    assert.equal(result.diagnostics?.attemptPhase, "initial-analysis");
+    assert.equal(result.diagnostics?.failureCategory, "network_failure");
+    assert.equal(result.diagnostics?.responseBodyPresent, false);
   });
 
   it("classifies provider 503 report failures as retryable without using a fallback model", async () => {
@@ -381,6 +515,10 @@ describe("Gemini chat completion guard", () => {
     if (result.ok) return;
     assert.equal(result.providerStatus, 503);
     assert.equal(result.retryable, true);
+    assert.equal(result.diagnostics?.attemptPhase, "initial-analysis");
+    assert.equal(result.diagnostics?.failureCategory, "provider_http_503");
+    assert.equal(result.diagnostics?.providerStatus, 503);
+    assert.equal(result.diagnostics?.responseBodyPresent, true);
     assert.deepEqual(models, ["gemini-3.5-flash"]);
   });
 
@@ -402,6 +540,134 @@ describe("Gemini chat completion guard", () => {
     if (result.ok) return;
     assert.equal(result.providerStatus, 401);
     assert.equal(result.retryable, undefined);
+  });
+
+  it("records a max_tokens repair trigger when the schema-repair call times out", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls += 1;
+      if (calls === 1) return geminiResponse('{"fitLevel":"strong"', "MAX_TOKENS");
+      throw timeoutError();
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.error, "provider-error");
+    assert.equal(result.retryable, true);
+    assert.equal(result.diagnostics?.attemptPhase, "schema-repair");
+    assert.equal(result.diagnostics?.repairTriggerCategory, "max_tokens");
+    assert.equal(result.diagnostics?.failureCategory, "provider_timeout");
+    assert.equal(result.diagnostics?.responseBodyPresent, false);
+  });
+
+  it("records an invalid_json repair trigger when the schema-repair call has a network failure", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls += 1;
+      if (calls === 1) return geminiResponse("not json", "STOP");
+      throw new Error("network down");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.retryable, true);
+    assert.equal(result.diagnostics?.attemptPhase, "schema-repair");
+    assert.equal(result.diagnostics?.repairTriggerCategory, "invalid_json");
+    assert.equal(result.diagnostics?.failureCategory, "network_failure");
+  });
+
+  it("records schema_invalid, invalid_role_index, and duplicate_role_index repair triggers", async () => {
+    for (const [firstText, expectedCategory] of [
+      ['{"fitLevel":"good"}', "schema_invalid"],
+      [validReportAnalysis(3), "invalid_role_index"],
+      [JSON.stringify({
+        fitLevel: "good",
+        fitRationale: "Approved evidence supports the role context.",
+        evidenceConfidence: "high",
+        evidenceConfidenceRationale: "The assessment uses approved project evidence.",
+        skillsCoverageLabel: "Evidence-backed coverage",
+        items: [
+          JSON.parse(validReportAnalysis(0)).items[0],
+          JSON.parse(validReportAnalysis(0)).items[0],
+        ],
+      }), "duplicate_role_index"],
+    ] as const) {
+      process.env.GEMINI_API_KEY = "test-key";
+      process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
+      let calls = 0;
+      globalThis.fetch = async () => {
+        calls += 1;
+        if (calls === 1) return geminiResponse(firstText, "STOP");
+        throw new Error("network down");
+      };
+
+      const result = await createGeminiRoleFitProvider().generateReport({
+        roleText: "Title: Senior UX Strategist",
+        language: "en",
+        task: "analysis",
+        maxOutputTokens: 2500,
+        approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+        runtimeState: JSON.stringify({
+          roleItems: [
+            { originalText: "Complex product strategy", source: "requirement" },
+            { originalText: "Strategic systems thinking", source: "requirement" },
+          ],
+        }),
+      });
+
+      assert.equal(result.ok, false);
+      if (result.ok) return;
+      assert.equal(result.retryable, true);
+      assert.equal(result.diagnostics?.attemptPhase, "schema-repair");
+      assert.equal(result.diagnostics?.repairTriggerCategory, expectedCategory);
+      assert.equal(result.diagnostics?.failureCategory, "network_failure");
+    }
+  });
+
+  it("captures safe usage metadata token counts when Gemini returns them", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3-flash-preview";
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: validReportAnalysis(0) }] }, finishReason: "STOP" }],
+      usageMetadata: {
+        promptTokenCount: 1200,
+        candidatesTokenCount: 340,
+        totalTokenCount: 1540,
+      },
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, true);
   });
 
   it("repairs one schema-invalid report response before failing the request", async () => {
@@ -443,7 +709,7 @@ describe("Gemini chat completion guard", () => {
 
     assert.equal(result.ok, true);
     assert.equal(requests.length, 2);
-    const reportPrompt = String((requests[0]?.contents as Array<{ parts: Array<{ text: string }> }>)[0]?.parts[0]?.text);
+    const reportPrompt = requestPrompt(requests[0] ?? {});
     assert.match(reportPrompt, /ROLE_ITEM_CANDIDATE_SOURCE_IDS are ranked suggestions.*not an authorization boundary/);
     assert.match(reportPrompt, /CV fallback/);
     assert.match(reportPrompt, /same canonical evidence ID may support multiple requirements/);
@@ -488,7 +754,7 @@ describe("Gemini chat completion guard", () => {
 
     assert.equal(result.ok, true);
     assert.equal(requests.length, 2);
-    const retryPrompt = String((requests[1]?.contents as Array<{ parts: Array<{ text: string }> }>)[0]?.parts[0]?.text);
+    const retryPrompt = requestPrompt(requests[1] ?? {});
     assert.match(retryPrompt, /allowed=0;received=3/);
   });
 });

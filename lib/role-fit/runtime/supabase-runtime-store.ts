@@ -101,6 +101,8 @@ function safeMetadata(metadata: SafeMetadata | undefined) {
     "provider", "model", "parseStatus", "repeatedInput", "missingField", "completedReportCount",
     "maxReportsPerSession", "language", "fitMode", "evidenceConfidence",
     "persistenceState", "persistenceReason", "providerStatus", "retryable", "retryAfterSeconds",
+    "attemptPhase", "repairTriggerCategory", "providerElapsedMs", "failureCategory", "finishReason",
+    "responseBodyPresent", "promptTokenCount", "outputTokenCount", "totalTokenCount",
   ]);
   return Object.fromEntries(
     Object.entries(metadata)

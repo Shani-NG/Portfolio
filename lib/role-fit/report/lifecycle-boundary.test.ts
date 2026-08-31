@@ -46,6 +46,18 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(eligibility, /completedReportCount >= 2/);
   });
 
+  test("uses a local RoleFit report-analysis output budget without changing shared runtime policy", async () => {
+    const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
+    const policy = await readFile(join(projectRoot, "lib", "role-fit", "runtime", "policy.ts"), "utf8");
+    const jobFitEvaluator = await readFile(join(projectRoot, "lib", "job-fit", "evaluate.ts"), "utf8");
+
+    assert.match(route, /const roleFitReportAnalysisMaxOutputTokens = 4_000/);
+    assert.match(route, /resolveRoleFitReportAnalysisMaxOutputTokens\(policy\.maxOutputTokens\)/);
+    assert.match(route, /maxOutputTokens: reportAnalysisMaxOutputTokens/);
+    assert.match(policy, /maxOutputTokens: readNumber\("ROLE_FIT_MAX_OUTPUT_TOKENS", 2500\)/);
+    assert.match(jobFitEvaluator, /maxOutputTokens: 2_500/);
+  });
+
   test("keeps retryable provider failures before persistence while preserving the pending role flow", async () => {
     const page = await readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8");
     const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");

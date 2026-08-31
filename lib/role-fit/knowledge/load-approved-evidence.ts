@@ -81,6 +81,11 @@ export type CanonicalEvidenceSourceDefinition = {
 
 type ScoredEvidenceSource = ApprovedEvidenceSource & { score: number };
 
+// Keep the complete compact index available to the model, but bound the prose-rich
+// context sent on every report request. This reduces latency without changing the
+// canonical evidence universe or application-owned evidence authorization.
+const maxRichContextSources = 13;
+
 const sourceDefinitions: readonly CanonicalEvidenceSourceDefinition[] = [
   { id: "cv", label: "CV knowledge", file: "CV_Knowledge.md", sourceType: "cv" },
   { id: "profile", label: "General profile knowledge", file: "General_Profile_Knowledge.md", sourceType: "profile" },
@@ -338,6 +343,46 @@ function compactText(value: string | undefined, maxChars: number) {
   return value?.replace(/\s+/g, " ").trim().slice(0, maxChars) ?? "";
 }
 
+function selectRichContextSources(
+  roleItems: EvidenceRoleItem[],
+  candidatesByRoleItem: RequirementEvidenceCandidates[],
+  catalogSources: ApprovedEvidenceSource[],
+) {
+  const sourceById = new Map(catalogSources.map((source) => [source.id, source]));
+  const selectedIds = new Set<string>();
+  const selectedProjectIds = new Set<string>();
+  const rankedByRoleItem = candidatesByRoleItem.map((candidateSet) =>
+    candidateSet.candidates
+      .map((candidate) => ({ source: sourceById.get(candidate.sourceId), score: candidate.relevanceScore }))
+      .filter((candidate): candidate is { source: ApprovedEvidenceSource; score: number } => Boolean(candidate.source)),
+  );
+
+  const addCandidate = (candidate: { source: ApprovedEvidenceSource; score: number } | undefined) => {
+    if (!candidate || selectedIds.has(candidate.source.id) || selectedIds.size >= maxRichContextSources) return false;
+    selectedIds.add(candidate.source.id);
+    if (candidate.source.project) selectedProjectIds.add(candidate.source.project.id);
+    return true;
+  };
+
+  // First pass: prefer one strong candidate per role item and spread across projects
+  // where the ranked candidates make that possible.
+  for (const candidates of rankedByRoleItem) {
+    addCandidate(candidates.find((candidate) => candidate.source.project && !selectedProjectIds.has(candidate.source.project.id)) ?? candidates[0]);
+  }
+
+  // Second pass: add another strong candidate for each role item when available.
+  for (const candidates of rankedByRoleItem) addCandidate(candidates[1]);
+
+  // Always preserve the CV fallback when it was ranked for any role item.
+  for (const source of catalogSources) {
+    if (source.sourceType === "cv" && candidatesByRoleItem.some((candidateSet) => candidateSet.candidates.some((candidate) => candidate.sourceId === source.id))) {
+      addCandidate({ source, score: 0 });
+    }
+  }
+
+  return catalogSources.filter((source) => selectedIds.has(source.id) || (!roleItems.length && source.sourceType === "cv"));
+}
+
 function compactCatalogSource(source: ApprovedEvidenceSource) {
   const resolution = source.sourceType === "case-study"
     ? resolveApprovedEvidenceDestination({
@@ -381,8 +426,7 @@ export async function loadApprovedEvidence(roleText: string, roleItems?: Evidenc
     ? roleItems
     : [{ originalText: roleText, source: "requirement" as const }];
   const candidatesByRoleItem = buildRequirementCandidates(effectiveRoleItems, catalog.sources);
-  const selectedIds = new Set(candidatesByRoleItem.flatMap((candidateSet) => candidateSet.candidates.map((candidate) => candidate.sourceId)));
-  const selected = catalog.sources.filter((source) => selectedIds.has(source.id) || source.sourceType === "cv");
+  const selected = selectRichContextSources(effectiveRoleItems, candidatesByRoleItem, catalog.sources);
   const selectableCatalog = catalog.sources.filter((source) => source.sourceType === "case-study" || source.sourceType === "cv");
   const candidateContract = candidatesByRoleItem.map((candidateSet) => [
     `ROLE_ITEM_INDEX: ${candidateSet.roleItemIndex}`,

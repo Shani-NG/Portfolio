@@ -115,4 +115,20 @@ describe("validated canonical evidence catalog", () => {
     for (const sourceId of caseStudyIds) assert.match(bundle.promptContext, new RegExp(`EVIDENCE_ID: ${sourceId}`));
     assert.ok(bundle.promptContext.length < 45_000, `prompt context was ${bundle.promptContext.length} characters`);
   });
+
+  it("bounds rich prose context while retaining the complete compact evidence index", async () => {
+    const bundle = await loadApprovedEvidence("senior product and innovation role", [
+      { originalText: "Lead product discovery and strategy across complex systems", source: "responsibility" },
+      { originalText: "Collaborate with engineering and cross-functional teams", source: "responsibility" },
+      { originalText: "Strong UX and product design experience", source: "requirement" },
+      { originalText: "Experience with innovation and AI adoption", source: "requirement" },
+      { originalText: "Ability to define research, measurement, and learning loops", source: "requirement" },
+      { originalText: "Senior stakeholder facilitation and strategic communication", source: "requirement" },
+    ]);
+    const richHeaders = bundle.promptContext.match(/### APPROVED_SOURCE_ID:/g) ?? [];
+
+    assert.ok(richHeaders.length <= 13, `rich source count was ${richHeaders.length}`);
+    assert.match(bundle.promptContext, /COMPLETE APPROVED EVIDENCE INDEX/);
+    assert.equal(bundle.sources.filter((source) => source.sourceType === "case-study").length, 48);
+  });
 });
