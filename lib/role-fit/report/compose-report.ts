@@ -47,6 +47,15 @@ const fitPresentation = {
 const positiveMatchTypes = new Set<AnalysisItem["matchType"]>(["direct", "semantic", "transferable"]);
 const gapMatchTypes = new Set<AnalysisItem["matchType"]>(["partial", "insufficient-evidence", "real-gap"]);
 
+function normalizePositiveMatchImpact(item: AnalysisItem): AnalysisItem {
+  // `matchType` is the model's semantic classification. A positive classification cannot
+  // truthfully be rendered as a gap; preserve all evidence and rationale, and repair only
+  // this structurally contradictory presentation field.
+  return positiveMatchTypes.has(item.matchType) && item.impact === "gap"
+    ? { ...item, impact: "strength" }
+    : item;
+}
+
 export function resolveStableFitLevel(analysis: QualitativeReportAnalysis): QualitativeReportAnalysis["fitLevel"] {
   if (analysis.fitLevel === "out-of-scope") return "out-of-scope";
 
@@ -271,7 +280,7 @@ export function composeReportUIPayload(input: {
         unproven: analysisItem.unproven,
       },
     });
-    const resolvedAnalysisItem: AnalysisItem = selection.ok
+    const selectedAnalysisItem: AnalysisItem = selection.ok
       ? { ...analysisItem, evidenceSourceIds: selection.sourceIds }
       : {
           ...analysisItem,
@@ -283,6 +292,7 @@ export function composeReportUIPayload(input: {
             : "No sufficiently relevant canonical evidence remained after the full evidence ladder; this requirement is unsupported, not proven as a real gap.",
           evidenceSourceIds: [],
         };
+    const resolvedAnalysisItem = normalizePositiveMatchImpact(selectedAnalysisItem);
     resolvedAnalysisItems.push(resolvedAnalysisItem);
     const evidenceSourceIds = selectDisplayedEvidenceSourceIds(resolvedAnalysisItem.evidenceSourceIds, sourceById);
 

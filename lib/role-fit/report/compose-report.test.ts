@@ -540,6 +540,17 @@ describe("Task C evidence and report integrity", () => {
     assert.deepEqual(result, { ok: false, diagnostic: "semantic:incomplete-semantic-rationale" });
   });
 
+  it("C19 normalizes a positive semantic match incorrectly marked as a gap without changing its evidence", () => {
+    const contradictorySemanticItem = item(0, "semantic", "gap");
+    const result = composeReportUIPayload({ analysis: analysis({ items: [contradictorySemanticItem] }), roleDraft: roleDraft(), evidence, language: "en" });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.requirementMapping.items[0]?.matchType, "semantic");
+    assert.equal(result.report.requirementMapping.items[0]?.impact, "strength");
+    assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i"]);
+  });
+
   it("keeps every approved destination anchor aligned with a published page ID", async () => {
     const publishedSource = (
       await Promise.all([
