@@ -4,6 +4,7 @@ import { getRoleFitModelProvider } from "../role-fit/model/index.ts";
 import type { QualitativeReportAnalysis } from "../role-fit/model/provider.ts";
 import { getRoleAnalysisItems, resolveStableFitLevel } from "../role-fit/report/compose-report.ts";
 import { createRoleValidationResult } from "../role-fit/server/eligibility.ts";
+import { getJobFitModel } from "./model.ts";
 import type { CanonicalNormalizedJobCandidate, JobFitEvaluatorResponse, JobFitRequirementAssessment, NormalizedJobCandidate } from "./contracts";
 
 function canonicalCandidate(candidate: NormalizedJobCandidate): CanonicalNormalizedJobCandidate {
@@ -129,6 +130,7 @@ export async function evaluateCanonicalJobFit(candidate: NormalizedJobCandidate)
     roleText: candidate.cleanedJobContent,
     language: candidate.language,
     task: "analysis",
+    modelOverride: getJobFitModel(),
     maxOutputTokens: 2_500,
     runtimeState: JSON.stringify({
       validation: prepared.validation,
