@@ -10,6 +10,7 @@ import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/
 import { composeReportUIPayload, getRoleAnalysisItems } from "@/lib/role-fit/report/compose-report";
 import { createCompositionFailureMetadata, type CompositionRepairOutcome } from "@/lib/role-fit/report/composition-observability";
 import type { RoleFitProviderFailure } from "@/lib/role-fit/model/provider";
+import { publicReportRetryTimeoutMs, retryEarlyPublicReport503 } from "@/lib/role-fit/model/public-report-retry";
 import {
   constrainRepairAnalysis,
   getDeterministicLimitationRepresentation,
@@ -263,17 +264,49 @@ export async function POST(request: Request) {
       })),
     });
   }
+  const reportModel = getGoogleAiStudioReportModel();
   let modelResult = await provider.generateReport({
     roleText: boundedRoleText,
     language: parsedRequest.data.language,
     task: "analysis",
-    modelOverride: getGoogleAiStudioReportModel(),
+    modelOverride: reportModel,
     initialProviderTimeoutMs: 90_000,
     maxOutputTokens: reportAnalysisMaxOutputTokens,
     runtimeState: JSON.stringify({ validation, roleItems }),
     approvedEvidence: approvedEvidence.promptContext,
   });
-  let providerElapsedMs = modelResult.ok ? modelResult.diagnostics.providerElapsedMs : 0;
+  const retryRun = await retryEarlyPublicReport503({
+    initialResult: modelResult,
+    routeElapsedMs: Date.now() - startedAt,
+    retry: () => provider.generateReport({
+      roleText: boundedRoleText,
+      language: parsedRequest.data.language,
+      task: "analysis",
+      modelOverride: reportModel,
+      initialProviderTimeoutMs: publicReportRetryTimeoutMs,
+      maxOutputTokens: reportAnalysisMaxOutputTokens,
+      runtimeState: JSON.stringify({ validation, roleItems }),
+      approvedEvidence: approvedEvidence.promptContext,
+    }),
+  });
+  modelResult = retryRun.result;
+  for (const attempt of retryRun.attempts) {
+    console.info("[role-fit-report] initial provider attempt completed", {
+      traceId,
+      model: modelResult.model ?? reportModel,
+      retryUsed: retryRun.retryUsed,
+      ...attempt,
+    });
+  }
+  console.info("[role-fit-report] initial provider attempts completed", {
+    traceId,
+    model: modelResult.model ?? reportModel,
+    retryUsed: retryRun.retryUsed,
+    attemptCount: retryRun.attempts.length,
+    totalProviderElapsedMs: retryRun.totalProviderElapsedMs,
+    finalOutcome: retryRun.finalOutcome,
+  });
+  let providerElapsedMs = retryRun.totalProviderElapsedMs;
   let schemaRepairUsed = modelResult.ok ? modelResult.diagnostics.schemaRepairUsed : false;
 
   if (!modelResult.ok) {

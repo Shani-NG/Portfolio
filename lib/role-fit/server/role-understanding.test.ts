@@ -160,6 +160,56 @@ describe("Role Fit pasted job understanding", () => {
     assert.deepEqual(result.missingFields, ["title"]);
   });
 
+  it("rejects unlabeled promotional or media lines as inferred titles", () => {
+    const rejectedCandidates = [
+      "Sneak peak to our product: https://www.youtube.com/watch?v=F9949Q-_onc&t=9s",
+      "Sneak peek at our product",
+      "Watch our product demo",
+      "Learn more about our product",
+      "Visit our product page",
+      "Click here for our product overview",
+    ];
+
+    for (const candidate of rejectedCandidates) {
+      const result = validateRoleText({
+        conversationId: "conv_promotional_title",
+        traceId: "trace_promotional_title",
+        roleText: [
+          candidate,
+          "Responsibilities: Lead discovery and align product with engineering stakeholders",
+          "Requirements: Strong product design and UX strategy experience",
+        ].join("\n"),
+        detectedLanguage: "en",
+      });
+
+      assert.equal(result.roleDraft.title?.originalValue, "");
+      assert.deepEqual(result.missingFields, ["title"]);
+    }
+  });
+
+  it("preserves valid unlabeled product and architecture titles", () => {
+    for (const title of ["Product Designer", "Senior Product Designer", "Product Design Lead", "Solution Architect"]) {
+      const draft = createRoleDraftFromText([
+        title,
+        "Responsibilities: Lead discovery and align product with engineering stakeholders",
+        "Requirements: Strong relevant design or solution architecture experience",
+      ].join("\n"));
+
+      assert.equal(draft.title?.originalValue, title);
+    }
+  });
+
+  it("keeps an explicitly labeled title authoritative", () => {
+    const draft = createRoleDraftFromText([
+      "Sneak peek at our product: https://example.com/demo",
+      "Title: Senior Product Designer",
+      "Responsibilities: Lead product discovery with engineering stakeholders",
+      "Requirements: Strong product design and UX strategy experience",
+    ].join("\n"));
+
+    assert.equal(draft.title?.originalValue, "Senior Product Designer");
+  });
+
   it("separates a conversational prefix from a complete English JD", () => {
     const roleText = [
       "נסה עבור זאת",

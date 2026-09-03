@@ -123,6 +123,8 @@ const hebrewRoleTitleSignal = /(?:^|\s)(?:מנהל(?:ת|[-־]ת)?|מעצב(?:ת|
 const standaloneTitleLabel = /^(?:job title|title|role|שם המשרה|תפקיד)\s*:\s*(.+)$/i;
 const roleFieldLabelSignal = /^(?:company|organization|title|job title|role|description|responsibilities|requirements|qualifications|skills|location|job location|חברה|ארגון|תפקיד|שם המשרה|תיאור|תיאור המשרה|תחומי אחריות|אחריות|דרישות|כישורים נדרשים)\s*:/i;
 const priorTitleReferenceSignal = /(?:שם\s+המשרה|הכותרת|התפקיד).{0,50}(?:כתוב|כתובה|הופיע|הופיעה|נמצא|נמצאת|שורה\s+ראשונה|למעלה|בהתחלה)|(?:כתוב|כתובה|הופיע|הופיעה|נמצא|נמצאת).{0,50}(?:שורה\s+ראשונה|למעלה|בהתחלה)|\b(?:title|role)\b.{0,50}\b(?:first line|above|previous|already|pasted)\b|\b(?:first line|above|previous|already pasted)\b.{0,50}\b(?:title|role)\b/i;
+const embeddedUrlSignal = /(?:https?:\/\/|www\.)\S+/i;
+const promotionalMediaTitleSignal = /\b(?:sneak\s+(?:peek|peak)|watch|learn\s+more|visit|click\s+here|our\s+product)\b/i;
 
 function hasStrongTitleLexiconMatch(value: string) {
   return findLexiconMatches({ text: value, language: "mixed" })
@@ -138,6 +140,10 @@ export function isPlausibleRoleTitle(value: string): boolean {
   if (/^(about|company|organization|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(title)) return false;
 
   return roleTitleSignal.test(title) || hebrewRoleTitleSignal.test(title) || hasStrongTitleLexiconMatch(title);
+}
+
+function isTrustworthyUnlabeledTitleCandidate(value: string) {
+  return !embeddedUrlSignal.test(value) && !promotionalMediaTitleSignal.test(value);
 }
 
 export function extractStandaloneRoleTitle(value: string): string | null {
@@ -213,10 +219,16 @@ function inferTitle(roleText: string): { value: string; confidence: "high" | "me
       !line.startsWith("http") &&
       !line.includes("applicants") &&
       !line.includes("District") &&
+      isTrustworthyUnlabeledTitleCandidate(line) &&
       isPlausibleRoleTitle(line),
     );
 
   if (inferredTitle) return { value: inferredTitle, confidence: "medium" };
+  const rejectedPromotionalCandidate = titleSource
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .some((line) => line && isPlausibleRoleTitle(line) && !isTrustworthyUnlabeledTitleCandidate(line));
+  if (rejectedPromotionalCandidate) return { value: "", confidence: "medium" };
   const semanticTitle = inferSemanticTitle(roleText);
   return { value: semanticTitle, confidence: semanticTitle ? "low" : "medium" };
 }

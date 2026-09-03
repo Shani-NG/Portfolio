@@ -21,6 +21,21 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.doesNotMatch(route.slice(repairStart, repairEnd), /initialProviderTimeoutMs/);
   });
 
+  test("allows one bounded retry only around the initial public report call", async () => {
+    const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
+    const initialStart = route.indexOf("let modelResult = await provider.generateReport({");
+    const failureBoundary = route.indexOf("if (!modelResult.ok)", initialStart);
+    const initialLifecycle = route.slice(initialStart, failureBoundary);
+
+    assert.match(initialLifecycle, /initialProviderTimeoutMs: 90_000/);
+    assert.match(initialLifecycle, /retryEarlyPublicReport503\(\{/);
+    assert.match(initialLifecycle, /initialProviderTimeoutMs: publicReportRetryTimeoutMs/);
+    assert.match(initialLifecycle, /modelOverride: reportModel/g);
+    assert.match(initialLifecycle, /retryUsed: retryRun\.retryUsed/);
+    assert.match(initialLifecycle, /finalOutcome: retryRun\.finalOutcome/);
+    assert.doesNotMatch(initialLifecycle, /composition-repair/);
+  });
+
   test("derives eligibility from the composed report and returns no-report before persistence", async () => {
     const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
     const noReportStart = route.indexOf('if (eligibility.state === "no-report")');
