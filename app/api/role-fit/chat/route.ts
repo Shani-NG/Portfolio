@@ -4,6 +4,7 @@ import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
+import { compareActiveReportRole, guardReportLifecycleClaim } from "@/lib/role-fit/conversation/active-report";
 import {
   clarificationLimitAnswer,
   existingReportAnswer,
@@ -51,6 +52,13 @@ const requestSchema = z
     completedReportCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional().default(0),
     conversationContext: z.string().max(12_000).optional(),
     reportContext: z.string().max(18_000).optional(),
+    activeReportRole: z
+      .object({
+        company: z.string().max(300).optional(),
+        title: z.string().max(300).optional(),
+      })
+      .strict()
+      .optional(),
     roleContext: z
       .object({
         roleDraft: roleDraftSchema,
@@ -133,15 +141,6 @@ export async function POST(request: Request) {
     });
   }
 
-  if (parsedRequest.data.reportContext && parsedRequest.data.repeatedInput && hasRoleInput) {
-    return NextResponse.json({
-      state: "report-ready",
-      answer: existingReportAnswer(parsedRequest.data.language),
-      roleDraft: roleContext?.roleDraft,
-      safeMessageKey: "report.existing_role",
-    });
-  }
-
   if (roleContext && pendingRoleField && isFieldClarification && !isValidRoleClarificationAnswer(pendingRoleField, parsedRequest.data.message)) {
     if (pendingRoleField === "title" && referencesPreviouslyProvidedTitle(parsedRequest.data.message)) {
       return NextResponse.json({
@@ -186,6 +185,23 @@ export async function POST(request: Request) {
   const incomingRoleDraft = hasRoleInput && !isFieldClarification
     ? createRoleDraftFromText(parsedRequest.data.message)
     : createEmptyRoleDraft();
+  const activeReportDisposition = parsedRequest.data.activeReportRole && hasRoleInput && !isFieldClarification
+    ? compareActiveReportRole(parsedRequest.data.activeReportRole, {
+        company: incomingRoleDraft.company?.originalValue,
+        title: incomingRoleDraft.title?.originalValue,
+      })
+    : "unknown";
+
+  if (activeReportDisposition === "same-role") {
+    return NextResponse.json({
+      state: "report-ready",
+      answer: existingReportAnswer(parsedRequest.data.language),
+      roleDraft: roleContext?.roleDraft,
+      activeReportDisposition,
+      safeMessageKey: "report.existing_role",
+    });
+  }
+
   const roleDraftForValidation = standaloneRoleTitle
     ? mergeRoleDraftClarification(createEmptyRoleDraft(), "title", standaloneRoleTitle)
     : roleCorrection && currentRoleDraft
@@ -255,6 +271,7 @@ export async function POST(request: Request) {
         roleDraft: validation.roleDraft,
         pendingField: null,
         clarificationExhausted: false,
+        ...(activeReportDisposition === "different-role" ? { activeReportDisposition } : {}),
         safeMessageKey: "role.ready_for_confirmation",
       });
     }
@@ -292,6 +309,7 @@ export async function POST(request: Request) {
       roleDraft: validation.roleDraft,
       pendingField: clarificationExhausted ? null : missingField,
       clarificationExhausted,
+      ...(activeReportDisposition === "different-role" ? { activeReportDisposition } : {}),
       safeMessageKey: "role.missing_required_fields",
     });
   }
@@ -353,6 +371,10 @@ export async function POST(request: Request) {
     state: "general-qa",
     provider: modelResult.provider,
     model: modelResult.model,
-    answer: modelResult.answer,
+    answer: guardReportLifecycleClaim({
+      answer: modelResult.answer,
+      hasAuthoritativeReport: Boolean(parsedRequest.data.reportContext),
+      language: parsedRequest.data.language,
+    }),
   });
 }

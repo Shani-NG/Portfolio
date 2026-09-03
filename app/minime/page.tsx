@@ -3,6 +3,7 @@
 import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import { createPublicReportContext } from "@/lib/role-fit/conversation/active-report";
 import {
   genericRecoverableErrorAnswer,
   isHebrewLanguage,
@@ -169,6 +170,10 @@ export default function RoleFitPage() {
     );
     const messageForAgent = submittedText;
     const activeLanguage = resolveConversationLanguage(submittedText, currentSession.activeLanguage);
+    const parsedActiveReport = currentSession.reportPayload
+      ? reportUIPayloadSchema.safeParse(currentSession.reportPayload)
+      : null;
+    const authoritativeReport = parsedActiveReport?.success ? parsedActiveReport.data : undefined;
 
     const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
     setRoleInput("");
@@ -197,7 +202,13 @@ export default function RoleFitPage() {
           clarificationAttempts: currentSession.clarificationAttempts,
           completedReportCount: currentSession.completedReportCount,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)).slice(-12000),
-          reportContext: currentSession.reportPayload ? JSON.stringify(currentSession.reportPayload).slice(0, 18000) : undefined,
+          reportContext: authoritativeReport ? JSON.stringify(createPublicReportContext(authoritativeReport)).slice(0, 18000) : undefined,
+          activeReportRole: authoritativeReport
+            ? {
+                company: authoritativeReport.roleSnapshot.company,
+                title: authoritativeReport.roleSnapshot.title,
+              }
+            : undefined,
           roleContext: currentSession.activeRoleDraft
             ? {
                 roleDraft: currentSession.activeRoleDraft,
@@ -209,7 +220,10 @@ export default function RoleFitPage() {
 
       const result = await response.json();
       const responseState = (result.state ?? "general-qa") as RoleFitLiveState;
-      const nextState = currentSession.reportPayload && responseState === "general-qa" ? "report-ready" : responseState;
+      const startsDifferentRole = result.activeReportDisposition === "different-role";
+      const recognizesActiveReport = result.activeReportDisposition === "same-role";
+      const retainedReportPayload = startsDifferentRole ? null : currentSession.reportPayload;
+      const nextState = retainedReportPayload && responseState === "general-qa" ? "report-ready" : responseState;
       appendLiveMessage({ role: "agent", content: result.answer ?? "I need a little more context before I can answer safely." });
       syncLiveSession({
         state: nextState,
@@ -220,7 +234,18 @@ export default function RoleFitPage() {
           ? currentSession.clarificationAttempts + 1
           : 0,
         activeLanguage,
+        ...(startsDifferentRole
+          ? {
+              reportPayload: null,
+              reportProvider: "",
+              reportModel: "",
+              pendingReportId: null,
+              expandedEvidenceItemIds: null,
+            }
+          : {}),
       });
+      if (startsDifferentRole) setActivePane("chat");
+      if (recognizesActiveReport) setActivePane("report");
 
       if (!response.ok) {
         setApiStatusMessage(result.answer ?? "The Role Fit Agent is not available right now. Please try again later.");

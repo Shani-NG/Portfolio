@@ -4,6 +4,52 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 describe("Role Fit runtime conversation contract", () => {
+  it("recognizes an active report by role identity instead of the previous user message", async () => {
+    const route = await readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8");
+    const identityCheck = route.indexOf("compareActiveReportRole(parsedRequest.data.activeReportRole");
+    const sameRoleBranch = route.slice(
+      route.indexOf('if (activeReportDisposition === "same-role")', identityCheck),
+      route.indexOf("const roleDraftForValidation", identityCheck),
+    );
+
+    assert.ok(identityCheck >= 0);
+    assert.match(sameRoleBranch, /state: "report-ready"/);
+    assert.match(sameRoleBranch, /existingReportAnswer/);
+    assert.doesNotMatch(sameRoleBranch, /awaiting-report-confirmation|generateReport/);
+    assert.doesNotMatch(route, /reportContext && parsedRequest\.data\.repeatedInput/);
+  });
+
+  it("starts a different role without discarding session identity or the completed-report count", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+    const transitionStart = page.indexOf('const startsDifferentRole = result.activeReportDisposition === "different-role"');
+    const transitionEnd = page.indexOf("if (!response.ok)", transitionStart);
+    const transition = page.slice(transitionStart, transitionEnd);
+
+    assert.ok(transitionStart >= 0);
+    assert.match(transition, /reportPayload: null/);
+    assert.match(transition, /pendingReportId: null/);
+    assert.doesNotMatch(transition, /sessionId:|conversationId:|completedReportCount:/);
+    assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)/);
+    assert.match(page, /await requestReport\(currentSession\)/);
+  });
+
+  it("sends only sanitized report context and explicit active role identity to the canonical chat route", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+
+    assert.match(page, /JSON\.stringify\(createPublicReportContext\(authoritativeReport\)\)/);
+    assert.match(page, /activeReportRole:/);
+    assert.match(page, /company: authoritativeReport\.roleSnapshot\.company/);
+    assert.match(page, /title: authoritativeReport\.roleSnapshot\.title/);
+    assert.doesNotMatch(page, /reportContext: currentSession\.reportPayload \? JSON\.stringify\(currentSession\.reportPayload\)/);
+  });
+
+  it("guards model lifecycle claims using authoritative report context", async () => {
+    const route = await readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8");
+
+    assert.match(route, /answer: guardReportLifecycleClaim\(\{/);
+    assert.match(route, /hasAuthoritativeReport: Boolean\(parsedRequest\.data\.reportContext\)/);
+  });
+
   it("never auto-approves a report after role completion", async () => {
     const route = await readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8");
 
