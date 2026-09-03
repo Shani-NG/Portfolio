@@ -23,6 +23,7 @@ type ReportDiagnosticMetadata = NonNullable<RoleFitProviderFailure["diagnostics"
 type GeminiJsonSchema = Record<string, unknown>;
 
 const reportSchemaRepairMaxOutputTokens = 5_000;
+const defaultProviderTimeoutMs = 45_000;
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim();
@@ -282,6 +283,7 @@ async function generateGeminiContent(input: {
   thinkingLevel?: "minimal" | "low" | "medium" | "high";
   attemptPhase?: ReportDiagnosticMetadata["attemptPhase"];
   repairTriggerCategory?: ReportDiagnosticMetadata["repairTriggerCategory"];
+  timeoutMs?: number;
 }): Promise<GeminiCallResult> {
   let lastError: GeminiCallResult | undefined;
 
@@ -309,7 +311,7 @@ async function generateGeminiContent(input: {
               : {}),
           },
         }),
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(input.timeoutMs ?? defaultProviderTimeoutMs),
       });
     } catch (error) {
       const isTimeout = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
@@ -668,6 +670,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         responseJsonSchema: geminiReportAnalysisJsonSchema,
         thinkingLevel: "minimal",
         attemptPhase: initialAttemptPhase,
+        timeoutMs: input.initialProviderTimeoutMs,
       });
 
       let invalidDetail = "qualitative-analysis:unknown";

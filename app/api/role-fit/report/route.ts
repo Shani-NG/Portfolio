@@ -268,6 +268,7 @@ export async function POST(request: Request) {
     language: parsedRequest.data.language,
     task: "analysis",
     modelOverride: getGoogleAiStudioReportModel(),
+    initialProviderTimeoutMs: 90_000,
     maxOutputTokens: reportAnalysisMaxOutputTokens,
     runtimeState: JSON.stringify({ validation, roleItems }),
     approvedEvidence: approvedEvidence.promptContext,

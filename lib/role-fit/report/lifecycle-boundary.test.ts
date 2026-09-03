@@ -6,6 +6,21 @@ import { describe, test } from "node:test";
 const projectRoot = process.cwd();
 
 describe("Role Fit report lifecycle boundary", () => {
+  test("overrides only the initial public report provider timeout", async () => {
+    const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
+    const initialStart = route.indexOf("let modelResult = await provider.generateReport({");
+    const initialEnd = route.indexOf("let providerElapsedMs", initialStart);
+    const repairStart = route.indexOf("const repairResult = await provider.generateReport({", initialEnd);
+    const repairEnd = route.indexOf("if (repairResult.ok)", repairStart);
+
+    assert.ok(initialStart >= 0);
+    assert.ok(initialEnd > initialStart);
+    assert.ok(repairStart > initialEnd);
+    assert.ok(repairEnd > repairStart);
+    assert.match(route.slice(initialStart, initialEnd), /initialProviderTimeoutMs: 90_000/);
+    assert.doesNotMatch(route.slice(repairStart, repairEnd), /initialProviderTimeoutMs/);
+  });
+
   test("derives eligibility from the composed report and returns no-report before persistence", async () => {
     const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
     const noReportStart = route.indexOf('if (eligibility.state === "no-report")');

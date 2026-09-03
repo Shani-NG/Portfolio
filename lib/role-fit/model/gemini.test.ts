@@ -11,9 +11,11 @@ const originalChatModel = process.env.GOOGLE_AI_STUDIO_CHAT_MODEL;
 const originalChatFallbackModel = process.env.GOOGLE_AI_STUDIO_CHAT_FALLBACK_MODEL;
 const originalAnalysisModel = process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL;
 const originalReportModel = process.env.GOOGLE_AI_STUDIO_REPORT_MODEL;
+const originalAbortSignalTimeout = AbortSignal.timeout;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  AbortSignal.timeout = originalAbortSignalTimeout;
   if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
   else process.env.GEMINI_API_KEY = originalApiKey;
   if (originalChatModel === undefined) delete process.env.GOOGLE_AI_STUDIO_CHAT_MODEL;
@@ -25,6 +27,15 @@ afterEach(() => {
   if (originalReportModel === undefined) delete process.env.GOOGLE_AI_STUDIO_REPORT_MODEL;
   else process.env.GOOGLE_AI_STUDIO_REPORT_MODEL = originalReportModel;
 });
+
+function captureProviderTimeouts() {
+  const timeouts: number[] = [];
+  AbortSignal.timeout = (milliseconds) => {
+    timeouts.push(milliseconds);
+    return originalAbortSignalTimeout(milliseconds);
+  };
+  return timeouts;
+}
 
 function geminiResponse(text: string, finishReason: string) {
   return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] }, finishReason }] }), {
@@ -312,6 +323,84 @@ describe("Gemini chat completion guard", () => {
     assert.equal(typeof result.diagnostics.providerElapsedMs, "number");
     assert.equal(result.diagnostics.schemaRepairUsed, false);
     assert.deepEqual(models, ["gemini-3.5-flash"]);
+  });
+
+  it("uses a request-level timeout override only for the initial report request", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    const timeouts = captureProviderTimeouts();
+    globalThis.fetch = async () => geminiResponse(validReportAnalysis(0), "STOP");
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      initialProviderTimeoutMs: 90_000,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(timeouts, [90_000]);
+  });
+
+  it("keeps schema repair at the default timeout after an overridden initial report request", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    const timeouts = captureProviderTimeouts();
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls += 1;
+      return calls === 1
+        ? geminiResponse('{"fitLevel":"good"', "MAX_TOKENS")
+        : geminiResponse(validReportAnalysis(0), "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      initialProviderTimeoutMs: 90_000,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(timeouts, [90_000, 45_000]);
+  });
+
+  it("keeps default report and Chat requests at 45 seconds", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    process.env.GOOGLE_AI_STUDIO_CHAT_MODEL = "gemini-3.5-flash-lite";
+    const timeouts = captureProviderTimeouts();
+    globalThis.fetch = async (_input, init) => {
+      const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return requestGenerationConfig(request).responseMimeType === "application/json"
+        ? geminiResponse(validReportAnalysis(0), "STOP")
+        : geminiResponse("The requested information is ready.", "STOP");
+    };
+
+    const reportResult = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+    const chatResult = await createGeminiRoleFitProvider().generateChat({
+      message: "What should I review?",
+      language: "en",
+      maxOutputTokens: 800,
+      approvedContext: "Approved profile context.",
+    });
+
+    assert.equal(reportResult.ok, true);
+    assert.equal(chatResult.ok, true);
+    assert.deepEqual(timeouts, [45_000, 45_000]);
   });
 
   it("returns the complete sentence when a retry ends with a trailing fragment", async () => {
