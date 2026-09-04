@@ -73,7 +73,7 @@
   padding: 0;
   position: fixed;
   right: 28px;
-  top: calc(var(--site-header-height) + 72px);
+  top: calc(var(--site-header-height) + 16px);
   transition: transform 0.25s ease, background 0.25s ease;
   z-index: 30;
   width: 44px;
@@ -1179,7 +1179,7 @@
     bottom: auto;
     left: auto;
     right: max(var(--ds-grid-gutter), calc(env(safe-area-inset-right) + var(--ds-grid-gutter)));
-    top: calc(var(--site-header-height) + 72px);
+    top: calc(var(--site-header-height) + 16px);
     justify-content: center;
   }
 

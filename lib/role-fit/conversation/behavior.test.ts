@@ -99,9 +99,9 @@ describe("Role Fit conversation behavior", () => {
   });
 
   it("keeps report transition copy conversational and free of internal terminology", () => {
-    assert.match(reportLoadingAnswer("he"), /מתחילה ליצור את הדוח/);
-    assert.match(reportLoadingAnswer("en"), /Starting the report/);
-    assert.doesNotMatch(reportLoadingAnswer("en"), /Evidence Cards|payload|persistence/i);
+    assert.match(reportLoadingAnswer("he"), /דוח ה־RoleFit שלך/);
+    assert.match(reportLoadingAnswer("en"), /I’m working on your RoleFit report now/);
+    assert.doesNotMatch(reportLoadingAnswer("en"), /Evidence Cards|payload|persistence|Gemini|Google|provider|server|retry|timeout|infrastructure/i);
     assert.match(reportReadyAnswer("he"), /בדיקת ההתאמה מוכנה/);
     assert.match(reportReadyAnswer("en"), /specific requirement, strength, or gap/);
   });

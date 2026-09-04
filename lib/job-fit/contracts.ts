@@ -37,6 +37,17 @@ export type JobFitRequirementAssessment = {
   evidenceSourceIds: string[];
 };
 
+export type JobFitProviderDiagnostics = {
+  provider?: "gemini";
+  model?: string;
+  failureCategory?: "provider_timeout" | "network_failure" | "provider_http_503" | "provider_http_429" | "max_tokens" | "invalid_json" | "schema_invalid" | "empty_response" | "invalid_role_index" | "duplicate_role_index" | "unknown_transport_failure";
+  providerStatus?: number;
+  retryable?: boolean;
+  providerElapsedMs?: number;
+  responseBodyPresent?: boolean;
+  attemptPhase?: "initial-analysis" | "schema-repair" | "composition-repair";
+};
+
 export type JobFitEvaluatorResponse =
   | {
       state: "ready";
@@ -66,4 +77,6 @@ export type JobFitEvaluatorResponse =
       reason: string;
       rationale?: string;
       requirementAssessments?: JobFitRequirementAssessment[];
+      /** Internal-only transport metadata. The API route strips this before responding. */
+      diagnostics?: JobFitProviderDiagnostics;
     };

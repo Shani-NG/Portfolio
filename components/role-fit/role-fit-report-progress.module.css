@@ -1,0 +1,150 @@
+.progressShell {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  min-height: min(42rem, calc(100vh - var(--site-header-height) - 8rem));
+  overflow: hidden;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  text-align: center;
+}
+
+.stageContent,
+.successContent {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  inline-size: min(100%, 36rem);
+}
+
+.eyebrow {
+  color: var(--rf-green-500);
+  font-family: var(--ds-font-family-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.stageContent h2,
+.successContent h2 {
+  color: var(--rf-text-primary);
+  font-family: var(--ds-font-family-display);
+  font-size: 1.5rem;
+  letter-spacing: 0;
+  line-height: 1.15;
+  margin: 1rem 0 0;
+}
+
+.stageCopy {
+  animation: stageEnter 360ms cubic-bezier(.2, .8, .2, 1);
+  color: var(--rf-text-primary);
+  font-size: 1.125rem;
+  min-block-size: 3.2rem;
+  line-height: 1.4;
+  margin: 1.5rem 0 0;
+  max-inline-size: 32rem;
+}
+
+.visualSurface {
+  block-size: clamp(19rem, 40vw, 24rem);
+  inline-size: min(100%, 31rem);
+  margin-block-start: 3.375rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.backgroundCircle {
+  aspect-ratio: 1;
+  background: #0b0d12;
+  border-radius: 50%;
+  box-shadow: 0 0 34px rgba(216, 166, 180, 0.13), 0 0 28px rgba(184, 216, 208, 0.08);
+  inline-size: calc(min(70.2%, 468px) + 64px);
+  inset: 50% auto auto 50%;
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.visualFrame {
+  block-size: 40rem;
+  border: 0;
+  inline-size: 47.5rem;
+  inset-block-start: -11.75rem;
+  inset-inline-start: 50%;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%) scale(0.82);
+  transform-origin: top center;
+  transition: opacity 360ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.activeFrame {
+  opacity: 1;
+}
+
+.successShell {
+  min-height: min(34rem, calc(100vh - var(--site-header-height) - 10rem));
+}
+
+.successContent {
+  border-radius: var(--rf-radius-lg);
+  min-block-size: 18rem;
+  justify-content: center;
+}
+
+.successContent .eyebrow {
+  color: var(--rf-rose-500);
+  text-shadow: 0 0 18px rgba(216, 166, 180, 0.36);
+}
+
+@keyframes stageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 70rem) {
+  .progressShell {
+    min-height: 32rem;
+    padding-inline: 1rem;
+  }
+}
+
+@media (max-width: 40rem) {
+  .visualFrame {
+    transform: translateX(-50%) scale(0.68);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stageCopy,
+  .successContent {
+    animation: reducedStageEnter 220ms ease-out;
+  }
+
+  .visualFrame {
+    transition: opacity 220ms ease-out;
+  }
+
+  .activeFrame {
+    opacity: 0.86;
+  }
+}
+
+@keyframes reducedStageEnter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
