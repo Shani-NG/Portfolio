@@ -4,7 +4,7 @@
   flex: 1;
   justify-content: center;
   min-height: min(42rem, calc(100vh - var(--site-header-height) - 8rem));
-  overflow: hidden;
+  overflow: visible;
   padding: clamp(1.5rem, 4vw, 3rem);
   text-align: center;
 }
