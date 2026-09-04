@@ -69,6 +69,7 @@
 .backgroundCircle {
   aspect-ratio: 1;
   background: #0b0d12;
+  block-size: var(--background-circle-diameter);
   border-radius: 50%;
   inline-size: var(--background-circle-diameter);
   inset: 50% auto auto 50%;
@@ -79,6 +80,7 @@
 .frameMask {
   aspect-ratio: 1;
   background: #0b0d12;
+  block-size: var(--animation-circle-diameter);
   border-radius: 50%;
   inline-size: var(--animation-circle-diameter);
   inset: 50% auto auto 50%;
