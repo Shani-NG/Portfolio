@@ -70,20 +70,16 @@ export function RoleFitReportProgress({ mode = "progress" }: RoleFitReportProgre
         <h2>SCANNING</h2>
         <p className={styles.stageCopy} key={stage.copy}>{stage.copy}</p>
         <div className={styles.visualSurface} aria-hidden="true">
-          <div className={styles.animationStack}>
-            <div className={styles.backgroundCircle} />
-            <div className={styles.frameMask}>
-              {progressStages.map((progressStage, index) => (
-                <iframe
-                  className={`${styles.visualFrame} ${index === stageIndex ? styles.activeFrame : ""}`}
-                  key={progressStage.visualSrc}
-                  src={progressStage.visualSrc}
-                  tabIndex={-1}
-                  title=""
-                />
-              ))}
-            </div>
-          </div>
+          <div className={styles.backgroundCircle} />
+          {progressStages.map((progressStage, index) => (
+            <iframe
+              className={`${styles.visualFrame} ${index === stageIndex ? styles.activeFrame : ""}`}
+              key={progressStage.visualSrc}
+              src={progressStage.visualSrc}
+              tabIndex={-1}
+              title=""
+            />
+          ))}
         </div>
       </div>
     </div>

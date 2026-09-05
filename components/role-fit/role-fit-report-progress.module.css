@@ -49,58 +49,44 @@
 
 .visualSurface {
   --frame-scale: 0.82;
-  --source-animation-diameter: 20.1825rem;
-  --source-animation-center-y: 28.963rem;
-  --animation-circle-diameter: calc(var(--source-animation-diameter) * var(--frame-scale));
-  --background-circle-diameter: calc(var(--animation-circle-diameter) + 4rem);
-  block-size: var(--background-circle-diameter);
-  inline-size: var(--background-circle-diameter);
+  --source-unit-center-y: 22.27975rem;
+  --source-unit-diameter: 20.1825rem;
+  --inner-circle-size: calc(var(--source-unit-diameter) * var(--frame-scale));
+  --background-circle-diameter: calc(var(--inner-circle-size) + 4rem);
+  block-size: 24rem;
+  inline-size: min(100%, 31rem);
   margin-block-start: 3.375rem;
   overflow: visible;
   position: relative;
 }
 
-.animationStack {
-  block-size: var(--background-circle-diameter);
-  inline-size: var(--background-circle-diameter);
-  position: relative;
-}
-
 .backgroundCircle {
   aspect-ratio: 1;
-  background: #0b0d12;
+  background: #000000;
   block-size: var(--background-circle-diameter);
   border-radius: 50%;
   inline-size: var(--background-circle-diameter);
-  inset: 50% auto auto 50%;
+  inset-block-start: calc(-11.75rem + (var(--source-unit-center-y) * var(--frame-scale)));
+  inset-inline-start: 50%;
   position: absolute;
   transform: translate(-50%, -50%);
-}
-
-.frameMask {
-  aspect-ratio: 1;
-  background: #0b0d12;
-  block-size: var(--animation-circle-diameter);
-  border-radius: 50%;
-  inline-size: var(--animation-circle-diameter);
-  inset: 50% auto auto 50%;
-  overflow: hidden;
-  position: absolute;
-  transform: translate(-50%, -50%);
+  z-index: 0;
 }
 
 .visualFrame {
   block-size: 40rem;
   border: 0;
+  clip-path: circle(calc(var(--source-unit-diameter) / 2) at 50% var(--source-unit-center-y));
   inline-size: 47.5rem;
-  inset-block-start: calc(50% - (var(--source-animation-center-y) * var(--frame-scale)));
+  inset-block-start: -11.75rem;
   inset-inline-start: 50%;
   opacity: 0;
   pointer-events: none;
   position: absolute;
-  transform: translateX(-50%) scale(var(--frame-scale));
+  transform: translateX(-50%) scale(0.82);
   transform-origin: top center;
   transition: opacity 520ms linear;
+  z-index: 1;
 }
 
 .activeFrame {
@@ -144,6 +130,10 @@
 @media (max-width: 40rem) {
   .visualSurface {
     --frame-scale: 0.68;
+  }
+
+  .visualFrame {
+    transform: translateX(-50%) scale(0.68);
   }
 }
 
