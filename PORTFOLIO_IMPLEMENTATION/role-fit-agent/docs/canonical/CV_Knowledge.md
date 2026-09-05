@@ -4,6 +4,12 @@
 
 *Structured professional knowledge for portfolio-agent retrieval, role-fit analysis, and evidence-grounded responses.*
 
+**CURRENT AI IMPLEMENTATION TOOLING SUMMARY**
+
+Hands-on AI product / UX implementation using modern AI-assisted development, automation, integration, data, and delivery tooling, including Vibe Coding, Vibe Engineering, coding-agent workflows, Claude Code, Codex, Make, MCP, API integration, Supabase, database-backed application workflows, persistence, runtime logging, server/API integration, VS Code, Git, GitHub, and Vercel.
+
+Boundary: this supports AI product implementation and UX-led implementation practice. It does not convert Shani's positioning into Software Engineer, Backend Engineer, ML Engineer, Database Engineer, DevOps Engineer, infrastructure owner, or production-scale engineering owner.
+
 **DOCUMENT CONTROL**
 
 Source file: CV\_Shani\_NG\_2026.docx
@@ -172,11 +178,11 @@ Design Thinking; Workshop Facilitation; Hackathon Architecture.
 
 AI and emerging methodologies
 
-AI-Augmented UX; ML Data Annotation; RAG-Based Research; Vibe Coding; LLM-related workflows.
+AI-Augmented UX; ML Data Annotation; RAG-Based Research; Vibe Coding; Vibe Engineering; AI-assisted implementation; coding-agent workflows; AI Agent Architecture; agentic workflows; Prompt Engineering; RAG and LLM-related workflows.
 
 Design, collaboration, and delivery tools
 
-Figma; UXpilot; Adobe Creative Suite; Confluence; Azure DevOps; Monday.com; Office 365; Make; Claude Code; Git.
+Figma; UXpilot; Adobe Creative Suite; Confluence; Azure DevOps; Monday.com; Office 365; Make; MCP; API integration; Supabase; database-backed application workflows; structured application data and tables; persistence; runtime logging; server/API integration; Claude Code; Codex; VS Code; Git; GitHub; Vercel.
 
 **LANGUAGES**
 
@@ -258,23 +264,23 @@ Use for people leadership, mentorship, and professional-development requirements
 
 Claim
 
-Shani has hands-on professional exposure to RAG, LLM integrations, Vibe Coding, AI-augmented UX, and organizational AI adoption.
+Shani has hands-on AI product implementation experience using AI-assisted development, coding-agent workflows, automation, integration, and data/persistence tooling, including documented use of Vibe Coding, Claude Code, Codex, Make, MCP, API integration, Supabase, Git/GitHub, and Vercel.
 
 Evidence basis
 
-Energy Team responsibilities, strategic skills, and current AI Implementation & Integration studies.
+Energy Team responsibilities, strategic skills, current AI Implementation & Integration studies, and documented hands-on Role Fit Agent implementation practice.
 
 Reliability
 
-High for exposure and practice; medium for depth in any specific technical implementation.
+High for hands-on AI product and UX implementation practice; medium for depth, scale, or ownership in any specific engineering specialization.
 
 Safe use
 
-Describe as AI-augmented UX and implementation practice.
+Describe as hands-on AI product / UX implementation using modern AI-assisted development, automation, integration, data, and delivery tooling. When approved evidence directly supports, or reasonably demonstrates exposure to, an adjacent tool or method, treat that evidence positively rather than converting an exact vendor-name mismatch into a gap. Do not downgrade a capability solely because the job description names a different tool from the same functional category, such as Cursor when approved evidence includes Claude Code, Codex, Git/GitHub, and AI-assisted implementation.
 
 Limitation
 
-Do not describe Shani as an ML engineer, software engineer, or model researcher.
+Do not describe Shani as a software engineer, backend engineer, ML engineer, database engineer, DevOps engineer, infrastructure owner, or model researcher. Preserve a gap where a job requirement materially adds unsupported depth, ownership, scale, tenure, or engineering specialization.
 
 **EV-CV-05 — Medical and ML data-annotation experience**
 
@@ -329,6 +335,8 @@ Do not claim
 • Unstated business metrics, adoption rates, revenue impact, or quantified performance improvement.
 
 • Technical engineering ownership beyond the documented UX, product, innovation, and coordination scope.
+
+• Software Engineer, Backend Engineer, ML Engineer, Database Engineer, DevOps Engineer, infrastructure ownership, or production-scale engineering ownership.
 
 • Expertise in a named tool or methodology beyond the level supported by the CV.
 

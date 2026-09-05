@@ -6,6 +6,26 @@ import { describe, test } from "node:test";
 const projectRoot = process.cwd();
 
 describe("Role Fit report lifecycle boundary", () => {
+  test("keeps the public loading presentation timed and presentation-only", async () => {
+    const [page, progress] = await Promise.all([
+      readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8"),
+      readFile(join(projectRoot, "components", "role-fit", "role-fit-report-progress.tsx"), "utf8"),
+    ]);
+
+    assert.match(progress, /const stageTransitionDelays = \[3500, 7500, 11500, 15500\] as const/);
+    assert.equal((progress.match(/window\.setTimeout/g) ?? []).length, 1);
+    assert.doesNotMatch(progress, /setInterval/);
+    assert.match(progress, /setStageIndex\(index \+ 1\)/);
+    assert.match(progress, /Making sure nothing is missed/);
+    assert.match(page, /type ReportPresentationState = "normal" \| "success-bridge"/);
+    assert.match(page, /window\.setTimeout\(\(\) => \{/);
+    assert.match(page, /\}, 650\)/);
+    assert.match(page, /liveSession\.state === "generating-report"/);
+    assert.match(page, /liveSession\.state === "recoverable-error" && !activeReport/);
+    assert.match(page, /activeReport && reportPresentationState === "success-bridge"/);
+    assert.match(page, /<RoleFitLiveReport/);
+  });
+
   test("derives eligibility from the composed report and returns no-report before persistence", async () => {
     const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
     const noReportStart = route.indexOf('if (eligibility.state === "no-report")');

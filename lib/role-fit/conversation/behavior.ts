@@ -151,8 +151,8 @@ export function reportLimitAnswer(language: "he" | "en" | "mixed") {
 
 export function reportLoadingAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
-    ? "מתחילה ליצור את הדוח...\nזה ייקח לי כמה רגעים לחבר בין דרישות המשרה לניסיון ולפרויקטים הרלוונטיים."
-    : "Starting the report...\nThis will take me a few moments to connect the role requirements with the relevant experience and projects.";
+    ? "אני עובדת עכשיו על דוח ה־RoleFit שלך. זה יכול לקחת כמה דקות, אבל אני מוודאת שזה יהיה שווה את ההמתנה."
+    : "I’m working on your RoleFit report now. It may take a few minutes, but I’m making sure it’s worth the wait.";
 }
 
 export function reportRetryableFailureAnswer(language: "he" | "en" | "mixed") {

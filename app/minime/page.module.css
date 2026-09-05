@@ -73,7 +73,7 @@
   padding: 0;
   position: fixed;
   right: 28px;
-  top: calc(var(--site-header-height) + 72px);
+  top: calc(var(--site-header-height) + 16px);
   transition: transform 0.25s ease, background 0.25s ease;
   z-index: 30;
   width: 44px;
@@ -1175,11 +1175,46 @@
     padding: 16px 12px 96px;
   }
 
+  .roleFitPage.conversationPage {
+    bottom: 0;
+    display: flex;
+    left: 0;
+    overflow: hidden;
+    padding: var(--ds-space-lg) var(--ds-grid-gutter) max(var(--ds-space-lg), env(safe-area-inset-bottom));
+    right: 0;
+    top: var(--site-header-height);
+  }
+
+  .conversationPage .agentViewContainer {
+    flex: 1;
+    height: auto;
+    margin: 0 auto;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .conversationPage .chatPane {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+  }
+
+  .conversationPage .chatHistory {
+    flex: 1;
+    margin-bottom: var(--ds-space-lg);
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .conversationPage .chatBoxContainer {
+    flex: 0 0 auto;
+  }
+
   .stickyReportChip {
     bottom: auto;
     left: auto;
     right: max(var(--ds-grid-gutter), calc(env(safe-area-inset-right) + var(--ds-grid-gutter)));
-    top: calc(var(--site-header-height) + 72px);
+    top: calc(var(--site-header-height) + 16px);
     justify-content: center;
   }
 

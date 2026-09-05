@@ -287,6 +287,12 @@ export async function POST(request: Request) {
       retryable: failedModelResult.retryable ?? false,
       retryAfterSeconds: failedModelResult.retryAfterSeconds,
       ...safeProviderDiagnostics(failedModelResult),
+      ...(failedModelResult.error === "provider-error"
+        && failedModelResult.providerStatus !== undefined
+        && failedModelResult.diagnostics?.responseBodyPresent
+        && failedModelResult.detail
+          ? { providerErrorDetail: failedModelResult.detail }
+          : {}),
       ...(failedModelResult.error === "invalid-output" ? { diagnostic: failedModelResult.detail } : {}),
     });
     after(() =>

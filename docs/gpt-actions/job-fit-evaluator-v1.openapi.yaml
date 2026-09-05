@@ -38,14 +38,27 @@ paths:
           description: The normalized candidate contract is invalid.
         '401':
           description: The evaluator Bearer credential is missing or invalid.
-        '409':
-          description: The evaluation retry state is ambiguous and cannot be replayed.
         '422':
-          description: The job is out of scope, invalid for analysis, or evaluation failed safely.
+          description: The job is out of scope or invalid for analysis.
         '429':
           description: The evaluator quota is unavailable.
         '503':
-          description: The evaluator model or backing service is unavailable.
+          description: >-
+            The evaluator model or backing service is temporarily unavailable, or the same
+            canonical evaluation is already active. The GPT must not invent a substitute result.
+          headers:
+            Retry-After:
+              description: Seconds until the active evaluation lease expires, when applicable.
+              schema: { type: integer, minimum: 1, maximum: 120 }
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [state, reason]
+                properties:
+                  state: { type: string, const: model-unavailable }
+                  reason: { type: string }
 components:
   securitySchemes:
     evaluatorBearer:

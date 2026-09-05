@@ -1,0 +1,164 @@
+.progressShell {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  min-height: min(42rem, calc(100vh - var(--site-header-height) - 8rem));
+  overflow: visible;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  text-align: center;
+}
+
+.stageContent,
+.successContent {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  inline-size: min(100%, 36rem);
+}
+
+.eyebrow {
+  color: var(--rf-green-500);
+  font-size: var(--ds-type-label-13-size);
+  font-weight: var(--ds-type-weight-semibold);
+  letter-spacing: 0.08em;
+  line-height: var(--ds-type-label-13-line);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.stageContent h2,
+.successContent h2 {
+  color: var(--rf-text-primary);
+  font-family: var(--ds-font-family-display);
+  font-size: 1.5rem;
+  letter-spacing: 0;
+  line-height: 1.15;
+  margin: 1rem 0 0;
+}
+
+.stageCopy {
+  animation: stageEnter 360ms cubic-bezier(.2, .8, .2, 1);
+  color: var(--rf-text-primary);
+  font-size: 1rem;
+  font-weight: var(--ds-type-weight-regular);
+  min-block-size: 3.2rem;
+  line-height: var(--ds-type-body-16-line);
+  margin: 1.5rem 0 0;
+  max-inline-size: 32rem;
+}
+
+.visualSurface {
+  --frame-scale: 0.82;
+  --source-unit-center-y: 22.27975rem;
+  --source-unit-diameter: 20.1825rem;
+  --inner-circle-size: calc(var(--source-unit-diameter) * var(--frame-scale));
+  --background-circle-diameter: calc(var(--inner-circle-size) + 4rem);
+  block-size: 24rem;
+  inline-size: min(100%, 31rem);
+  margin-block-start: 4.5rem;
+  overflow: visible;
+  position: relative;
+}
+
+.backgroundCircle {
+  aspect-ratio: 1;
+  background: #000000;
+  block-size: var(--background-circle-diameter);
+  border-radius: 50%;
+  inline-size: var(--background-circle-diameter);
+  inset-block-start: calc(-11.75rem + (var(--source-unit-center-y) * var(--frame-scale)));
+  inset-inline-start: 50%;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+}
+
+.visualFrame {
+  block-size: 40rem;
+  border: 0;
+  clip-path: circle(calc(var(--source-unit-diameter) / 2) at 50% var(--source-unit-center-y));
+  inline-size: 47.5rem;
+  inset-block-start: -11.75rem;
+  inset-inline-start: 50%;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%) scale(0.82);
+  transform-origin: top center;
+  transition: opacity 520ms linear;
+  z-index: 1;
+}
+
+.activeFrame {
+  opacity: 1;
+}
+
+.successShell {
+  min-height: min(34rem, calc(100vh - var(--site-header-height) - 10rem));
+}
+
+.successContent {
+  border-radius: var(--rf-radius-lg);
+  min-block-size: 18rem;
+  justify-content: center;
+}
+
+.successContent .eyebrow {
+  color: var(--rf-rose-500);
+  text-shadow: 0 0 18px rgba(216, 166, 180, 0.36);
+}
+
+@keyframes stageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 70rem) {
+  .progressShell {
+    min-height: 32rem;
+    padding-inline: 1rem;
+  }
+}
+
+@media (max-width: 40rem) {
+  .visualSurface {
+    --frame-scale: 0.68;
+  }
+
+  .visualFrame {
+    transform: translateX(-50%) scale(0.68);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stageCopy,
+  .successContent {
+    animation: reducedStageEnter 220ms ease-out;
+  }
+
+  .visualFrame {
+    transition: opacity 220ms ease-out;
+  }
+
+  .activeFrame {
+    opacity: 0.86;
+  }
+}
+
+@keyframes reducedStageEnter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

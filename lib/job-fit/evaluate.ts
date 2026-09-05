@@ -139,7 +139,22 @@ export async function evaluateCanonicalJobFit(candidate: NormalizedJobCandidate)
     }),
     approvedEvidence: approvedEvidence.promptContext,
   });
-  if (!modelResult.ok) return { state: "model-unavailable", reason: modelResult.safeMessageKey };
+  if (!modelResult.ok) {
+    return {
+      state: "model-unavailable",
+      reason: modelResult.safeMessageKey,
+      diagnostics: {
+        provider: modelResult.provider,
+        ...(modelResult.model ? { model: modelResult.model } : {}),
+        ...(modelResult.diagnostics?.failureCategory ? { failureCategory: modelResult.diagnostics.failureCategory } : {}),
+        ...(modelResult.providerStatus !== undefined ? { providerStatus: modelResult.providerStatus } : {}),
+        ...(modelResult.retryable !== undefined ? { retryable: modelResult.retryable } : {}),
+        ...(modelResult.diagnostics?.elapsedMs !== undefined ? { providerElapsedMs: modelResult.diagnostics.elapsedMs } : {}),
+        ...(modelResult.diagnostics?.responseBodyPresent !== undefined ? { responseBodyPresent: modelResult.diagnostics.responseBodyPresent } : {}),
+        ...(modelResult.diagnostics?.attemptPhase ? { attemptPhase: modelResult.diagnostics.attemptPhase } : {}),
+      },
+    };
+  }
 
   const assessments = assessmentsFromAnalysis(modelResult.analysis, prepared.roleItems);
   const stableFit = resolveStableFitLevel(modelResult.analysis);

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RoleFit — Reviewing Preview</title>
+  <style>
+    :root { color-scheme: dark; font-family: Outfit, Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; min-height: 100vh; background: #0b0d12; color: #f2efea; }
+    main { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    .canvas { width: min(100%, 760px); min-height: min(92vh, 820px); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; background: radial-gradient(circle at 50% 44%, rgba(184,216,208,.045), transparent 39%), #0b0d12; }
+    .label { color: #93bdb2; font-size: .76rem; font-weight: 600; letter-spacing: .19em; line-height: 1; }
+    .caption { margin: 24px 24px 0; color: #c9c3bc; font-size: clamp(1rem, 1.4vw, 1.12rem); line-height: 1.3; text-align: center; }
+    .viewport { position: relative; display: grid; place-items: center; width: min(100%, 460px); height: min(58vh, 460px); margin-top: 16px; }
+    .halo { position: absolute; width: min(calc(70.2% + 32px), 500px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 50% 58%, rgba(94,194,165,.16), rgba(67,167,139,.08) 23%, rgba(30,92,78,.035) 38%, transparent 52%); filter: blur(18px); opacity: .72; animation: breathe 6s ease-in-out infinite; }
+    .unit { position: relative; width: min(70.2%, 468px); aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: #0b0d12; isolation: isolate; }
+    .unit img, .unit svg { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .unit img { position: relative; z-index: 0; }
+    .unit svg { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: visible; }
+    .scan { animation: scan 5.2s cubic-bezier(.2,0,0,1) infinite; transform-box: fill-box; transform-origin: center; }
+    .paths { opacity: .28; }
+    .particle { opacity: 0; filter: drop-shadow(0 0 5px rgba(242,192,206,.62)); animation: flow 5.2s ease-in-out infinite; }
+    .p2 { animation-delay: .55s; } .p3 { animation-delay: 1.05s; } .p4 { animation-delay: 1.45s; } .p5 { animation-delay: 1.9s; }
+    @keyframes breathe { 0%,100% { transform: translateZ(0) scale(.98); opacity: .58; } 50% { transform: translateZ(0) scale(1); opacity: .76; } }
+    @keyframes scan { 0%,8% { transform: translateY(-22px); opacity: 0; } 15% { opacity: 1; } 73% { transform: translateY(420px); opacity: 1; } 84%,100% { transform: translateY(460px); opacity: 0; } }
+    @keyframes flow { 0%,12% { opacity: 0; transform: translateY(-4px) scale(.82); } 22% { opacity: .9; } 72% { opacity: .65; transform: translateY(180px) scale(1); } 86%,100% { opacity: 0; transform: translateY(220px) scale(.9); } }
+    @media (prefers-reduced-motion: reduce) { .halo, .scan, .particle { animation: none; } .halo { opacity: .68; } .scan { opacity: .5; } .particle { opacity: .5; } }
+  </style>
+</head>
+<body>
+  <main><section class="canvas" aria-label="RoleFit reviewing preview">
+    <div class="label">SCANNING</div>
+    <p class="caption">Reviewing role requirements...</p>
+    <div class="viewport"><div class="halo" aria-hidden="true"></div><div class="unit">
+      <img src="client/public/fit-analyze-a.png" alt="Role requirements analysis" />
+      <svg viewBox="0 0 1254 1254" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+        <g transform="skewY(1.9)" class="scan"><path d="M410 121 L829 136" fill="none" stroke="#F0B5C5" stroke-opacity=".22" stroke-width="24" stroke-linecap="round"/><path d="M410 121 L829 136" fill="none" stroke="#F2C0CE" stroke-opacity=".98" stroke-width="6" stroke-linecap="round"/><path d="M422 127 L817 141" fill="none" stroke="#fff" stroke-opacity=".42" stroke-width="1.2" stroke-linecap="round"/></g>
+        <g class="paths" fill="none" stroke="#D8A6B4" stroke-opacity=".3" stroke-dasharray="2 13" stroke-linecap="round"><path d="M620 653 C620 748 622 815 625 898"/><path d="M626 657 C624 756 626 824 626 925"/><path d="M632 650 C632 748 630 822 627 912"/></g>
+        <g fill="#F2C0CE"><circle class="particle" cx="620" cy="656" r="5.25"/><circle class="particle p2" cx="626" cy="658" r="4.725"/><circle class="particle p3" cx="632" cy="653" r="5.04"/><circle class="particle p4" cx="623" cy="700" r="3.36"/><circle class="particle p5" cx="630" cy="714" r="3.675"/></g>
+      </svg>
+    </div></div>
+  </section></main>
+</body>
+</html>
