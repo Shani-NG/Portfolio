@@ -10,6 +10,8 @@ Hands-on AI product / UX implementation using modern AI-assisted development, au
 
 Boundary: this supports AI product implementation and UX-led implementation practice. It does not convert Shani's positioning into Software Engineer, Backend Engineer, ML Engineer, Database Engineer, DevOps Engineer, infrastructure owner, or production-scale engineering owner.
 
+Design practice: Hands-on Figma experience, including building a design system from scratch, creating reusable components and patterns, and maintaining consistent UI behavior across product interfaces.
+
 **DOCUMENT CONTROL**
 
 Source file: CV\_Shani\_NG\_2026.docx
