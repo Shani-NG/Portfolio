@@ -123,7 +123,7 @@
 
 @media (max-width: 70rem) {
   .progressShell {
-    min-height: 32rem;
+    min-height: min(42rem, calc(100svh - var(--site-header-height) - (var(--ds-space-xl) * 2)));
     padding-inline: 1rem;
   }
 }
