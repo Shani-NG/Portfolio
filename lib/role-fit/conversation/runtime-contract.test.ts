@@ -79,6 +79,28 @@ describe("Role Fit runtime conversation contract", () => {
     assert.doesNotMatch(branch, /createRoleDraftFromText|conversationContext/);
   });
 
+  it("keeps a rejected title in role collection until the corrected title reaches report confirmation", async () => {
+    const route = await readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8");
+    const rejectionBranch = route.slice(
+      route.indexOf("if (roleContext && isTitleRejection)"),
+      route.indexOf("if (roleContext && pendingRoleField && isFieldClarification"),
+    );
+    const clarificationFlow = route.slice(
+      route.indexOf("currentRoleDraft && pendingRoleField && isFieldClarification"),
+      route.indexOf("const boundedRoleText"),
+    );
+
+    assert.match(route, /isRoleTitleRejection\(parsedRequest\.data\.message\)/);
+    assert.match(rejectionBranch, /clearRoleDraftField\(roleContext\.roleDraft, "title"\)/);
+    assert.match(rejectionBranch, /state: "awaiting-role-completion"/);
+    assert.match(rejectionBranch, /answer:[\s\S]*"What is the exact role title\?"/);
+    assert.match(rejectionBranch, /pendingField: "title"/);
+    assert.match(rejectionBranch, /safeMessageKey: "role\.title_rejected"/);
+    assert.doesNotMatch(rejectionBranch, /readyForReportAnswer|generateReport|requestReport|createRoleDraftFromText/);
+    assert.match(clarificationFlow, /mergeRoleDraftClarification\(currentRoleDraft, pendingRoleField, parsedRequest\.data\.message\)/);
+    assert.match(route, /state: "awaiting-report-confirmation"/);
+  });
+
   it("opens a real file input instead of sending an upload chat message", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
 

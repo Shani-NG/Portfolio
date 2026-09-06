@@ -12,7 +12,7 @@ const roleSectionHeadings: Array<{ kind: RoleSectionKind; labels: string[] }> = 
   { kind: "responsibilities", labels: ["What You'll Do", "What You Will Do", "Responsibilities", "Key Responsibilities", "Your Responsibilities", "The Role", "תחומי אחריות", "אחריות", "מה תעשו", "מה תעשי"] },
   {
     kind: "requirements",
-    labels: ["Requirements", "What We're Looking For", "What You Have", "Qualifications", "Required Qualifications", "Key Qualifications", "Must Have", "Skills", "דרישות", "כישורים נדרשים", "מה אנחנו מחפשים"],
+    labels: ["Requirements", "What We're Looking For", "What You Have", "What You'll Bring To The Team", "Qualifications", "Required Qualifications", "Key Qualifications", "Must Have", "Skills", "דרישות", "כישורים נדרשים", "מה אנחנו מחפשים"],
   },
   { kind: "preferred", labels: ["Nice to Have", "Preferred Qualifications", "Bonus Points", "Preferred", "יתרון", "כישורים מועדפים"] },
 ];
@@ -35,7 +35,7 @@ const headingPattern = new RegExp(
 function roleField<T extends string | number>(
   originalValue: T,
   sourceId: string,
-  options: { kind?: "user-text" | "uploaded-file" | "clarification"; confidence?: "high" | "medium" | "low" } = {},
+  options: { kind?: "user-text" | "uploaded-file" | "clarification"; confidence?: "high" | "medium" | "low"; confirmed?: boolean } = {},
 ) {
   return {
     originalValue,
@@ -44,7 +44,7 @@ function roleField<T extends string | number>(
       kind: options.kind ?? "user-text" as const,
     },
     confidence: options.confidence ?? "medium" as const,
-    confirmed: Boolean(String(originalValue).trim()),
+    confirmed: options.confirmed ?? Boolean(String(originalValue).trim()),
   };
 }
 
@@ -123,6 +123,8 @@ const hebrewRoleTitleSignal = /(?:^|\s)(?:מנהל(?:ת|[-־]ת)?|מעצב(?:ת|
 const standaloneTitleLabel = /^(?:job title|title|role|שם המשרה|תפקיד)\s*:\s*(.+)$/i;
 const roleFieldLabelSignal = /^(?:company|organization|title|job title|role|description|responsibilities|requirements|qualifications|skills|location|job location|חברה|ארגון|תפקיד|שם המשרה|תיאור|תיאור המשרה|תחומי אחריות|אחריות|דרישות|כישורים נדרשים)\s*:/i;
 const priorTitleReferenceSignal = /(?:שם\s+המשרה|הכותרת|התפקיד).{0,50}(?:כתוב|כתובה|הופיע|הופיעה|נמצא|נמצאת|שורה\s+ראשונה|למעלה|בהתחלה)|(?:כתוב|כתובה|הופיע|הופיעה|נמצא|נמצאת).{0,50}(?:שורה\s+ראשונה|למעלה|בהתחלה)|\b(?:title|role)\b.{0,50}\b(?:first line|above|previous|already|pasted)\b|\b(?:first line|above|previous|already pasted)\b.{0,50}\b(?:title|role)\b/i;
+const obviousNonTitleLineSignal = /(?:https?:\/\/|www\.|\b[\w.-]+\.[a-z]{2,}(?:\/\S*)?|\byoutube\b|\b(?:sneak\s+pe[ae]k|watch|learn more|read more)\b)/i;
+const titleRejectionSignal = /(?:שם\s+המשרה\s+לא\s+נכון|הכותרת\s+לא\s+נכונה|התפקיד\s+שזיהית\s+לא\s+נכון|זה\s+לא\s+שם\s+המשרה)|\b(?:the\s+)?(?:job\s+)?title\s+is\s+(?:wrong|incorrect)\b|\bthat's\s+not\s+the\s+role\s+title\b|\byou\s+got\s+the\s+title\s+wrong\b/i;
 
 function hasStrongTitleLexiconMatch(value: string) {
   return findLexiconMatches({ text: value, language: "mixed" })
@@ -134,6 +136,7 @@ export function isPlausibleRoleTitle(value: string): boolean {
   const words = title.split(/\s+/);
 
   if (!title || title.length > 100 || words.length > 12) return false;
+  if (obviousNonTitleLineSignal.test(title)) return false;
   if (/[.!?]$/.test(title) || setupInstructionSignal.test(title)) return false;
   if (/^(about|company|organization|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(title)) return false;
 
@@ -198,9 +201,9 @@ function inferSemanticTitle(roleText: string): string {
   return best.entry.preferred_label;
 }
 
-function inferTitle(roleText: string): { value: string; confidence: "high" | "medium" | "low" } {
+function inferTitle(roleText: string): { value: string; confidence: "high" | "medium" | "low"; confirmed: boolean } {
   const labeledTitle = extractSection(roleText, ["title", "role", "תפקיד", "שם המשרה"]);
-  if (labeledTitle) return { value: labeledTitle, confidence: "high" };
+  if (labeledTitle && isPlausibleRoleTitle(labeledTitle)) return { value: labeledTitle, confidence: "high", confirmed: true };
 
   const normalizedText = normalizeRoleText(roleText);
   const firstHeadingIndex = normalizedText.search(headingPattern);
@@ -216,9 +219,9 @@ function inferTitle(roleText: string): { value: string; confidence: "high" | "me
       isPlausibleRoleTitle(line),
     );
 
-  if (inferredTitle) return { value: inferredTitle, confidence: "medium" };
+  if (inferredTitle) return { value: inferredTitle, confidence: "medium", confirmed: true };
   const semanticTitle = inferSemanticTitle(roleText);
-  return { value: semanticTitle, confidence: semanticTitle ? "low" : "medium" };
+  return { value: semanticTitle, confidence: semanticTitle ? "low" : "medium", confirmed: false };
 }
 
 const genericRoleTitles = new Map([
@@ -235,6 +238,10 @@ export function isNoRoleTitleAnswer(value: string): boolean {
 
 export function referencesPreviouslyProvidedTitle(value: string): boolean {
   return priorTitleReferenceSignal.test(value.trim());
+}
+
+export function isRoleTitleRejection(value: string): boolean {
+  return titleRejectionSignal.test(value.trim());
 }
 
 export function normalizeRoleTitleClarification(value: string): string {
@@ -306,7 +313,7 @@ export function hasRoleDraftContent(
 }
 
 function isCompleteDraft(roleDraft: StructuredRoleDraft) {
-  return Boolean(nonEmptyField(roleDraft.title) && roleDraft.responsibilities.length && roleDraft.requirements.length);
+  return Boolean(roleDraft.title?.confirmed && nonEmptyField(roleDraft.title) && roleDraft.responsibilities.length && roleDraft.requirements.length);
 }
 
 export function mergeStructuredRoleDraft(
@@ -349,6 +356,12 @@ export function mergeRoleDraftClarification(
 
 export function applyRoleDraftCorrection(roleDraft: StructuredRoleDraft, correction: RoleCorrection) {
   return mergeRoleDraftClarification(roleDraft, correction.field, correction.value);
+}
+
+export function clearRoleDraftField(roleDraft: StructuredRoleDraft, field: RoleClarificationField): StructuredRoleDraft {
+  if (field === "responsibilities" || field === "requirements") return { ...roleDraft, [field]: [] };
+  const { [field]: _removed, ...rest } = roleDraft;
+  return rest;
 }
 
 export function serializeRoleDraftForBoundary(roleDraft: StructuredRoleDraft): string {
@@ -507,7 +520,7 @@ export function createRoleDraftFromText(roleText: string) {
 
   return {
     company: roleField(company, sourceId),
-    title: roleField(title.value, sourceId, { confidence: title.confidence }),
+    title: roleField(title.value, sourceId, { confidence: title.confidence, confirmed: title.confirmed }),
     description: roleField(description, sourceId),
     responsibilities: inferredResponsibilities.map((item) => roleField(item, sourceId)),
     requirements: inferredRequirements.map((item) => roleField(item, sourceId)),

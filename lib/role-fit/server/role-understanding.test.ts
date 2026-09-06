@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyRoleDraftCorrection, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, isPlausibleRoleTitle, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeRoleTitleClarification, referencesPreviouslyProvidedTitle, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
+import { applyRoleDraftCorrection, clearRoleDraftField, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, isPlausibleRoleTitle, isRoleTitleRejection, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeRoleTitleClarification, referencesPreviouslyProvidedTitle, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -158,6 +158,43 @@ describe("Role Fit pasted job understanding", () => {
 
     assert.equal(result.roleDraft.title?.originalValue, "");
     assert.deepEqual(result.missingFields, ["title"]);
+  });
+
+  it("rejects Rubrik-like promo links and low-confidence semantic inference as confirmed titles", () => {
+    const roleText = [
+      "Based in Tel Aviv office, in hybrid model.",
+      "About Rubrik",
+      "Rubrik helps organizations protect and recover business data.",
+      "About Team & About Role",
+      "We are looking for a highly-skilled UX Designer for our Israel site to join a product team.",
+      "Sneak peak to our product:",
+      "https://www.youtube.com/watch?v=F9949Q-_onc&t=9s",
+      "What You'll Do",
+      "Own end-to-end design work for complex user workflows",
+      "Collaborate with product and engineering on discovery and delivery",
+      "What You'll Bring To The Team",
+      "Strong UX design experience in product teams",
+      "Ability to translate complex requirements into clear interaction flows",
+    ].join("\n");
+
+    const result = validateRoleText({
+      conversationId: "conv_rubrik",
+      traceId: "trace_rubrik",
+      roleText,
+      detectedLanguage: "en",
+    });
+
+    assert.equal(isPlausibleRoleTitle("Sneak peak to our product: https://www.youtube.com/watch?v=F9949Q-_onc&t=9s"), false);
+    assert.equal(isPlausibleRoleTitle("Product Designer example.com/apply"), false);
+    assert.equal(isPlausibleRoleTitle("Sneak peek to our product:"), false);
+    assert.equal(isPlausibleRoleTitle("Watch our product overview"), false);
+    assert.equal(result.parseStatus, "valid-incomplete");
+    assert.deepEqual(result.missingFields, ["title"]);
+    assert.notEqual(result.roleDraft.title?.originalValue, "Sneak peak to our product:");
+    assert.notEqual(result.roleDraft.title?.originalValue, "https://www.youtube.com/watch?v=F9949Q-_onc&t=9s");
+    assert.equal(result.roleDraft.title?.confirmed, false);
+    assert.ok(result.roleDraft.responsibilities.length >= 2);
+    assert.ok(result.roleDraft.requirements.length >= 2);
   });
 
   it("separates a conversational prefix from a complete English JD", () => {
@@ -468,6 +505,24 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(corrected.title?.originalValue, "Principal Product Designer");
     assert.deepEqual(corrected.responsibilities, original.responsibilities);
     assert.deepEqual(corrected.requirements, original.requirements);
+  });
+
+  it("clears only a rejected title and lets a replacement title complete the preserved draft", () => {
+    const original = createRoleDraftFromText("Title: Product Designer\nResponsibilities: Lead product discovery\nRequirements: Product design experience");
+    const titleRejected = clearRoleDraftField(original, "title");
+    const rejectedValidation = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_rejected", roleDraft: titleRejected, detectedLanguage: "he" });
+    const corrected = mergeRoleDraftClarification(titleRejected, "title", "Senior Product Designer");
+    const correctedValidation = validateStructuredRoleDraft({ conversationId: "conv_test", traceId: "trace_corrected", roleDraft: corrected, detectedLanguage: "en" });
+
+    assert.equal(isRoleTitleRejection("שם המשרה לא נכון"), true);
+    assert.equal(isRoleTitleRejection("the job title is wrong"), true);
+    assert.equal(titleRejected.title, undefined);
+    assert.deepEqual(titleRejected.responsibilities, original.responsibilities);
+    assert.deepEqual(titleRejected.requirements, original.requirements);
+    assert.equal(rejectedValidation.parseStatus, "valid-incomplete");
+    assert.deepEqual(rejectedValidation.missingFields, ["title"]);
+    assert.equal(correctedValidation.parseStatus, "valid-complete");
+    assert.equal(correctedValidation.roleDraft.title?.originalValue, "Senior Product Designer");
   });
 
   it("replaces an existing role when a new complete JD follows conversational context", () => {

@@ -30,7 +30,6 @@ type LiveReportState = {
 };
 
 type ErrorContext = "conversation" | "report" | "validation" | null;
-type ReportPresentationState = "normal" | "success-bridge";
 
 const reportRequestTimeoutMs = 150_000;
 const maxRoleFileBytes = 64 * 1024;
@@ -100,9 +99,7 @@ export default function RoleFitPage() {
   const [isNarrowLayout, setIsNarrowLayout] = useState(false);
   const [isAgentUnavailable, setIsAgentUnavailable] = useState(false);
   const [errorContext, setErrorContext] = useState<ErrorContext>(null);
-  const [reportPresentationState, setReportPresentationState] = useState<ReportPresentationState>("normal");
   const reportRequestInFlightRef = useRef(false);
-  const successBridgeTimerRef = useRef<number | null>(null);
   const chatPaneRef = useRef<HTMLDivElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -148,26 +145,6 @@ export default function RoleFitPage() {
     const nextSession = appendRoleFitMessage(message);
     setLiveSession(nextSession);
     return nextSession;
-  }
-
-  function clearSuccessBridgeTimer() {
-    if (successBridgeTimerRef.current === null) return;
-    window.clearTimeout(successBridgeTimerRef.current);
-    successBridgeTimerRef.current = null;
-  }
-
-  function resetReportPresentation() {
-    clearSuccessBridgeTimer();
-    setReportPresentationState("normal");
-  }
-
-  function showSuccessBridge() {
-    clearSuccessBridgeTimer();
-    setReportPresentationState("success-bridge");
-    successBridgeTimerRef.current = window.setTimeout(() => {
-      successBridgeTimerRef.current = null;
-      setReportPresentationState("normal");
-    }, 650);
   }
 
   async function submitLiveMessage(textOverride?: string, sessionOverride?: RoleFitLiveSession) {
@@ -298,7 +275,6 @@ export default function RoleFitPage() {
 
     setApiStatusMessage("");
     setErrorContext(null);
-    resetReportPresentation();
     setLiveReportState(null);
     const reportId = reportSession.pendingReportId ?? createReportId();
     reportRequestInFlightRef.current = true;
@@ -335,7 +311,6 @@ export default function RoleFitPage() {
         const message = reportFailureMessage(result, reportSession.activeLanguage);
         const missingField = result.validation?.missingFields?.[0] ?? null;
         const isNoReport = result.state === "no-report";
-        resetReportPresentation();
         setApiStatusMessage(message);
         setErrorContext(isNoReport ? null : missingField ? "validation" : "report");
         setIsAgentUnavailable(false);
@@ -353,7 +328,6 @@ export default function RoleFitPage() {
       const parsedReport = reportUIPayloadSchema.safeParse(result.report ?? result.eligibility?.report);
       if (!parsedReport.success) {
         const message = genericRecoverableErrorAnswer(reportSession.activeLanguage);
-        resetReportPresentation();
         setApiStatusMessage(message);
         setErrorContext("report");
         setIsAgentUnavailable(false);
@@ -376,7 +350,6 @@ export default function RoleFitPage() {
         model: result.model,
         report,
       });
-      showSuccessBridge();
       if (!persisted) setApiStatusMessage(lifecycleMessage);
       appendLiveMessage({ role: "agent", content: lifecycleMessage });
       syncLiveSession({
@@ -407,7 +380,6 @@ export default function RoleFitPage() {
           ? "The fit review took too long to complete. Your role details are still here, and you can try again."
           : "The service is unavailable, so the fit review was not completed. Your role details are still here, and you can try again later.";
       setApiStatusMessage(message);
-      resetReportPresentation();
       setErrorContext("report");
       setIsAgentUnavailable(false);
       appendLiveMessage({ role: "agent", content: message });
@@ -430,10 +402,6 @@ export default function RoleFitPage() {
     const submittedText = [pendingInput.text, pendingInput.fileText].filter(Boolean).join("\n\n").trim();
     const uploadPrefix = pendingInput.fileName ? `Uploaded file: ${pendingInput.fileName}` : "";
     void submitLiveMessage([uploadPrefix, submittedText].filter(Boolean).join("\n\n"), restoredSession);
-  }, []);
-
-  useEffect(() => {
-    return () => clearSuccessBridgeTimer();
   }, []);
 
   useEffect(() => {
@@ -516,7 +484,6 @@ export default function RoleFitPage() {
   }
 
   function startNewAnalysis() {
-    resetReportPresentation();
     const nextSession = resetRoleFitAnalysis();
     setLiveSession(nextSession);
     setLiveReportState(null);
@@ -659,8 +626,6 @@ export default function RoleFitPage() {
                   <h2>{errorHeading}</h2>
                   <p>{apiStatusMessage || genericRecoverableErrorAnswer(liveSession.activeLanguage)}</p>
                 </div>
-              ) : activeReport && reportPresentationState === "success-bridge" ? (
-                <RoleFitReportProgress mode="success" />
               ) : (
                 activeReport ? (
                   <RoleFitLiveReport

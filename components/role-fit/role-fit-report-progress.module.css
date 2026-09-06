@@ -135,6 +135,7 @@
 @media (max-width: 40rem) {
   .visualSurface {
     --frame-scale: 0.68;
+    margin-block-start: calc(4.5rem + 5.462rem);
   }
 
   .visualFrame {
