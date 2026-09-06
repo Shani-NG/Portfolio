@@ -221,7 +221,8 @@ export function deriveTopStrengths(items: ReportItem[]) {
 export function deriveKeyGaps(items: ReportItem[], representedLimitationItemIds: ReadonlySet<string> = new Set()) {
   return dedupeReportItems(
     items.filter((item) =>
-      gapMatchTypes.has(item.matchType)
+      item.matchType !== "insufficient-evidence"
+      && gapMatchTypes.has(item.matchType)
       && (item.impact === "gap" || representedLimitationItemIds.has(item.itemId)),
     ),
     3,
@@ -292,7 +293,11 @@ export function composeReportUIPayload(input: {
             : "I couldn't verify enough portfolio evidence for this specific requirement.",
           evidenceSourceIds: [],
         };
-    const resolvedAnalysisItem = normalizePositiveMatchImpact(selectedAnalysisItem);
+    const resolvedAnalysisItem = normalizePositiveMatchImpact(
+      selectedAnalysisItem.matchType === "insufficient-evidence"
+        ? { ...selectedAnalysisItem, evidenceSourceIds: [] }
+        : selectedAnalysisItem,
+    );
     resolvedAnalysisItems.push(resolvedAnalysisItem);
     const evidenceSourceIds = selectDisplayedEvidenceSourceIds(resolvedAnalysisItem.evidenceSourceIds, sourceById);
 

@@ -193,8 +193,15 @@ function EvidenceSection({
   openEvidenceItemIds: string[] | null;
   onOpenEvidenceItemIdsChange: (itemIds: string[]) => void;
 }) {
-  const defaultItemId = report.requirementMapping.defaultSelectedItemId ?? report.requirementMapping.items[0]?.itemId;
-  const validItemIds = new Set(report.requirementMapping.items.map((item) => item.itemId));
+  const evidenceItems = report.requirementMapping.items.filter(
+    (item) => item.matchType !== "insufficient-evidence" && item.clusterIds.length > 0,
+  );
+  const requestedDefaultItemId = report.requirementMapping.defaultSelectedItemId;
+  const defaultItemId =
+    requestedDefaultItemId && evidenceItems.some((item) => item.itemId === requestedDefaultItemId)
+      ? requestedDefaultItemId
+      : evidenceItems[0]?.itemId;
+  const validItemIds = new Set(evidenceItems.map((item) => item.itemId));
   const restoredOpenIds = openEvidenceItemIds?.filter((itemId) => validItemIds.has(itemId));
   const [openIds, setOpenIds] = useState<Set<string>>(() => restoredOpenIds
     ? new Set(restoredOpenIds)
@@ -202,7 +209,7 @@ function EvidenceSection({
   const clusterById = new Map(report.evidencePanel.clusters.map((cluster) => [cluster.clusterId, cluster]));
 
   useEffect(() => {
-    const currentItemIds = new Set(report.requirementMapping.items.map((item) => item.itemId));
+    const currentItemIds = new Set(evidenceItems.map((item) => item.itemId));
     const nextIds = openEvidenceItemIds?.filter((itemId) => currentItemIds.has(itemId));
     setOpenIds(nextIds ? new Set(nextIds) : defaultItemId ? new Set([defaultItemId]) : new Set());
   }, [defaultItemId, report.reportId]);
@@ -217,7 +224,7 @@ function EvidenceSection({
         <p className={styles.instruction}><MaterialIcon name="touch_app" />Open a requirement to view its portfolio evidence</p>
       </div>
       <div className={styles.accordion}>
-        {report.requirementMapping.items.map((item, index) => {
+        {evidenceItems.map((item, index) => {
           const isOpen = openIds.has(item.itemId);
           const panelId = `evidence-panel-${report.reportId}-${item.itemId}`;
           const clusters = item.clusterIds.map((id) => clusterById.get(id)).filter((cluster): cluster is EvidenceCluster => Boolean(cluster));
