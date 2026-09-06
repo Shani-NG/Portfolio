@@ -38,6 +38,9 @@ describe("Portfolio Agent prompt assembly", () => {
     assert.match(prompt, /<untrusted_user_text>[\s\S]*Existing report id: rpt_test\./);
     assert.match(prompt, /Analyze this role\./);
     assert.match(prompt, /Default to 1-3 short, complete sentences/);
+    assert.match(prompt, /use first name only: Hebrew שני, English Shani/);
+    assert.match(prompt, /Never infer, translate, construct, or generate a surname/);
+    assert.match(prompt, /Prefer היי! for casual Hebrew greetings/);
     assert.match(prompt, /list all currently missing role details together/);
     assert.match(prompt, /short hyphen bullets and preserve line breaks/);
     assert.match(prompt, /pasted job description in another language does not switch the conversation language/);
