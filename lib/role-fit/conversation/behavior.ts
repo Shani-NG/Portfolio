@@ -97,14 +97,11 @@ export function clarificationLimitAnswer(language: "he" | "en" | "mixed") {
     : "I still do not have enough information to complete the role. You can paste the full job description when ready.";
 }
 
-function conciseResponsibilities(values: string[] | undefined, language: "he" | "en" | "mixed") {
-  const items = (values ?? [])
+function conciseResponsibilityItems(values: string[] | undefined) {
+  return (values ?? [])
     .map((value) => value.replace(/\s+/g, " ").trim().replace(/[.;,]+$/u, "").slice(0, 140))
     .filter(Boolean)
     .slice(0, 2);
-
-  if (items.length === 0) return "";
-  return items.join(isHebrewLanguage(language) ? " ו־" : " and ");
 }
 
 export function readyForReportAnswer(input: {
@@ -114,21 +111,21 @@ export function readyForReportAnswer(input: {
   language: "he" | "en" | "mixed";
   repeatedInput: boolean;
 }) {
-  const responsibilities = conciseResponsibilities(input.responsibilities, input.language);
+  const responsibilities = conciseResponsibilityItems(input.responsibilities);
 
   if (isHebrewLanguage(input.language)) {
-    const opening = input.repeatedInput ? "התמונה עדיין מספיק ברורה לי." : "עכשיו התמונה מספיק ברורה לי.";
-    const roleLabel = input.title ? `זו משרת ${input.title}` : "זהו התפקיד שתיארת";
+    const opening = input.repeatedInput ? "התמונה עדיין מספיק ברורה לי:" : "עכשיו התמונה מספיק ברורה לי:";
+    const roleLabel = input.title ? `משרת ${input.title}` : "התפקיד שתיארת";
     const companyLabel = input.companyName ? ` ב־${input.companyName}` : "";
-    const focusLabel = responsibilities ? `, עם דגש על ${responsibilities}` : "";
-    return `${opening} ממה שהבנתי, ${roleLabel}${companyLabel}${focusLabel}. אם זה מתאר נכון את התפקיד, אפשר שאכין את בדיקת ההתאמה. אם משהו לא מדויק, אפשר לתקן אותו לפני שאמשיך.`;
+    const bullets = [`${roleLabel}${companyLabel}`, ...responsibilities].map((item) => `- ${item}`).join("\n");
+    return `${opening}\n${bullets}\n\nאם זה מתאר נכון את התפקיד, אפשר שאכין את בדיקת ההתאמה.\nאם משהו לא מדויק, אפשר לתקן אותו לפני שאמשיך.`;
   }
 
-  const opening = input.repeatedInput ? "I still have a clear enough picture." : "I have a clear enough picture now.";
-  const roleLabel = input.title ? `this is a ${input.title} position` : "this is the role you described";
+  const opening = input.repeatedInput ? "I still have a clear enough picture:" : "I have a clear enough picture now:";
+  const roleLabel = input.title ? `${input.title} position` : "the role you described";
   const companyLabel = input.companyName ? ` at ${input.companyName}` : "";
-  const focusLabel = responsibilities ? `, focused mainly on ${responsibilities}` : "";
-  return `${opening} As I understand it, ${roleLabel}${companyLabel}${focusLabel}. If that is accurate, I can prepare the fit review. If anything is off, you can correct it before I continue.`;
+  const bullets = [`${roleLabel}${companyLabel}`, ...responsibilities].map((item) => `- ${item}`).join("\n");
+  return `${opening}\n${bullets}\n\nIf that is accurate, I can prepare the fit review.\nIf anything is off, you can correct it before I continue.`;
 }
 
 export function roleSubmissionSetupAnswer(language: "he" | "en" | "mixed") {

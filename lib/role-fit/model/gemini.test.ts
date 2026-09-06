@@ -468,6 +468,8 @@ describe("Gemini chat completion guard", () => {
     assert.match(prompt, /Any exact EVIDENCE_ID in the compact approved index may support any role item/);
     assert.match(prompt, /EVIDENCE_ID: cv/);
     assert.match(prompt, /direct case study, semantic\/contextual case study, transferable case study, legitimate reuse, CV fallback, then insufficient evidence/);
+    assert.match(prompt, /state the direct gap, the transferable context, and the residual unproven gap in the same item/);
+    assert.match(prompt, /do not improve fitLevel solely because transferable context exists/);
     for (const sourceId of [...compactSourceIds, ...richSourceIds]) {
       assert.ok(evidence.sources.some((source) => source.id === sourceId), sourceId);
     }

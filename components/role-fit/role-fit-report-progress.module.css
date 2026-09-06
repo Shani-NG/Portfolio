@@ -126,6 +126,10 @@
     min-height: min(42rem, calc(100svh - var(--site-header-height) - (var(--ds-space-xl) * 2)));
     padding-inline: 1rem;
   }
+
+  .stageCopy {
+    min-block-size: auto;
+  }
 }
 
 @media (max-width: 40rem) {
