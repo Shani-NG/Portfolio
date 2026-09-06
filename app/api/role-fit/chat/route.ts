@@ -21,11 +21,13 @@ import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import {
   applyRoleDraftCorrection,
+  clearRoleDraftField,
   createEmptyRoleDraft,
   createRoleDraftFromText,
   detectRoleCorrection,
   extractStandaloneRoleTitle,
   isNoRoleTitleAnswer,
+  isRoleTitleRejection,
   isValidRoleClarificationAnswer,
   looksLikeReportIntent,
   mergeRoleDraftClarification,
@@ -115,6 +117,7 @@ export async function POST(request: Request) {
   });
   const pendingRoleField = roleContext?.pendingField;
   const isFieldClarification = Boolean(roleContext && shouldTreatAsRoleClarification(pendingRoleField, parsedRequest.data.message));
+  const isTitleRejection = Boolean(roleContext && isRoleTitleRejection(parsedRequest.data.message));
   const roleCorrection = roleContext && !pendingRoleField
     ? detectRoleCorrection(parsedRequest.data.message)
     : null;
@@ -139,6 +142,28 @@ export async function POST(request: Request) {
       answer: existingReportAnswer(parsedRequest.data.language),
       roleDraft: roleContext?.roleDraft,
       safeMessageKey: "report.existing_role",
+    });
+  }
+
+  if (roleContext && isTitleRejection) {
+    const roleDraft = clearRoleDraftField(roleContext.roleDraft, "title");
+    const validation = validateStructuredRoleDraft({
+      conversationId,
+      traceId,
+      roleDraft,
+      detectedLanguage: parsedRequest.data.language,
+    });
+
+    return NextResponse.json({
+      state: "awaiting-role-completion",
+      answer: parsedRequest.data.language === "he" || parsedRequest.data.language === "mixed"
+        ? "מה שם המשרה המדויק?"
+        : "What is the exact role title?",
+      validation,
+      roleDraft: validation.roleDraft,
+      pendingField: "title",
+      clarificationExhausted: false,
+      safeMessageKey: "role.title_rejected",
     });
   }
 

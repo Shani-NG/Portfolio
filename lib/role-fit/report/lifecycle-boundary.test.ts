@@ -17,12 +17,10 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.doesNotMatch(progress, /setInterval/);
     assert.match(progress, /setStageIndex\(index \+ 1\)/);
     assert.match(progress, /Making sure nothing is missed/);
-    assert.match(page, /type ReportPresentationState = "normal" \| "success-bridge"/);
-    assert.match(page, /window\.setTimeout\(\(\) => \{/);
-    assert.match(page, /\}, 650\)/);
     assert.match(page, /liveSession\.state === "generating-report"/);
     assert.match(page, /liveSession\.state === "recoverable-error" && !activeReport/);
-    assert.match(page, /activeReport && reportPresentationState === "success-bridge"/);
+    assert.doesNotMatch(page, /ReportPresentationState|successBridgeTimerRef|showSuccessBridge|success-bridge/);
+    assert.doesNotMatch(page, /<RoleFitReportProgress mode="success" \/>/);
     assert.match(page, /<RoleFitLiveReport/);
   });
 
