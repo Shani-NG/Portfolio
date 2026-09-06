@@ -4,13 +4,13 @@
 
 *Structured professional knowledge for portfolio-agent retrieval, role-fit analysis, and evidence-grounded responses.*
 
+Design practice: Figma; built and managed design systems.
+
 **CURRENT AI IMPLEMENTATION TOOLING SUMMARY**
 
 Hands-on AI product / UX implementation using modern AI-assisted development, automation, integration, data, and delivery tooling, including Vibe Coding, Vibe Engineering, coding-agent workflows, Claude Code, Codex, Make, MCP, API integration, Supabase, database-backed application workflows, persistence, runtime logging, server/API integration, VS Code, Git, GitHub, and Vercel.
 
 Boundary: this supports AI product implementation and UX-led implementation practice. It does not convert Shani's positioning into Software Engineer, Backend Engineer, ML Engineer, Database Engineer, DevOps Engineer, infrastructure owner, or production-scale engineering owner.
-
-Design practice: Hands-on Figma experience, including building a design system from scratch, creating reusable components and patterns, and maintaining consistent UI behavior across product interfaces.
 
 **DOCUMENT CONTROL**
 
