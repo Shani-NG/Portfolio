@@ -288,8 +288,8 @@ export function composeReportUIPayload(input: {
           impact: "gap",
           evidenceConfidence: "insufficient",
           shortRationale: input.language === "he"
-            ? "לא נמצאה ראיה קנונית רלוונטית מספיק לאחר מיצוי סולם הראיות; הדרישה נשארת ללא תמיכה ולא הומרה לפער מוכח."
-            : "No sufficiently relevant canonical evidence remained after the full evidence ladder; this requirement is unsupported, not proven as a real gap.",
+            ? "לא הצלחתי לאמת מספיק ראיות מהפורטפוליו לדרישה הספציפית הזו."
+            : "I couldn't verify enough portfolio evidence for this specific requirement.",
           evidenceSourceIds: [],
         };
     const resolvedAnalysisItem = normalizePositiveMatchImpact(selectedAnalysisItem);
