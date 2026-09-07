@@ -1,16 +1,4 @@
-**CV KNOWLEDGE SOURCE**
-
-**Shani Nakash-Gomel**
-
-*Structured professional knowledge for portfolio-agent retrieval, role-fit analysis, and evidence-grounded responses.*
-
-Design practice: Figma; built and managed design systems.
-
-**CURRENT AI IMPLEMENTATION TOOLING SUMMARY**
-
-Hands-on AI product / UX implementation using modern AI-assisted development, automation, integration, data, and delivery tooling, including Vibe Coding, Vibe Engineering, coding-agent workflows, Claude Code, Codex, Make, MCP, API integration, Supabase, database-backed application workflows, persistence, runtime logging, server/API integration, VS Code, Git, GitHub, and Vercel.
-
-Boundary: this supports AI product implementation and UX-led implementation practice. It does not convert Shani's positioning into Software Engineer, Backend Engineer, ML Engineer, Database Engineer, DevOps Engineer, infrastructure owner, or production-scale engineering owner.
+Senior UX Strategist & Innovation Lead; 12 yrs UX; AI solutions/automation/product; AI adoption; AI agents/agentic workflows; RAG/LLM; prompt engineering; Product/Project Mgmt/PM; product strategy; complex problem-solving; UX/UI; user research; Figma; design systems built/managed; mobile; MVP prioritization; data-driven; dashboards/data viz; information fusion; mission-critical systems; defense/C4I/command & control; medical; SaaS; knowledge management; innovation; cross-functional/stakeholder mgmt; Design Thinking/hackathons; Vibe Coding; Claude Code; Codex; MCP/API integrations; Make; Supabase; DB/persistence/logging; Git/GitHub; Vercel; ML data annotation; not SWE/backend/ML/DevOps owner
 
 **DOCUMENT CONTROL**
 
