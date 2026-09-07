@@ -1,7 +1,7 @@
 import { reportUIPayloadSchema, type ReportUIPayload, type RoleValidationResult } from "../contracts/index.ts";
 import { resolveApprovedEvidenceDestination } from "../knowledge/evidence-destinations.ts";
-import { createEvidenceSelectionState, selectRequirementEvidence } from "../knowledge/evidence-selection.ts";
-import type { ApprovedEvidenceBundle } from "../knowledge/load-approved-evidence.ts";
+import { createEvidenceSelectionState, isNarrowCapabilityFactRequirement, selectRequirementEvidence } from "../knowledge/evidence-selection.ts";
+import { evidenceRelevance, type ApprovedEvidenceBundle } from "../knowledge/load-approved-evidence.ts";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
 import { createReportId } from "../identifiers.ts";
 
@@ -45,7 +45,7 @@ const fitPresentation = {
 } as const;
 
 const positiveMatchTypes = new Set<AnalysisItem["matchType"]>(["direct", "semantic", "transferable"]);
-const gapMatchTypes = new Set<AnalysisItem["matchType"]>(["partial", "insufficient-evidence", "real-gap"]);
+const limitationMatchTypes = new Set<AnalysisItem["matchType"]>(["partial", "real-gap"]);
 
 function normalizePositiveMatchImpact(item: AnalysisItem): AnalysisItem {
   // `matchType` is the model's semantic classification. A positive classification cannot
@@ -69,14 +69,12 @@ export function resolveStableFitLevel(analysis: QualitativeReportAnalysis): Qual
     positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.evidenceSourceIds.length > 0,
   );
   const materialCentralRealGaps = centralItems.filter((item) => item.matchType === "real-gap");
-  const centralPartialLimitations = centralItems.filter((item) => item.matchType === "partial");
-  const centralInsufficientEvidence = centralItems.filter((item) => item.matchType === "insufficient-evidence");
-  const limitations = analysis.items.filter((item) => gapMatchTypes.has(item.matchType));
+  const centralPartialLimitations = centralItems.filter((item) => item.matchType === "partial" && item.impact === "gap");
+  const limitations = analysis.items.filter((item) => limitationMatchTypes.has(item.matchType) && item.impact === "gap");
 
   if (centralItems.length > 0 && centralSupportedStrengths.length === 0) return "partial";
   if (materialCentralRealGaps.length > 0) return "partial";
   if (centralPartialLimitations.length > 1) return "partial";
-  if (centralInsufficientEvidence.length > 1) return "partial";
   if (
     limitations.length > 0
     && (analysis.evidenceConfidence === "low" || analysis.evidenceConfidence === "insufficient")
@@ -132,16 +130,20 @@ function semanticRationale(item: AnalysisItem, language: "he" | "en" | "mixed") 
 function semanticDiagnostic(
   analysis: QualitativeReportAnalysis,
   representedLimitationRoleItemIndexes: ReadonlySet<number>,
+  nonPunitiveRescueRoleItemIndexes: ReadonlySet<number>,
 ): string | null {
-  const gapEligibleItems = analysis.items.filter((item) => gapMatchTypes.has(item.matchType) && item.impact === "gap");
-  const limitationItems = analysis.items.filter((item) => gapMatchTypes.has(item.matchType));
+  const stableFitLevel = resolveStableFitLevel(analysis);
+  const gapEligibleItems = analysis.items.filter((item) => limitationMatchTypes.has(item.matchType) && item.impact === "gap");
+  const limitationItems = analysis.items.filter((item) =>
+    limitationMatchTypes.has(item.matchType) && !nonPunitiveRescueRoleItemIndexes.has(item.roleItemIndex),
+  );
   const unrepresentedLimitationItems = limitationItems.filter((item) =>
     item.impact !== "gap" && !representedLimitationRoleItemIndexes.has(item.roleItemIndex),
   );
 
   for (const item of analysis.items) {
     if (positiveMatchTypes.has(item.matchType) && item.impact === "gap") return "semantic:positive-match-marked-gap";
-    if (gapMatchTypes.has(item.matchType) && item.impact === "strength") return "semantic:limitation-marked-strength";
+    if (limitationMatchTypes.has(item.matchType) && item.impact === "strength") return "semantic:limitation-marked-strength";
     if (
       (item.matchType === "semantic" || item.matchType === "transferable")
       && (!item.sharedCapability || !item.contextDifference || !item.bridgeability || !item.unproven)
@@ -150,24 +152,16 @@ function semanticDiagnostic(
     }
   }
 
-  if (analysis.fitLevel === "partial" && gapEligibleItems.length === 0) {
+  if (stableFitLevel === "partial" && gapEligibleItems.length === 0 && limitationItems.length > 0) {
     return "semantic:partial-fit-without-gap";
   }
 
   if (
-    (analysis.fitLevel === "strong" || analysis.fitLevel === "good")
+    (stableFitLevel === "strong" || stableFitLevel === "good")
     && gapEligibleItems.length === 0
     && unrepresentedLimitationItems.length > 0
   ) {
     return "semantic:unrepresented-limitation";
-  }
-
-  if (
-    (analysis.fitLevel === "strong" || analysis.fitLevel === "good")
-    && gapEligibleItems.length === 0
-    && (analysis.evidenceConfidence === "low" || analysis.evidenceConfidence === "insufficient")
-  ) {
-    return "semantic:low-confidence-without-gap";
   }
 
   const generatedText = [
@@ -211,10 +205,17 @@ function selectDisplayedEvidenceSourceIds(
   return caseStudyIds.slice(0, 5);
 }
 
-export function deriveTopStrengths(items: ReportItem[]) {
+export function deriveCoreMatchingSkills(items: ReportItem[]) {
   return dedupeReportItems(
     items.filter((item) => positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.clusterIds.length > 0),
     5,
+  );
+}
+
+export function deriveTopStrengths(items: ReportItem[]) {
+  return dedupeReportItems(
+    items.filter((item) => positiveMatchTypes.has(item.matchType) && item.impact === "strength" && item.clusterIds.length > 0),
+    3,
   );
 }
 
@@ -222,11 +223,105 @@ export function deriveKeyGaps(items: ReportItem[], representedLimitationItemIds:
   return dedupeReportItems(
     items.filter((item) =>
       item.matchType !== "insufficient-evidence"
-      && gapMatchTypes.has(item.matchType)
+      && limitationMatchTypes.has(item.matchType)
       && (item.impact === "gap" || representedLimitationItemIds.has(item.itemId)),
     ),
     3,
   );
+}
+
+const topStrengthGenericTerms = new Set([
+  "strong", "strength", "strengths", "capability", "capabilities", "experience", "experienced", "skill", "skills",
+  "relevant", "supported", "evidence", "proven", "ability",
+]);
+
+function topStrengthTerms(value: string) {
+  return new Set((value.toLowerCase().match(/[a-z0-9]{3,}|[\u0590-\u05ff]{3,}/g) ?? [])
+    .filter((term) => !topStrengthGenericTerms.has(term)));
+}
+
+function isObviousTopStrengthDuplicate(value: string, existing: string) {
+  const left = topStrengthTerms(value);
+  const right = topStrengthTerms(existing);
+  if (left.size === 0 || right.size === 0) return false;
+  const overlap = [...left].filter((term) => right.has(term)).length;
+  return overlap / Math.min(left.size, right.size) > 0.72;
+}
+
+function hasForbiddenTopStrengthClaim(value: string) {
+  return /\b(hire|do not hire|don't hire|hiring recommendation|chance of (?:being hired|success))\b|להעסיק|לא להעסיק|המלצת גיוס|סיכויי קבלה|\b(?:fit|compatibility|match)\s+(?:score|percentage)\b|\d+\s*%\s*(?:fit|match)/i.test(value);
+}
+
+function createTopStrengthItems(input: {
+  candidates: QualitativeReportAnalysis["topStrengths"];
+  coreSkills: ReportItem[];
+  sourceById: Map<string, ApprovedEvidenceBundle["sources"][number]>;
+}) {
+  const strengths: ReportItem[] = [];
+  for (const candidate of input.candidates ?? []) {
+    const sourceIds = [...new Set(candidate.evidenceSourceIds)];
+    const sources = sourceIds.map((sourceId) => input.sourceById.get(sourceId));
+    if (sourceIds.length === 0 || sources.some((source) => !source || (source.sourceType !== "case-study" && source.sourceType !== "cv"))) continue;
+    const approvedSources = sources.filter((source): source is NonNullable<typeof source> => Boolean(source));
+    if (approvedSources.every((source) => source.cvEvidenceLevel === "capability-fact") && approvedSources.length < 2) continue;
+
+    const displayLabel = normalizeItemText(candidate.displayLabel, "", 64);
+    const shortRationale = normalizeItemText(candidate.shortRationale, "", 320);
+    const generatedText = `${displayLabel} ${shortRationale}`;
+    if (!displayLabel || !shortRationale || hasForbiddenTopStrengthClaim(generatedText)) continue;
+    if (!approvedSources.some((source) => evidenceRelevance(generatedText, source) >= 3)) continue;
+    if (input.coreSkills.some((item) =>
+      isObviousTopStrengthDuplicate(displayLabel, item.displayLabel ?? item.originalText)
+      || isNearDuplicate(shortRationale, item.shortRationale)
+    )) continue;
+    if (strengths.some((item) =>
+      isObviousTopStrengthDuplicate(displayLabel, item.displayLabel ?? item.originalText)
+      || isNearDuplicate(shortRationale, item.shortRationale)
+    )) continue;
+
+    strengths.push({
+      itemId: `top-strength-${strengths.length + 1}`,
+      originalText: displayLabel,
+      displayLabel,
+      normalizedConcept: displayLabel,
+      source: "professional-context",
+      importance: "supporting",
+      matchType: "semantic",
+      impact: "strength",
+      evidenceConfidence: "medium",
+      shortRationale,
+      clusterIds: sourceIds.map((sourceId) => `evidence-${sourceId}`),
+    });
+    if (strengths.length === 3) break;
+  }
+  return strengths;
+}
+
+function rescueInsufficientEvidence(input: {
+  item: AnalysisItem;
+  requirementText: string;
+  source: ApprovedEvidenceBundle["sources"][number];
+  sourceIds: string[];
+  language: "he" | "en" | "mixed";
+}) {
+  const isNarrowFact = isNarrowCapabilityFactRequirement(input.requirementText, input.source);
+  const isDirectlySupported = isNarrowFact;
+  const capability = input.source.capabilities?.[0] ?? input.source.claim ?? input.source.label;
+  const shortRationale = input.language === "he"
+    ? isDirectlySupported
+      ? `הראיות המאושרות מתעדות במפורש את היכולת: ${capability}.`
+      : `הראיות המאושרות תומכות בחלק מהדרישה, אך אינן מוכיחות את מלוא העומק או ההיקף שלה.`
+    : isDirectlySupported
+      ? `The approved evidence explicitly documents ${capability}.`
+      : "Approved evidence supports part of this requirement, but does not establish its full depth or scope.";
+  return {
+    ...input.item,
+    matchType: isDirectlySupported ? "direct" as const : "partial" as const,
+    impact: isDirectlySupported ? "strength" as const : "neutral" as const,
+    evidenceConfidence: isDirectlySupported && input.source.evidenceSpecificity === "high" ? "high" as const : "medium" as const,
+    shortRationale,
+    evidenceSourceIds: input.sourceIds,
+  };
 }
 
 export function composeReportUIPayload(input: {
@@ -248,7 +343,7 @@ export function composeReportUIPayload(input: {
   }
 
   const recoverableLimitationRoleItemIndexes = new Set(input.analysis.items
-    .filter((item) => gapMatchTypes.has(item.matchType) && item.impact === "neutral")
+    .filter((item) => limitationMatchTypes.has(item.matchType) && item.impact === "neutral")
     .map((item) => item.roleItemIndex));
   const representedLimitationRoleItemIndexes = new Set(
     (input.representedLimitationRoleItemIndexes ?? [])
@@ -257,6 +352,7 @@ export function composeReportUIPayload(input: {
   const reportItems: ReportItem[] = [];
   const resolvedAnalysisItems: AnalysisItem[] = [];
   const representedLimitationItemIds = new Set<string>();
+  const nonPunitiveRescueRoleItemIndexes = new Set<number>();
 
   for (const [position, analysisItem] of input.analysis.items.entries()) {
     const roleItem = roleItems[analysisItem.roleItemIndex];
@@ -265,7 +361,9 @@ export function composeReportUIPayload(input: {
     }
     seenIndexes.add(analysisItem.roleItemIndex);
 
-    const requiresEvidence = positiveMatchTypes.has(analysisItem.matchType) || analysisItem.matchType === "partial";
+    const requiresEvidence = positiveMatchTypes.has(analysisItem.matchType)
+      || analysisItem.matchType === "partial"
+      || analysisItem.matchType === "insufficient-evidence";
     const selection = selectRequirementEvidence({
       roleItemIndex: analysisItem.roleItemIndex,
       requirementText: roleItem.originalText,
@@ -281,18 +379,30 @@ export function composeReportUIPayload(input: {
         unproven: analysisItem.unproven,
       },
     });
+    const selectedSource = selection.ok ? sourceById.get(selection.sourceIds[0] ?? "") : undefined;
     const selectedAnalysisItem: AnalysisItem = selection.ok
-      ? { ...analysisItem, evidenceSourceIds: selection.sourceIds }
+      ? analysisItem.matchType === "insufficient-evidence" && selectedSource
+        ? rescueInsufficientEvidence({
+            item: analysisItem,
+            requirementText: roleItem.originalText,
+            source: selectedSource,
+            sourceIds: selection.sourceIds,
+            language: input.language,
+          })
+        : { ...analysisItem, evidenceSourceIds: selection.sourceIds }
       : {
           ...analysisItem,
           matchType: "insufficient-evidence",
-          impact: "gap",
+          impact: "neutral",
           evidenceConfidence: "insufficient",
           shortRationale: input.language === "he"
             ? "לא הצלחתי לאמת מספיק ראיות מהפורטפוליו לדרישה הספציפית הזו."
             : "I couldn't verify enough portfolio evidence for this specific requirement.",
           evidenceSourceIds: [],
         };
+    if (analysisItem.matchType === "insufficient-evidence" && selection.ok && selectedAnalysisItem.matchType === "partial") {
+      nonPunitiveRescueRoleItemIndexes.add(analysisItem.roleItemIndex);
+    }
     const resolvedAnalysisItem = normalizePositiveMatchImpact(
       selectedAnalysisItem.matchType === "insufficient-evidence"
         ? { ...selectedAnalysisItem, evidenceSourceIds: [] }
@@ -333,10 +443,22 @@ export function composeReportUIPayload(input: {
   }
 
   const resolvedAnalysis = { ...input.analysis, items: resolvedAnalysisItems };
-  const semanticIssue = semanticDiagnostic(resolvedAnalysis, representedLimitationRoleItemIndexes);
+  const semanticIssue = semanticDiagnostic(
+    resolvedAnalysis,
+    representedLimitationRoleItemIndexes,
+    nonPunitiveRescueRoleItemIndexes,
+  );
   if (semanticIssue) return { ok: false, diagnostic: semanticIssue };
 
-  const referencedSourceIds = [...new Set(reportItems.flatMap((item) =>
+  const coreSkills = deriveCoreMatchingSkills(reportItems);
+  const topStrengths = createTopStrengthItems({
+    candidates: input.analysis.topStrengths,
+    coreSkills,
+    sourceById,
+  });
+  const evidenceBackedItems = [...reportItems, ...topStrengths];
+
+  const referencedSourceIds = [...new Set(evidenceBackedItems.flatMap((item) =>
     item.clusterIds.map((clusterId) => clusterId.slice("evidence-".length)),
   ))];
   const sourceToClusterId = new Map<string, string>();
@@ -352,7 +474,7 @@ export function composeReportUIPayload(input: {
     });
     const dedupeKey = resolved.destination.dedupeKey;
     const existing = clustersByDestination.get(dedupeKey);
-    const supportedItems = reportItems.filter((item) => item.clusterIds.includes(`evidence-${sourceId}`));
+    const supportedItems = evidenceBackedItems.filter((item) => item.clusterIds.includes(`evidence-${sourceId}`));
 
     if (existing) {
       existing.evidenceIds = [...new Set([...existing.evidenceIds, sourceId])];
@@ -377,14 +499,13 @@ export function composeReportUIPayload(input: {
   }
 
   const clusters = [...clustersByDestination.values()];
-  for (const reportItem of reportItems) {
+  for (const reportItem of evidenceBackedItems) {
     reportItem.clusterIds = [...new Set(reportItem.clusterIds.map((clusterId) => {
       const sourceId = clusterId.slice("evidence-".length);
       return sourceToClusterId.get(sourceId) ?? clusterId;
     }))];
   }
 
-  const strengths = deriveTopStrengths(reportItems);
   const gaps = deriveKeyGaps(reportItems, representedLimitationItemIds);
   const matchedRequirements = reportItems.filter((item) =>
     positiveMatchTypes.has(item.matchType) && item.clusterIds.length > 0,
@@ -433,7 +554,7 @@ export function composeReportUIPayload(input: {
       rationale: conciseSentences(resolvedAnalysis.evidenceConfidenceRationale, 2, 220),
     },
     skillsMatch: {
-      items: strengths,
+      items: coreSkills,
       visualCoverage: { mode: "traceable-count", matchedCount: matchedRequirements, totalCount: totalRequirements },
     },
     requirementMapping: {
@@ -444,7 +565,7 @@ export function composeReportUIPayload(input: {
       clusters,
       ...(clusters[0] ? { defaultClusterId: clusters[0].clusterId } : {}),
     },
-    topStrengths: { items: strengths },
+    topStrengths: { items: deriveTopStrengths(topStrengths) },
     keyGaps: { items: gaps },
     disclaimer: {
       copyKey: "report.disclaimer.v1",

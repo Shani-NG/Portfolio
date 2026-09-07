@@ -14,6 +14,7 @@ export type ApprovedEvidenceSource = {
   label: string;
   content: string;
   sourceType: "case-study" | "cv" | "profile";
+  cvEvidenceLevel?: "evidence-card" | "capability-fact";
   approvedPublicVisibility: boolean;
   claim?: string;
   capabilities?: string[];
@@ -130,6 +131,9 @@ export function evidenceRelevance(requirementText: string, source: ApprovedEvide
     conceptOverlap * 3
     + lexicalRelevance(requirementText, source.capabilities?.join(" ") ?? "") * 4
     + lexicalRelevance(requirementText, source.claim ?? "") * 4
+    + (source.cvEvidenceLevel === "capability-fact" && source.capabilities?.some((capability) =>
+      requirementText.toLowerCase().includes(capability.toLowerCase())
+    ) ? 6 : 0)
     + (source.sourceType === "case-study" ? 0 : lexicalRelevance(requirementText, source.content))
   );
 }
@@ -144,6 +148,76 @@ function firstField(block: string, label: string) {
 
 function headingField(block: string, label: string) {
   return block.match(new RegExp(`(?:^|\\n)#{1,6}\\s*(?:\\*{1,2})?${label}(?:\\*{1,2})?\\s*\\n+([^#\\n][^\\n]*)`, "i"))?.[1]?.trim();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function cvField(block: string, label: string, nextLabels: string[]) {
+  const next = nextLabels.map(escapeRegExp).join("|");
+  return block.match(new RegExp(
+    `(?:^|\\n)\\s*(?:\\*{1,2})?${escapeRegExp(label)}(?:\\*{1,2})?\\s*\\n+([\\s\\S]*?)(?=\\n+\\s*(?:\\*{1,2})?(?:${next})(?:\\*{1,2})?\\s*\\n|$)`,
+    "i",
+  ))?.[1]?.replace(/\s+/g, " ").trim();
+}
+
+const cvCapabilityFacts = [
+  { id: "EV-CV-FACT-FIGMA", capability: "Figma", pattern: /\bFigma\b/i },
+  { id: "EV-CV-FACT-DESIGN-SYSTEMS", capability: "Design systems", pattern: /\bdesign systems?\b/i },
+  { id: "EV-CV-FACT-UXPILOT", capability: "UXPilot", pattern: /\bUXpilot\b/i },
+  { id: "EV-CV-FACT-CLAUDE-CODE", capability: "Claude Code", pattern: /\bClaude Code\b/i },
+  { id: "EV-CV-FACT-CODEX", capability: "Codex", pattern: /\bCodex\b/i },
+  { id: "EV-CV-FACT-MCP", capability: "MCP", pattern: /\bMCP\b/i },
+  { id: "EV-CV-FACT-AI-ASSISTED-IMPLEMENTATION", capability: "AI-assisted implementation", pattern: /\bAI-assisted implementation\b/i },
+  { id: "EV-CV-FACT-PRODUCT-MANAGEMENT", capability: "Product Management", pattern: /\bProduct Management\b/i },
+  { id: "EV-CV-FACT-MAKE", capability: "Make", pattern: /(?:^|[;\s])Make(?:[;\s]|$)/m },
+  { id: "EV-CV-FACT-SUPABASE", capability: "Supabase", pattern: /\bSupabase\b/i },
+  { id: "EV-CV-FACT-GIT-GITHUB", capability: "Git and GitHub", pattern: /\bGit(?:\/GitHub|; GitHub)\b/i },
+  { id: "EV-CV-FACT-VERCEL", capability: "Vercel", pattern: /\bVercel\b/i },
+  { id: "EV-CV-FACT-RAG-LLM", capability: "RAG and LLM workflows", pattern: /\bRAG(?: and |\/)?LLM/i },
+  { id: "EV-CV-FACT-API-INTEGRATION", capability: "API integration", pattern: /\bAPI integration\b/i },
+] as const;
+
+export function parseCanonicalCvEvidence(content: string) {
+  const headers = [...content.matchAll(/^\*\*(EV-CV-\d+)\s+[—-]\s+(.+?)\*\*\s*$/gm)];
+  const cards = headers.flatMap((header, index): ApprovedEvidenceSource[] => {
+    const start = header.index ?? 0;
+    const end = headers[index + 1]?.index ?? content.length;
+    const block = content.slice(start, end).trim();
+    const claim = cvField(block, "Claim", ["Evidence basis", "Reliability", "Safe use", "Limitation"]);
+    if (!claim) return [];
+    const reliability = cvField(block, "Reliability", ["Safe use", "Limitation"]);
+    const safeUse = cvField(block, "Safe use", ["Limitation"]);
+    const limitation = cvField(block, "Limitation", ["Claim"]);
+    return [{
+      id: header[1]!,
+      label: "CV / Professional Experience",
+      content: block.slice(0, 2_000),
+      sourceType: "cv",
+      cvEvidenceLevel: "evidence-card",
+      approvedPublicVisibility: false,
+      claim,
+      capabilities: [header[2]!, ...(safeUse ? [safeUse] : [])],
+      ...(limitation ? { limitations: [limitation] } : {}),
+      evidenceSpecificity: reliability?.toLowerCase().startsWith("high") ? "high" : "medium",
+    }];
+  });
+
+  const facts = cvCapabilityFacts.flatMap((fact): ApprovedEvidenceSource[] => fact.pattern.test(content) ? [{
+    id: fact.id,
+    label: "CV / Professional Experience",
+    content: `${fact.capability} is explicitly listed in the approved CV knowledge.`,
+    sourceType: "cv",
+    cvEvidenceLevel: "capability-fact",
+    approvedPublicVisibility: false,
+    claim: `${fact.capability} is explicitly listed in the approved CV.`,
+    capabilities: [fact.capability],
+    limitations: ["This narrow fact proves only that the capability or tool is explicitly listed; it does not prove expertise, ownership, scale, or depth."],
+    evidenceSpecificity: "high",
+  }] : []);
+
+  return { cards, facts };
 }
 
 export function parseCanonicalCaseStudyEvidence(source: CanonicalEvidenceSourceDefinition, content: string) {
@@ -265,6 +339,13 @@ export async function loadApprovedEvidenceCatalog() {
       continue;
     }
 
+    if (result.definition.sourceType === "cv") {
+      const parsed = parseCanonicalCvEvidence(result.content);
+      internalSources.push(...parsed.cards, ...parsed.facts);
+      for (const source of [...parsed.cards, ...parsed.facts]) sourceFileById.set(source.id, result.definition.file);
+      continue;
+    }
+
     if (result.definition.sourceType !== "case-study") {
       const source = internalEvidenceSource(result.definition, result.content);
       internalSources.push(source);
@@ -321,15 +402,18 @@ function rankSources(requirementText: string, sources: ApprovedEvidenceSource[])
 
 function buildRequirementCandidates(roleItems: EvidenceRoleItem[], catalogSources: ApprovedEvidenceSource[]) {
   const caseStudySources = catalogSources.filter((source) => source.sourceType === "case-study");
-  const internalSources = catalogSources.filter((source) => source.sourceType === "cv");
+  const cvCards = catalogSources.filter((source) => source.cvEvidenceLevel === "evidence-card");
+  const capabilityFacts = catalogSources.filter((source) => source.cvEvidenceLevel === "capability-fact");
 
   return roleItems.map((roleItem, roleItemIndex): RequirementEvidenceCandidates => {
     const rankedCaseStudies = rankSources(roleItem.originalText, caseStudySources).slice(0, 6);
-    const rankedFallback = rankSources(roleItem.originalText, internalSources).slice(0, 1);
+    const rankedCvCards = rankSources(roleItem.originalText, cvCards).slice(0, 2);
+    const rankedCapabilityFacts = rankSources(roleItem.originalText, capabilityFacts).slice(0, 1);
     return {
       roleItemIndex,
       roleItemText: roleItem.originalText,
-      candidates: [...rankedCaseStudies, ...rankedFallback].map((source) => ({ sourceId: source.id, relevanceScore: source.score })),
+      candidates: [...rankedCaseStudies, ...rankedCvCards, ...rankedCapabilityFacts]
+        .map((source) => ({ sourceId: source.id, relevanceScore: source.score })),
     };
   });
 }
@@ -392,9 +476,25 @@ function packRequirementCandidates(
   sourceById: ReadonlyMap<string, ApprovedEvidenceSource>,
 ) {
   const packed = candidatesByRoleItem.map((candidateSet): PackedCandidateSet => ({ ...candidateSet, candidates: [] }));
-  const selectedSourceIds = new Set(
-    [...sourceById.values()].filter((source) => source.sourceType === "cv").map((source) => source.id),
-  );
+  const cvCoverage = new Map<string, { coverage: number; relevance: number; firstRoleItemIndex: number }>();
+  for (const candidateSet of candidatesByRoleItem) {
+    for (const candidate of candidateSet.candidates.filter((entry) => sourceById.get(entry.sourceId)?.sourceType === "cv")) {
+      const current = cvCoverage.get(candidate.sourceId);
+      cvCoverage.set(candidate.sourceId, {
+        coverage: (current?.coverage ?? 0) + 1,
+        relevance: (current?.relevance ?? 0) + candidate.relevanceScore,
+        firstRoleItemIndex: current?.firstRoleItemIndex ?? candidateSet.roleItemIndex,
+      });
+    }
+  }
+  const selectedCvSourceIds = [...cvCoverage.entries()]
+    .sort((left, right) => right[1].coverage - left[1].coverage
+      || right[1].relevance - left[1].relevance
+      || left[1].firstRoleItemIndex - right[1].firstRoleItemIndex
+      || left[0].localeCompare(right[0]))
+    .slice(0, 2)
+    .map(([sourceId]) => sourceId);
+  const selectedSourceIds = new Set(selectedCvSourceIds);
   const caseStudyCandidatesByRoleItem = candidatesByRoleItem.map((candidateSet) => candidateSet.candidates.filter(
     (candidate) => sourceById.get(candidate.sourceId)?.sourceType === "case-study",
   ));
@@ -415,8 +515,10 @@ function packRequirementCandidates(
   }
 
   for (const [roleItemIndex, candidateSet] of candidatesByRoleItem.entries()) {
-    const cvCandidate = candidateSet.candidates.find((candidate) => sourceById.get(candidate.sourceId)?.sourceType === "cv");
-    if (cvCandidate) packed[roleItemIndex]?.candidates.push(cvCandidate);
+    const cvCandidates = candidateSet.candidates.filter((candidate) =>
+      selectedSourceIds.has(candidate.sourceId) && sourceById.get(candidate.sourceId)?.sourceType === "cv"
+    );
+    packed[roleItemIndex]?.candidates.push(...cvCandidates);
   }
 
   // A tied fourth case-study candidate can preserve a materially different
@@ -472,10 +574,14 @@ function selectRichSources(
       return left.metrics.firstRoleItemIndex - right.metrics.firstRoleItemIndex || left.source.id.localeCompare(right.source.id);
     })
     .map((entry) => entry.source);
-  const cvSource = [...sourceById.values()].find((source) => source.sourceType === "cv");
-  const cvBlock = cvSource ? selectiveRichSource(cvSource) : "";
-  const reservedCvSeparator = cvBlock ? 7 : 0;
-  let remainingBudget = Math.max(0, selectiveRichContextCharacterBudget - cvBlock.length - reservedCvSeparator);
+  const cvSources = [...new Set(packedCandidates.flatMap((candidateSet) => candidateSet.candidates.map((candidate) => candidate.sourceId)))]
+    .map((sourceId) => sourceById.get(sourceId))
+    .filter((source): source is ApprovedEvidenceSource => source?.sourceType === "cv")
+    .slice(0, 2);
+  const cvBlocks = cvSources.map(selectiveRichSource);
+  const cvBlockLength = cvBlocks.reduce((total, block) => total + block.length, 0) + Math.max(0, cvBlocks.length - 1) * 7;
+  const reservedCvSeparator = cvBlocks.length ? 7 : 0;
+  let remainingBudget = Math.max(0, selectiveRichContextCharacterBudget - cvBlockLength - reservedCvSeparator);
   const selectedCaseStudies: ApprovedEvidenceSource[] = [];
 
   for (const source of caseStudySources) {
@@ -486,7 +592,7 @@ function selectRichSources(
     remainingBudget -= block.length + separatorCost;
   }
 
-  return [...selectedCaseStudies, ...(cvSource ? [cvSource] : [])];
+  return [...selectedCaseStudies, ...cvSources];
 }
 
 export async function loadApprovedEvidence(roleText: string, roleItems?: EvidenceRoleItem[]) {

@@ -89,3 +89,32 @@ test("insufficient-evidence positioning names what is unproven without inventing
   assert.match(guidance, /Regulated-finance ownership is not proven/);
   assert.doesNotMatch(guidance, /verified experience:/i);
 });
+
+test("optional public-report Top Strength enrichment does not change the JAM guidance contract", () => {
+  const analysis = {
+    fitLevel: "good",
+    fitRationale: "The role aligns with approved product evidence.",
+    evidenceConfidence: "high",
+    evidenceConfidenceRationale: "Approved evidence supports the mapped requirement.",
+    skillsCoverageLabel: "Evidence-backed coverage",
+    items: [],
+    topStrengths: [{
+      displayLabel: "Strategy-to-execution range",
+      shortRationale: "A public-report-only synthesis candidate.",
+      evidenceSourceIds: ["c4i"],
+    }],
+  } satisfies QualitativeReportAnalysis;
+  const guidance = guidanceFromAnalysis(analysis, [{
+    requirement: "Product strategy",
+    source: "requirement",
+    importance: "core",
+    matchType: "direct",
+    impact: "strength",
+    evidenceConfidence: "high",
+    rationale: "Approved product strategy evidence.",
+    evidenceSourceIds: ["c4i"],
+  }]);
+
+  assert.match(guidance, /Approved product strategy evidence/);
+  assert.doesNotMatch(guidance, /public-report-only|Strategy-to-execution range/);
+});

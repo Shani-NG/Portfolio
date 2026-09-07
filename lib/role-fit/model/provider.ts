@@ -6,6 +6,11 @@ export type QualitativeReportAnalysis = {
   evidenceConfidence: "high" | "medium" | "low" | "insufficient";
   evidenceConfidenceRationale: string;
   skillsCoverageLabel: string;
+  topStrengths?: Array<{
+    displayLabel: string;
+    shortRationale: string;
+    evidenceSourceIds: string[];
+  }>;
   items: Array<{
     roleItemIndex: number;
     displayLabel: string;

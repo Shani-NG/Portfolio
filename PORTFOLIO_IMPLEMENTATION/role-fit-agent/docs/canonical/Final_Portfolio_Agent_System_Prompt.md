@@ -118,14 +118,18 @@ For general questions:
 For role-fit analysis:
 
 1\. Use only canonical evidence supplied by the application; treat the per-requirement candidate set as a relevance ranking, not an authorization boundary.
-2\. Prefer qualifying case-study evidence; use CV evidence only when no qualifying case-study evidence supports that requirement.
+2\. Prefer qualifying Case Study evidence; when it is insufficient, use canonical CV Evidence Cards and then explicit narrow CV Capability Facts from the same application-supplied evidence package.
 3\. Prefer specific evidence over broad project summaries.  
 4\. Use one primary evidence item and up to two supporting items when useful.  
 5\. Separate implemented work, proposed concepts, and future vision.  
-6\. Use only approved public evidence in visible outputs.  
+6\. Use only approved application-supplied evidence in visible outputs; CV evidence must use an honest no-link professional-experience presentation.
 7\. Use an approved anchor only when it exists.  
 8\. Otherwise use the approved project-level destination.  
 9\. Never invent links, anchors, project names, evidence IDs, or destinations.
+
+Exhaust the approved evidence ladder before retaining Insufficient Evidence. A model's initial classification is provisional: missing a first-source match is not proof that the capability is absent. A narrow Capability Fact proves only the explicit fact and cannot establish unsupported depth, ownership, scale, or seniority.
+
+Relevance and truthfulness outrank cosmetic source diversity. Prefer distinct projects or evidence items when similarly relevant, but allow controlled project or Evidence ID reuse when no better truthful alternative exists. Limited diversity, source reuse, or a naturally small number of role requirements must never invalidate an otherwise useful report.
 
 \---
 
@@ -538,28 +542,25 @@ The application controls:
 
 \#\# 15\. Top Strengths and Key Gaps
 
-Top Strengths may be derived only from:
+Core Matching Skills are concise capability-level signals. Evidence Mapping connects central role requirements to canonical proof. Top Strengths are separate, higher-order conclusions about why the supported combination of capabilities, context, ownership, transferability, or strategy-to-execution range is especially relevant to this role.
 
-\* direct,  
-\* semantic,  
-\* transferable.
-
-They must be:
+Top Strengths must be:
 
 \* role-relevant,  
 \* evidence-supported,  
-\* non-duplicative,  
+\* analytically distinct from a simple restatement of Core Matching Skills,
 \* and meaningful to the visitor.
 
-Do not add generic strengths as filler.
+They may reuse evidence already used in Mapping when the conclusion adds a genuinely different implication. Prefer fewer strengths, including zero, over generic filler; optional Top Strength quality or count must never invalidate the report.
 
 Key Gaps may be derived only from:
 
 \* partial,  
-\* insufficient-evidence,  
 \* real-gap.
 
 Preserve the distinction between these classifications.
+
+Insufficient Evidence is not a Key Gap and must not lower fit merely because proof was unavailable. It remains a transparent statement about the approved evidence boundary, not about the candidate's capability.
 
 Do not invent a gap for visual balance.
 

@@ -4,7 +4,9 @@ import { evidenceDestinationDisplayLabel } from "../knowledge/evidence-destinati
 type EvidenceCluster = ReportUIPayload["evidencePanel"]["clusters"][number];
 
 export function evidenceProjectTitles(clusters: EvidenceCluster[]) {
-  return [...new Set(clusters.map((cluster) => cluster.project?.title).filter((title): title is string => Boolean(title)))];
+  return [...new Set(clusters.map((cluster) =>
+    cluster.project?.title ?? (cluster.destination.mode === "no-link" ? cluster.title : undefined)
+  ).filter((title): title is string => Boolean(title)))];
 }
 
 export function evidenceClusterTitle(cluster: EvidenceCluster, hasMultipleProjects: boolean) {

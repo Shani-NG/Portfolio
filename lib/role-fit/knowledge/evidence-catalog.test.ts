@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { resolveApprovedEvidenceDestination } from "./evidence-destinations.ts";
-import { loadApprovedEvidence, loadApprovedEvidenceCatalog, parseCanonicalCaseStudyEvidence } from "./load-approved-evidence.ts";
+import { loadApprovedEvidence, loadApprovedEvidenceCatalog, parseCanonicalCaseStudyEvidence, parseCanonicalCvEvidence } from "./load-approved-evidence.ts";
 
 const expectedCounts = {
   "big-red-button": 9,
@@ -70,6 +70,23 @@ describe("validated canonical evidence catalog", () => {
     );
   });
 
+  it("normalizes the six canonical CV Evidence Cards and only approved explicit capability facts", async () => {
+    const canonicalPath = join(process.cwd(), "PORTFOLIO_IMPLEMENTATION", "role-fit-agent", "docs", "canonical", "CV_Knowledge.md");
+    const parsed = parseCanonicalCvEvidence(await readFile(canonicalPath, "utf8"));
+    assert.deepEqual(parsed.cards.map((source) => source.id), [
+      "EV-CV-01",
+      "EV-CV-02",
+      "EV-CV-03",
+      "EV-CV-04",
+      "EV-CV-05",
+      "EV-CV-06",
+    ]);
+    assert.ok(parsed.cards.every((source) => source.cvEvidenceLevel === "evidence-card" && source.claim));
+    assert.ok(parsed.facts.some((source) => source.id === "EV-CV-FACT-FIGMA"));
+    assert.ok(parsed.facts.some((source) => source.id === "EV-CV-FACT-CODEX"));
+    assert.equal(parsed.facts.some((source) => /CURSOR|BASE44/.test(source.id)), false);
+  });
+
   it("gives every accepted public card a valid route or approved anchor destination", async () => {
     const catalog = await loadApprovedEvidenceCatalog();
     for (const source of catalog.sources.filter((candidate) => candidate.sourceType === "case-study")) {
@@ -131,7 +148,7 @@ describe("validated canonical evidence catalog", () => {
     assert.ok((bundle.candidatesByRoleItem?.[0]?.candidates.length ?? 0) > 3);
     assert.match(bundle.promptContext, /COMPACT APPROVED EVIDENCE INDEX/);
     assert.match(bundle.promptContext, /SELECTIVE RICH CONTEXT FOR SEMANTIC REASONING AND CV FALLBACK/);
-    assert.match(bundle.promptContext, /EVIDENCE_ID: cv/);
+    assert.match(bundle.promptContext, /EVIDENCE_ID: EV-CV-/);
     assert.match(bundle.promptContext, /not an authorization boundary/);
     assert.match(bundle.promptContext, /may truthfully support any role item/);
     assert.ok(compactSourceIds.length > 1 && compactSourceIds.length <= 12);
