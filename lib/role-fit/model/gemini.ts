@@ -41,7 +41,15 @@ type GeminiCallResult =
       diagnostics?: ReportDiagnosticMetadata;
     };
 
-const qualitativeReportAnalysisSchema = z
+const topStrengthAnalysisSchema = z
+  .object({
+    displayLabel: z.string().min(1),
+    shortRationale: z.string().min(1),
+    evidenceSourceIds: z.array(z.string()).min(1),
+  })
+  .strict();
+
+const coreQualitativeReportAnalysisSchema = z
   .object({
     fitLevel: z.enum(["strong", "good", "partial", "insufficient", "out-of-scope"]),
     fitRationale: z.string().min(1),
@@ -71,6 +79,36 @@ const qualitativeReportAnalysisSchema = z
       .max(5),
   })
   .strict();
+
+const qualitativeReportAnalysisSchema = coreQualitativeReportAnalysisSchema.extend({
+  topStrengths: z.array(topStrengthAnalysisSchema).max(3).optional(),
+}).strict();
+
+function parseQualitativeReportAnalysis(value: unknown):
+  | { success: true; data: QualitativeReportAnalysis }
+  | { success: false; error: z.ZodError } {
+  if (!isPlainObject(value)) {
+    const parsed = coreQualitativeReportAnalysisSchema.safeParse(value);
+    return parsed.success ? { success: true, data: parsed.data } : parsed;
+  }
+
+  const { topStrengths, ...coreValue } = value;
+  const core = coreQualitativeReportAnalysisSchema.safeParse(coreValue);
+  if (!core.success) return core;
+  if (!Array.isArray(topStrengths)) return { success: true, data: core.data };
+
+  const validTopStrengths = topStrengths.flatMap((candidate) => {
+    const parsed = topStrengthAnalysisSchema.safeParse(candidate);
+    return parsed.success ? [parsed.data] : [];
+  }).slice(0, 3);
+  return {
+    success: true,
+    data: {
+      ...core.data,
+      ...(validTopStrengths.length > 0 ? { topStrengths: validTopStrengths } : {}),
+    },
+  };
+}
 
 const canonicalReportAnalysisJsonSchema = z.toJSONSchema(qualitativeReportAnalysisSchema);
 const reportAnalysisJsonSchema = JSON.stringify(canonicalReportAnalysisJsonSchema);
@@ -656,7 +694,8 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
         "fitRationale must be exactly one concise factual sentence describing the shared domain, platform, or product context that connects the role to the approved evidence. Do not mention Shani by name, years of experience, card values, or use promotional language.",
         "Prefer varied public case-study evidence only after truthfulness, relevance, evidence strength, and case-study-first fallback. Never choose cosmetic diversity over stronger support.",
         "Do not create links, destinations, cluster IDs, report IDs, timestamps, UI payload fields, markdown, or explanations outside JSON.",
-        "Keep the analysis to at most five role items. Strength and gap wording must be expressed through displayLabel and shortRationale on those same items, not through separate lists.",
+        "Return at most five central Evidence Mapping items. The application derives concise Core Matching Skills. Key Gaps are only partial limitations or real gaps; insufficient evidence is never a gap.",
+        "Optionally return 1-3 topStrengths as evidence-backed higher-order role implications, not renamed Mapping capabilities. Evidence reuse is valid when the conclusion adds a distinct strategic, execution, leadership, cross-functional, transferability, or capability-combination insight. Supported preferred qualifications may differentiate a strength. Fewer or zero are valid; never add filler or unsupported inference.",
       ].join("\n\n");
 
       let response = await generateGeminiContent({
@@ -702,7 +741,7 @@ export function createGeminiRoleFitProvider(): RoleFitModelProvider {
           repairTriggerCategory = "empty_response";
         } else {
           try {
-            const parsed = qualitativeReportAnalysisSchema.safeParse(extractJson(text));
+            const parsed = parseQualitativeReportAnalysis(extractJson(text));
             if (parsed.success) {
               const indexes = parsed.data.items.map((item) => item.roleItemIndex);
               const hasInvalidIndex = roleIndexConstraint

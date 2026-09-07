@@ -409,10 +409,74 @@ describe("Gemini chat completion guard", () => {
     const topLevelProperties = schema.properties as Record<string, unknown>;
     assert.ok(topLevelProperties.fitRationale);
     assert.ok(topLevelProperties.items);
+    assert.ok(topLevelProperties.topStrengths);
+    assert.equal((schema.required as string[]).includes("topStrengths"), false);
 
     const prompt = requestPrompt(requests[0] ?? {});
     assert.match(prompt, /Exact qualitative analysis JSON Schema:/);
     assert.match(prompt, /"minLength":1/);
+    assert.match(prompt, /Evidence reuse is valid/);
+    assert.match(prompt, /Supported preferred qualifications may differentiate a strength/);
+    assert.doesNotMatch(prompt, /Strength and gap wording must be expressed through .* same items/);
+  });
+
+  it("keeps optional Top Strength enrichment fail-soft without adding a provider call", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    const requests: Array<Record<string, unknown>> = [];
+    const response = JSON.parse(validReportAnalysis(0)) as Record<string, unknown>;
+    const topStrengths = [
+      {
+        displayLabel: "Strategy-to-execution range",
+        shortRationale: "Approved evidence connects product strategy with implementation decisions.",
+        evidenceSourceIds: ["c4i"],
+      },
+      { displayLabel: "Malformed optional item", evidenceSourceIds: ["c4i"] },
+    ];
+    response.topStrengths = topStrengths;
+    globalThis.fetch = async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return geminiResponse(JSON.stringify(response), "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(requests.length, 1);
+    assert.deepEqual(result.analysis.topStrengths, [topStrengths[0]]);
+  });
+
+  it("accepts absent or empty Top Strength enrichment as a valid one-call analysis", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GOOGLE_AI_STUDIO_ANALYSIS_MODEL = "gemini-3.5-flash";
+    const empty = JSON.parse(validReportAnalysis(0)) as Record<string, unknown>;
+    empty.topStrengths = [];
+    let requests = 0;
+    globalThis.fetch = async () => {
+      requests += 1;
+      return geminiResponse(JSON.stringify(empty), "STOP");
+    };
+
+    const result = await createGeminiRoleFitProvider().generateReport({
+      roleText: "Title: Senior UX Strategist",
+      language: "en",
+      task: "analysis",
+      maxOutputTokens: 2500,
+      approvedEvidence: "### APPROVED_SOURCE_ID: c4i",
+      runtimeState: JSON.stringify({ roleItems: [{ originalText: "Complex product strategy", source: "requirement" }] }),
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(requests, 1);
+    assert.equal(result.analysis.topStrengths, undefined);
   });
 
   it("keeps the maximum five-item compact inference package within the static budget without closing the evidence ladder", async () => {
@@ -461,12 +525,12 @@ describe("Gemini chat completion guard", () => {
     assert.equal(roleItems.length, 5);
     assert.ok(estimatedInputTokens >= 10_000 && estimatedInputTokens <= 12_000, `estimated ${estimatedInputTokens} input tokens`);
     assert.ok(compactSourceIds.length <= 12);
-    assert.deepEqual(candidateCounts, [4, 5, 5, 2, 5]);
+    assert.deepEqual(candidateCounts, [5, 4, 5, 2, 5]);
     assert.equal(richSourceIds.length, 4);
     assert.ok(projectTitles.size >= 4);
     assert.match(prompt, /transferable capabilities, limitations, and ownership boundaries/);
     assert.match(prompt, /Any exact EVIDENCE_ID in the compact approved index may support any role item/);
-    assert.match(prompt, /EVIDENCE_ID: cv/);
+    assert.match(prompt, /EVIDENCE_ID: EV-CV-/);
     assert.match(prompt, /direct case study, semantic\/contextual case study, transferable case study, legitimate reuse, CV fallback, then insufficient evidence/);
     assert.match(prompt, /state the direct gap, the transferable context, and the residual unproven gap in the same item/);
     assert.match(prompt, /do not improve fitLevel solely because transferable context exists/);

@@ -114,12 +114,12 @@ describe("deterministic three-level Overall Fit calibration", () => {
     ])), "partial");
   });
 
-  it("uses Partial for multiple important insufficient-evidence requirements", () => {
+  it("does not treat multiple important insufficient-evidence requirements as capability gaps", () => {
     assert.equal(resolveStableFitLevel(analysis([
       ...strongCore(),
       item({ roleItemIndex: 3, importance: "core", matchType: "insufficient-evidence" }),
       item({ roleItemIndex: 4, importance: "must-have", matchType: "insufficient-evidence" }),
-    ])), "partial");
+    ])), "good");
   });
 
   it("preserves Partial for a material must-have hard constraint represented as a real gap", () => {

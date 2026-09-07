@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createEvidenceSelectionState, selectRequirementEvidence, type EvidenceSelectionReasoning } from "./evidence-selection.ts";
+import { createEvidenceSelectionState, isNarrowCapabilityFactRequirement, selectRequirementEvidence, type EvidenceSelectionReasoning } from "./evidence-selection.ts";
 import type { ApprovedEvidenceBundle, ApprovedEvidenceSource } from "./load-approved-evidence.ts";
 
 type ProjectId = "big-red-button" | "c4i" | "epd";
@@ -32,7 +32,20 @@ function caseSource(input: {
 }
 
 function cvSource(content = "Recovery governance"): ApprovedEvidenceSource {
-  return { id: "cv", label: "CV", content, sourceType: "cv", approvedPublicVisibility: false };
+  return { id: "EV-CV-01", label: "CV", content, claim: content, capabilities: [content], sourceType: "cv", cvEvidenceLevel: "evidence-card", approvedPublicVisibility: false };
+}
+
+function capabilityFact(capability = "Figma"): ApprovedEvidenceSource {
+  return {
+    id: `EV-CV-FACT-${capability.toUpperCase().replace(/\W+/g, "-")}`,
+    label: "CV / Professional Experience",
+    content: `${capability} is explicitly listed.`,
+    claim: `${capability} is explicitly listed in the approved CV.`,
+    capabilities: [capability],
+    sourceType: "cv",
+    cvEvidenceLevel: "capability-fact",
+    approvedPublicVisibility: false,
+  };
 }
 
 function bundle(
@@ -151,11 +164,32 @@ describe("deterministic requirement evidence selection", () => {
     assert.deepEqual(select({ sources: [first, alias, distinct], requestedSourceIds: [alias.id], state }), { ok: true, sourceIds: [alias.id] });
   });
 
+  it("prefers distinct qualifying evidence from the same project during deterministic recovery", () => {
+    const first = caseSource({ id: "c4i:first", projectId: "c4i", claim: "Recovery governance leadership" });
+    const second = caseSource({ id: "c4i:second", projectId: "c4i", claim: "Recovery governance leadership" });
+    const state = createEvidenceSelectionState();
+    assert.deepEqual(select({ sources: [first, second], requestedSourceIds: [first.id], state }), { ok: true, sourceIds: [first.id] });
+    assert.deepEqual(select({ sources: [first, second], requestedSourceIds: ["invalid"], state }), { ok: true, sourceIds: [second.id] });
+  });
+
   it("keeps CV as the last fallback even when the model requests it", () => {
     const caseStudy = caseSource({ id: "c4i:case-study", projectId: "c4i", claim: "Recovery governance leadership" });
     const cv = cvSource("Recovery governance leadership");
     assert.deepEqual(select({ sources: [cv, caseStudy], requestedSourceIds: [cv.id] }), { ok: true, sourceIds: [caseStudy.id] });
     assert.deepEqual(select({ sources: [cv], requestedSourceIds: [cv.id] }), { ok: true, sourceIds: [cv.id] });
+  });
+
+  it("uses a structured CV card before a narrow capability fact", () => {
+    const cv = cvSource("Figma experience");
+    const fact = capabilityFact("Figma");
+    assert.deepEqual(select({ sources: [fact, cv], requestedSourceIds: [fact.id], requirementText: "Figma experience" }), { ok: true, sourceIds: [cv.id] });
+  });
+
+  it("allows a capability fact only as its own bounded evidence level", () => {
+    const fact = capabilityFact("Figma");
+    assert.deepEqual(select({ sources: [fact], requestedSourceIds: [], requirementText: "Experience using Figma" }), { ok: true, sourceIds: [fact.id] });
+    assert.equal(isNarrowCapabilityFactRequirement("Experience using Figma", fact), true);
+    assert.equal(isNarrowCapabilityFactRequirement("Lead enterprise Figma design-system ownership at scale", fact), false);
   });
 
   it("replaces an invented model-selected ID deterministically", () => {
@@ -173,7 +207,7 @@ describe("deterministic requirement evidence selection", () => {
 
   it("fails when no canonical source reaches the sufficient relevance threshold", () => {
     const result = select({
-      sources: [cvSource("governance")],
+      sources: [cvSource("tax litigation")],
       requestedSourceIds: ["invented"],
       requirementText: "Recovery governance",
     });

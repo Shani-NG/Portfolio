@@ -72,3 +72,16 @@ test("confidence remains available to assistive technology without adding visibl
     "C4I - Beyond Clarity. high evidence confidence.",
   );
 });
+
+test("CV evidence is labeled as professional experience without a fabricated Case Study destination", () => {
+  const cv = cluster({
+    clusterId: "evidence-EV-CV-02",
+    title: "CV / Professional Experience",
+    evidenceIds: ["EV-CV-02"],
+    project: undefined,
+    destination: { mode: "no-link", dedupeKey: "source:EV-CV-02" },
+  });
+  assert.deepEqual(evidenceProjectTitles([cv]), ["CV / Professional Experience"]);
+  assert.equal(evidenceClusterTitle(cv, false), "CV / Professional Experience");
+  assert.equal(cv.destination.mode, "no-link");
+});

@@ -221,26 +221,28 @@ describe("Task C evidence and report integrity", () => {
     ]).length, 2);
   });
 
-  it("C09 limits Key Gaps to eligible partial, insufficient-evidence, and real-gap items", () => {
+  it("C09 limits Key Gaps to actual partial limitations and real gaps", () => {
     const gaps = deriveKeyGaps([
       reportItem(1, "partial", "gap"),
       reportItem(2, "insufficient-evidence", "gap"),
       reportItem(3, "real-gap", "gap"),
       reportItem(4, "direct", "gap", ["evidence-4"]),
     ]);
-    assert.deepEqual(gaps.map((entry) => entry.matchType), ["partial", "insufficient-evidence", "real-gap"]);
+    assert.deepEqual(gaps.map((entry) => entry.matchType), ["partial", "real-gap"]);
   });
 
-  it("C10 preserves insufficient evidence instead of converting it to a real gap", () => {
+  it("C10 preserves insufficient evidence as a neutral mapping boundary, never a Key Gap", () => {
     const result = composeReportUIPayload({
       analysis: analysis({ fitLevel: "partial", items: [item(0, "insufficient-evidence", "gap", [])] }),
       roleDraft: roleDraft(),
-      evidence,
+      evidence: { promptContext: "canonical evidence", sources: [] },
       language: "en",
     });
     assert.equal(result.ok, true);
     if (!result.ok) return;
-    assert.equal(result.report.keyGaps.items[0]?.matchType, "insufficient-evidence");
+    assert.equal(result.report.requirementMapping.items[0]?.matchType, "insufficient-evidence");
+    assert.equal(result.report.requirementMapping.items[0]?.impact, "neutral");
+    assert.deepEqual(result.report.keyGaps.items, []);
   });
 
   it("turns one exhausted evidence ladder into requirement-level insufficient evidence instead of composition failure", () => {
@@ -313,9 +315,12 @@ describe("Task C evidence and report integrity", () => {
     assert.doesNotMatch(JSON.stringify(result.report), /[\u0590-\u05ff]/);
   });
 
-  it("C11 blocks Partial Fit when no gap-eligible item exists", () => {
+  it("C11 lets deterministic fit override a model Partial label when no limitation exists", () => {
     const result = composeReportUIPayload({ analysis: analysis({ fitLevel: "partial" }), roleDraft: roleDraft(), evidence, language: "en" });
-    assert.deepEqual(result, { ok: false, diagnostic: "semantic:partial-fit-without-gap" });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.overallFitVisual.mode === "fit" && result.report.overallFitVisual.level, "strong");
+    assert.deepEqual(result.report.keyGaps.items, []);
   });
 
   it("C12 allows Good Fit with no gaps when evidence confidence is sufficient", () => {
@@ -325,9 +330,12 @@ describe("Task C evidence and report integrity", () => {
     assert.equal(result.report.keyGaps.items.length, 0);
   });
 
-  it("C13 blocks low evidence confidence with no gaps", () => {
+  it("C13 keeps low evidence confidence separate from Key Gaps", () => {
     const result = composeReportUIPayload({ analysis: analysis({ fitLevel: "good", evidenceConfidence: "low" }), roleDraft: roleDraft(), evidence, language: "en" });
-    assert.deepEqual(result, { ok: false, diagnostic: "semantic:low-confidence-without-gap" });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.report.keyGaps.items, []);
+    assert.deepEqual(result.report.overallFitVisual.mode === "fit" && result.report.overallFitVisual.qualifiers, ["evidence-limited"]);
   });
 
   it("blocks a genuine structured limitation before deterministic representation recovery", () => {
@@ -335,7 +343,7 @@ describe("Task C evidence and report integrity", () => {
       fitLevel: "good",
       items: [
         item(0, "direct", "strength", ["c4i"]),
-        item(1, "insufficient-evidence", "neutral", []),
+        item(1, "partial", "neutral", ["c4i"]),
       ],
     });
 
@@ -354,7 +362,7 @@ describe("Task C evidence and report integrity", () => {
       fitLevel: "good",
       items: [
         item(0, "direct", "strength", ["c4i"]),
-        item(1, "insufficient-evidence", "neutral", []),
+        item(1, "partial", "neutral", ["c4i"]),
       ],
     });
     const originalAnalysis = structuredClone(limitedAnalysis);
@@ -373,16 +381,16 @@ describe("Task C evidence and report integrity", () => {
     assert.equal(result.report.overallFitVisual.mode, "fit");
     if (result.report.overallFitVisual.mode !== "fit") return;
     assert.equal(result.report.overallFitVisual.level, "good");
-    assert.equal(result.report.requirementMapping.items[1]?.matchType, "insufficient-evidence");
+    assert.equal(result.report.requirementMapping.items[1]?.matchType, "partial");
     assert.equal(result.report.requirementMapping.items[1]?.impact, "neutral");
-    assert.deepEqual(result.report.requirementMapping.items[1]?.clusterIds, []);
+    assert.deepEqual(result.report.requirementMapping.items[1]?.clusterIds, ["evidence-c4i"]);
     assert.deepEqual(result.report.keyGaps.items, [result.report.requirementMapping.items[1]]);
     assert.deepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["c4i"]);
   });
 
   it("cannot invent limitation representation with an unrelated role item index", () => {
     const result = composeReportUIPayload({
-      analysis: analysis({ fitLevel: "good", items: [item(0, "partial", "neutral", ["c4i"])] }),
+      analysis: analysis({ fitLevel: "good", items: [item(0), item(1, "partial", "neutral", ["c4i"])] }),
       roleDraft: roleDraft(),
       evidence,
       language: "en",
@@ -505,6 +513,142 @@ describe("Task C evidence and report integrity", () => {
     if (!result.ok) return;
     assert.equal(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds).length, 1);
     assert.notDeepEqual(result.report.evidencePanel.clusters.flatMap((cluster) => cluster.evidenceIds), ["cv"]);
+  });
+
+  it("rescues a premature model insufficient classification with approved Case Study evidence", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({ items: [item(0, "insufficient-evidence", "gap", [])] }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.requirementMapping.items[0]?.matchType, "partial");
+    assert.equal(result.report.requirementMapping.items[0]?.impact, "neutral");
+    assert.deepEqual(result.report.requirementMapping.items[0]?.clusterIds, ["evidence-c4i"]);
+    assert.deepEqual(result.report.keyGaps.items, []);
+  });
+
+  it("uses a canonical CV Evidence Card when no Case Study supports a premature insufficient result", () => {
+    const cvEvidence: ApprovedEvidenceBundle = {
+      promptContext: "Approved structured CV evidence",
+      sources: [{
+        id: "EV-CV-02",
+        label: "CV / Professional Experience",
+        content: "Complex-system UX strategy and cross-functional leadership.",
+        claim: "Complex-system UX strategy and cross-functional leadership are documented in the approved CV.",
+        capabilities: ["Complex-system UX strategy", "Cross-functional leadership"],
+        sourceType: "cv",
+        cvEvidenceLevel: "evidence-card",
+        approvedPublicVisibility: false,
+        evidenceSpecificity: "high",
+      }],
+    };
+    const result = composeReportUIPayload({
+      analysis: analysis({ items: [item(0, "insufficient-evidence", "gap", [])] }),
+      roleDraft: roleDraft(),
+      evidence: cvEvidence,
+      language: "en",
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.requirementMapping.items[0]?.matchType, "partial");
+    assert.deepEqual(result.report.evidencePanel.clusters[0]?.evidenceIds, ["EV-CV-02"]);
+    assert.equal(result.report.evidencePanel.clusters[0]?.destination.mode, "no-link");
+  });
+
+  it("lets a narrow CV Capability Fact prove existence without proving broader ownership or scale", () => {
+    const fact: ApprovedEvidenceBundle["sources"][number] = {
+      id: "EV-CV-FACT-FIGMA",
+      label: "CV / Professional Experience",
+      content: "Figma is explicitly listed.",
+      claim: "Figma is explicitly listed in the approved CV.",
+      capabilities: ["Figma"],
+      sourceType: "cv",
+      cvEvidenceLevel: "capability-fact",
+      approvedPublicVisibility: false,
+      evidenceSpecificity: "high",
+    };
+    const narrowDraft = validateRoleText({
+      conversationId: "conv_figma",
+      traceId: "trace_figma",
+      roleText: "Title: Product Designer\nResponsibilities: Use Figma\nRequirements: Experience using Figma",
+      detectedLanguage: "en",
+    }).roleDraft;
+    const broadDraft = validateRoleText({
+      conversationId: "conv_figma_broad",
+      traceId: "trace_figma_broad",
+      roleText: "Title: Design Systems Director\nResponsibilities: Govern design tooling\nRequirements: Lead enterprise Figma ownership at scale",
+      detectedLanguage: "en",
+    }).roleDraft;
+
+    const narrow = composeReportUIPayload({
+      analysis: analysis({ items: [item(0, "insufficient-evidence", "gap", [])] }),
+      roleDraft: narrowDraft,
+      evidence: { promptContext: "Approved fact", sources: [fact] },
+      language: "en",
+    });
+    assert.equal(narrow.ok, true);
+    if (narrow.ok) {
+      assert.equal(narrow.report.requirementMapping.items[0]?.matchType, "direct");
+      assert.equal(narrow.report.requirementMapping.items[0]?.impact, "strength");
+    }
+
+    const broad = composeReportUIPayload({
+      analysis: analysis({ items: [item(0, "insufficient-evidence", "gap", [])] }),
+      roleDraft: broadDraft,
+      evidence: { promptContext: "Approved fact", sources: [fact] },
+      language: "en",
+    });
+    assert.equal(broad.ok, true);
+    if (broad.ok) {
+      assert.equal(broad.report.requirementMapping.items[0]?.matchType, "partial");
+      assert.equal(broad.report.requirementMapping.items[0]?.impact, "neutral");
+      assert.doesNotMatch(broad.report.requirementMapping.items[0]?.shortRationale ?? "", /expert|ownership is proven/i);
+      assert.deepEqual(broad.report.keyGaps.items, []);
+    }
+  });
+
+  it("keeps Top Strength synthesis separate from Core Matching Skills while allowing evidence overlap", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        topStrengths: [{
+          displayLabel: "Strategy-to-execution range",
+          shortRationale: "Cross-functional product strategy is connected to implementation decisions in complex systems.",
+          evidenceSourceIds: ["c4i"],
+        }],
+      }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.report.skillsMatch.items.map((entry) => entry.displayLabel), ["Capability 1"]);
+    assert.deepEqual(result.report.topStrengths.items.map((entry) => entry.displayLabel), ["Strategy-to-execution range"]);
+    assert.deepEqual(result.report.topStrengths.items[0]?.clusterIds, ["evidence-c4i"]);
+    assert.deepEqual(result.report.evidencePanel.clusters[0]?.supportedItemIds, ["role-item-1", "top-strength-1"]);
+  });
+
+  it("drops duplicate, unsupported, and single-fact Top Strength enrichment without failing the report", () => {
+    const mappingItem = { ...item(0), displayLabel: "Complex-system UX strategy" };
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        items: [mappingItem],
+        topStrengths: [
+          { displayLabel: "Strong complex-system UX capability", shortRationale: "Complex-system UX strategy is supported.", evidenceSourceIds: ["c4i"] },
+          { displayLabel: "Unsupported commercial ownership", shortRationale: "Commercial ownership is proven.", evidenceSourceIds: ["invented"] },
+        ],
+      }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.report.topStrengths.items, []);
+    assert.equal(result.report.skillsMatch.items.length, 1);
   });
 
   it("C15 never turns raw JD text into an approved evidence source", async () => {

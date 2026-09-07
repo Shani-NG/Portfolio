@@ -58,6 +58,31 @@ function lexicalTerms(value: string) {
   return new Set(normalizeLexiconText(value).split(" ").filter((term) => term.length >= 3));
 }
 
+const narrowFactBoilerplate = new Set([
+  "experience", "experienced", "knowledge", "familiarity", "proficiency", "proficient", "skill", "skills",
+  "use", "using", "used", "work", "working", "hands", "with", "tool", "tools", "required", "preferred",
+]);
+
+export function isNarrowCapabilityFactRequirement(
+  requirementText: string,
+  source: ApprovedEvidenceBundle["sources"][number],
+) {
+  if (source.cvEvidenceLevel !== "capability-fact") return false;
+  const capability = source.capabilities?.[0]?.trim();
+  if (!capability) return false;
+  const requirement = normalizeLexiconText(requirementText);
+  const normalizedCapability = normalizeLexiconText(capability);
+  if (!requirement.includes(normalizedCapability)) return false;
+  if (/\b(?:expert|advanced|senior|lead|leading|leadership|own|ownership|manage|managed|manager|architect|architecture|scale|scaled|enterprise|organization|organisational|organizational|years?)\b/i.test(requirementText)) {
+    return false;
+  }
+  if (/\b(?:and|plus|alongside)\b|[,;&]/i.test(requirementText)) return false;
+  const residualTerms = normalizeLexiconText(requirement.replace(normalizedCapability, ""))
+    .split(" ")
+    .filter((term) => term.length >= 3 && !narrowFactBoilerplate.has(term));
+  return residualTerms.length <= 1;
+}
+
 export function semanticConnectionScore(requirementText: string, sharedCapability: string) {
   const requirementConcepts = new Set(findRelatedLexiconConceptIds(requirementText));
   const capabilityConcepts = new Set(findRelatedLexiconConceptIds(sharedCapability));
@@ -105,10 +130,12 @@ function rankedSufficientSources(input: {
   requirementText: string;
   evidence: ApprovedEvidenceBundle;
   sourceType: "case-study" | "cv";
+  cvEvidenceLevel?: ApprovedEvidenceBundle["sources"][number]["cvEvidenceLevel"];
   reasoning: EvidenceSelectionReasoning;
 }) {
   return input.evidence.sources
     .filter((source) => source.sourceType === input.sourceType)
+    .filter((source) => !input.cvEvidenceLevel || (source.cvEvidenceLevel ?? "evidence-card") === input.cvEvidenceLevel)
     .filter((source) => hasValidDestination(source))
     .map((source): RankedSource => ({
       source,
@@ -131,6 +158,8 @@ function selectStrongestWithDiversityPreference(candidates: RankedSource[], stat
     const leftUsage = state.projectUsage.get(projectKey(left)) ?? 0;
     const rightUsage = state.projectUsage.get(projectKey(right)) ?? 0;
     return leftUsage - rightUsage
+      || Number(state.selectedSourceIds.has(left.source.id)) - Number(state.selectedSourceIds.has(right.source.id))
+      || Number(state.selectedEvidenceIdentities.has(left.identity)) - Number(state.selectedEvidenceIdentities.has(right.identity))
       || right.relevanceScore - left.relevanceScore
       || left.source.id.localeCompare(right.source.id);
   })[0];
@@ -171,16 +200,29 @@ export function selectRequirementEvidence(input: {
   const selectedCaseStudy = selectStrongestWithDiversityPreference(caseStudyUniverse, input.state);
   if (selectedCaseStudy) return recordSelection(selectedCaseStudy, input.state);
 
-  const cvUniverse = rankedSufficientSources({
+  const cvCardUniverse = rankedSufficientSources({
     requirementText: input.requirementText,
     evidence: input.evidence,
     sourceType: "cv",
+    cvEvidenceLevel: "evidence-card",
     reasoning,
   });
-  const cvById = new Map(cvUniverse.map((candidate) => [candidate.source.id, candidate]));
-  const requestedCv = requestedSourceIds.map((sourceId) => cvById.get(sourceId)).find(Boolean);
-  const selectedCv = requestedCv ?? cvUniverse[0];
-  if (selectedCv) return recordSelection(selectedCv, input.state);
+  const cvCardById = new Map(cvCardUniverse.map((candidate) => [candidate.source.id, candidate]));
+  const requestedCvCard = requestedSourceIds.map((sourceId) => cvCardById.get(sourceId)).find(Boolean);
+  const selectedCvCard = requestedCvCard ?? cvCardUniverse[0];
+  if (selectedCvCard) return recordSelection(selectedCvCard, input.state);
+
+  const capabilityFactUniverse = rankedSufficientSources({
+    requirementText: input.requirementText,
+    evidence: input.evidence,
+    sourceType: "cv",
+    cvEvidenceLevel: "capability-fact",
+    reasoning,
+  });
+  const capabilityFactById = new Map(capabilityFactUniverse.map((candidate) => [candidate.source.id, candidate]));
+  const requestedCapabilityFact = requestedSourceIds.map((sourceId) => capabilityFactById.get(sourceId)).find(Boolean);
+  const selectedCapabilityFact = requestedCapabilityFact ?? capabilityFactUniverse[0];
+  if (selectedCapabilityFact) return recordSelection(selectedCapabilityFact, input.state);
 
   if (!input.requiresEvidence) return { ok: true, sourceIds: [] };
   return { ok: false, diagnostic: "evidence:no-sufficiently-relevant-canonical-source" };
