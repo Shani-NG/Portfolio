@@ -9,12 +9,14 @@ import {
   existingReportAnswer,
   genericRoleTitleAnswer,
   looksLikeNewReportRequest,
+  looksLikeReportMutationRequest,
   looksLikeRoleSubmissionSetup,
   maxRoleClarificationAttempts,
   missingDetailsAnswer,
   previouslyProvidedTitleAnswer,
   readyForReportAnswer,
   reportLimitAnswer,
+  reportMutationBlockedAnswer,
   roleSubmissionSetupAnswer,
 } from "@/lib/role-fit/conversation/behavior";
 import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
@@ -106,6 +108,17 @@ export async function POST(request: Request) {
   }
 
   const traceId = crypto.randomUUID();
+  const { conversationId, sessionId } = parsedRequest.data;
+
+  if (parsedRequest.data.reportContext && looksLikeReportMutationRequest(parsedRequest.data.message)) {
+    return NextResponse.json({
+      state: "report-ready",
+      answer: reportMutationBlockedAnswer(parsedRequest.data.language),
+      roleDraft: parsedRequest.data.roleContext?.roleDraft,
+      safeMessageKey: "report.immutable",
+    });
+  }
+
   const hasReportIntent = looksLikeReportIntent(parsedRequest.data.message);
   const roleContext = parsedRequest.data.roleContext;
   const standaloneRoleTitle = !roleContext && !parsedRequest.data.reportContext
@@ -122,7 +135,6 @@ export async function POST(request: Request) {
     ? detectRoleCorrection(parsedRequest.data.message)
     : null;
   const isRoleCorrection = Boolean(roleCorrection);
-  const { conversationId, sessionId } = parsedRequest.data;
 
   if (
     parsedRequest.data.completedReportCount >= policy.maxReportsPerSession
@@ -329,7 +341,9 @@ export async function POST(request: Request) {
     maxOutputTokens: Math.max(800, Math.min(policy.maxOutputTokens, 1200)),
     approvedContext,
     mode: parsedRequest.data.reportContext ? "report-follow-up" : "general-chat",
-    runtimeState: parsedRequest.data.reportContext ? "An existing validated report is active. Answer only about that report." : undefined,
+    runtimeState: parsedRequest.data.reportContext
+      ? "An existing generated report is active and immutable. Answer only about that report. Do not claim to edit, update, change, fix, or correct the generated report, and do not offer to mutate it. Corrections to role details require starting a new analysis."
+      : undefined,
     conversationContext: [parsedRequest.data.conversationContext, parsedRequest.data.reportContext].filter(Boolean).join("\n\n"),
   });
 

@@ -129,14 +129,21 @@
   }
 
   .stageCopy {
-    min-block-size: auto;
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    min-block-size: 3.25rem;
   }
 }
 
 @media (max-width: 40rem) {
+  .stageCopy {
+    min-block-size: 3.75rem;
+  }
+
   .visualSurface {
     --frame-scale: 0.68;
-    margin-block-start: var(--ds-space-xl);
+    margin-block-start: clamp(2rem, 7vw, 3rem);
   }
 
   .visualFrame {

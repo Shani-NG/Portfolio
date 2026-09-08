@@ -6,11 +6,13 @@ import {
   genericRecoverableErrorAnswer,
   genericRoleTitleAnswer,
   isReportConfirmationText,
+  looksLikeReportMutationRequest,
   missingDetailsAnswer,
   previouslyProvidedTitleAnswer,
   readyForReportAnswer,
   reportLimitAnswer,
   reportLoadingAnswer,
+  reportMutationBlockedAnswer,
   reportReadyAnswer,
   reportRetryExhaustedAnswer,
   reportRetryableFailureAnswer,
@@ -88,7 +90,8 @@ describe("Role Fit conversation behavior", () => {
     });
     assert.match(answer, /Senior Product Designer/);
     assert.match(answer, /Lead product discovery/);
-    assert.match(answer, /^עכשיו התמונה מספיק ברורה לי:\n- משרת Senior Product Designer ב־Acme\n- Lead product discovery\n- Collaborate with engineering\n\n/);
+    assert.match(answer, /^עכשיו התמונה מספיק ברורה לי:\n- משרת Senior Product Designer\n- Lead product discovery\n- Collaborate with engineering\n\n/);
+    assert.doesNotMatch(answer, /Acme/);
     assert.match(answer, /אפשר שאכין את בדיקת ההתאמה/);
     assert.match(answer, /אם משהו לא מדויק, אפשר לתקן אותו לפני שאמשיך/);
     assert.doesNotMatch(answer, /התאמה חזקה|התאמה טובה|פער|נקודת חוזק/);
@@ -106,8 +109,19 @@ describe("Role Fit conversation behavior", () => {
 
     assert.equal(
       answer,
-      "I still have a clear enough picture:\n- AI Product Lead position at Harmony AI\n- Design AI agent workflows\n- Partner with Product and Engineering\n\nIf that is accurate, I can prepare the fit review.\nIf anything is off, you can correct it before I continue.",
+      "I still have a clear enough picture:\n- AI Product Lead position\n- Design AI agent workflows\n- Partner with Product and Engineering\n\nIf that is accurate, I can prepare the fit review.\nIf anything is off, you can correct it before I continue.",
     );
+    assert.doesNotMatch(answer, /Harmony AI/);
+  });
+
+  it("blocks explicit report mutation requests without blocking explanation questions", () => {
+    assert.equal(looksLikeReportMutationRequest("Please fix the company in this report"), true);
+    assert.equal(looksLikeReportMutationRequest("Update the report title to Product Designer"), true);
+    assert.equal(looksLikeReportMutationRequest("תתקני את החברה בדוח"), true);
+    assert.equal(looksLikeReportMutationRequest("Why is the company missing?"), false);
+    assert.equal(looksLikeReportMutationRequest("Which company did you detect in the report?"), false);
+    assert.match(reportMutationBlockedAnswer("en"), /cannot be edited or corrected from Chat/);
+    assert.match(reportMutationBlockedAnswer("he"), /אי אפשר לערוך או לתקן את הדוח/);
   });
 
   it("provides contextual deterministic copy without generic chatbot filler", () => {

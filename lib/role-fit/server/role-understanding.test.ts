@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyRoleDraftCorrection, clearRoleDraftField, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, isPlausibleRoleTitle, isRoleTitleRejection, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeRoleTitleClarification, referencesPreviouslyProvidedTitle, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
+import { applyRoleDraftCorrection, clearRoleDraftField, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, isPlausibleRoleTitle, isRoleTitleRejection, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeCompanyName, normalizeRoleTitleClarification, referencesPreviouslyProvidedTitle, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
   it("recognizes LinkedIn sections with curly apostrophes", () => {
@@ -102,12 +102,28 @@ describe("Role Fit pasted job understanding", () => {
     const labeled = createRoleDraftFromText("Company: Base44\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
     const introduced = createRoleDraftFromText("We're Base44, a newly acquired part of Wix.\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
     const atCompany = createRoleDraftFromText("At monday.com, we build collaborative products.\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
+    const domainHiring = createRoleDraftFromText("monday.com is looking for a Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
+    const labeledDescription = createRoleDraftFromText("Company: monday.com is a work operating system\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
     const ambiguous = createRoleDraftFromText("Our team partners with Wix on shared initiatives.\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
 
+    assert.equal(normalizeCompanyName("Base44, a newly acquired part of Wix"), "Base44");
     assert.equal(labeled.company?.originalValue, "Base44");
     assert.equal(introduced.company?.originalValue, "Base44");
     assert.equal(atCompany.company?.originalValue, "monday.com");
+    assert.equal(domainHiring.company?.originalValue, "monday.com");
+    assert.equal(labeledDescription.company?.originalValue, "monday.com");
     assert.equal(ambiguous.company?.originalValue, "");
+  });
+
+  it("normalizes explicit company clarifications before report generation", () => {
+    const clarified = mergeRoleDraftClarification(undefined, "company", "monday.com, the work operating system");
+    const corrected = applyRoleDraftCorrection(
+      createRoleDraftFromText("Company: Acme\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience"),
+      { field: "company", value: "monday.com, the work operating system" },
+    );
+
+    assert.equal(clarified.company?.originalValue, "monday.com");
+    assert.equal(corrected.company?.originalValue, "monday.com");
   });
 
   it("keeps company optional for an otherwise valid role", () => {

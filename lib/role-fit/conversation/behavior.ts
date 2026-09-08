@@ -117,16 +117,28 @@ export function readyForReportAnswer(input: {
   if (isHebrewLanguage(input.language)) {
     const opening = input.repeatedInput ? "התמונה עדיין מספיק ברורה לי:" : "עכשיו התמונה מספיק ברורה לי:";
     const roleLabel = input.title ? `משרת ${input.title}` : "התפקיד שתיארת";
-    const companyLabel = input.companyName ? ` ב־${input.companyName}` : "";
-    const bullets = [`${roleLabel}${companyLabel}`, ...responsibilities].map((item) => `- ${item}`).join("\n");
+    const bullets = [roleLabel, ...responsibilities].map((item) => `- ${item}`).join("\n");
     return `${opening}\n${bullets}\n\nאם זה מתאר נכון את התפקיד, אפשר שאכין את בדיקת ההתאמה.\nאם משהו לא מדויק, אפשר לתקן אותו לפני שאמשיך.`;
   }
 
   const opening = input.repeatedInput ? "I still have a clear enough picture:" : "I have a clear enough picture now:";
   const roleLabel = input.title ? `${input.title} position` : "the role you described";
-  const companyLabel = input.companyName ? ` at ${input.companyName}` : "";
-  const bullets = [`${roleLabel}${companyLabel}`, ...responsibilities].map((item) => `- ${item}`).join("\n");
+  const bullets = [roleLabel, ...responsibilities].map((item) => `- ${item}`).join("\n");
   return `${opening}\n${bullets}\n\nIf that is accurate, I can prepare the fit review.\nIf anything is off, you can correct it before I continue.`;
+}
+
+export function looksLikeReportMutationRequest(message: string) {
+  const normalized = message.replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+
+  return /\b(?:change|edit|correct|update|fix|revise|modify)\b.{0,90}\b(?:this\s+)?(?:report|review|fit review|result|company|title)\b/i.test(normalized)
+    || /(?:שני|תשני|תקני|תתקני|עדכני|תעדכני|ערכי|תערכי|לשנות|לתקן|לעדכן|לערוך).{0,90}(?:הדוח|דוח|דו["״]?ח|החברה|חברה|שם המשרה|הכותרת|התפקיד)/.test(normalized);
+}
+
+export function reportMutationBlockedAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "אי אפשר לערוך או לתקן את הדוח שכבר נוצר מתוך הצ'אט. אם פרטי המשרה השתנו, צריך להתחיל ניתוח חדש כדי ליצור דוח חדש על בסיס הפרטים המתוקנים."
+    : "The generated report cannot be edited or corrected from Chat. If the role details changed, start a new analysis so a new report can be generated from the corrected details.";
 }
 
 export function roleSubmissionSetupAnswer(language: "he" | "en" | "mixed") {

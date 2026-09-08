@@ -19,7 +19,7 @@ import {
 } from "@/lib/role-fit/conversation/behavior";
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import { createReportId } from "@/lib/role-fit/identifiers";
-import type { RoleFitLiveSession, RoleFitLiveState } from "@/lib/role-fit/client/session";
+import type { RoleFitLiveSession, RoleFitLiveState, RoleFitReportAttemptState } from "@/lib/role-fit/client/session";
 import { hasRoleDraftContent } from "@/lib/role-fit/server/role-understanding";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import styles from "./page.module.css";
@@ -97,7 +97,7 @@ export default function RoleFitPage() {
   const [isAgentUnavailable, setIsAgentUnavailable] = useState(false);
   const [errorContext, setErrorContext] = useState<ErrorContext>(null);
   const reportRequestInFlightRef = useRef(false);
-  const reportAttemptRef = useRef<{ reportId: string; attempts: number } | null>(null);
+  const reportAttemptRef = useRef<RoleFitReportAttemptState | null>(liveSession.reportAttemptState);
   const chatPaneRef = useRef<HTMLDivElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
@@ -134,13 +134,36 @@ export default function RoleFitPage() {
   function syncLiveSession(update: Partial<RoleFitLiveSession>) {
     const nextSession = updateRoleFitLiveSession(update);
     setLiveSession(nextSession);
+    reportAttemptRef.current = nextSession.reportAttemptState;
     return nextSession;
   }
 
   function appendLiveMessage(message: { role: "user" | "agent"; content: string }) {
     const nextSession = appendRoleFitMessage(message);
     setLiveSession(nextSession);
+    reportAttemptRef.current = nextSession.reportAttemptState;
     return nextSession;
+  }
+
+  function clearPageLocalStateForSessionRollover() {
+    setLiveReportState(null);
+    setApiStatusMessage("");
+    setErrorContext(null);
+    setIsAgentUnavailable(false);
+    setIsReportRequestInFlight(false);
+    reportRequestInFlightRef.current = false;
+    reportAttemptRef.current = null;
+    setActivePane("chat");
+  }
+
+  function resolveCanonicalSession(snapshot: RoleFitLiveSession) {
+    const canonicalSession = restoreRoleFitLiveSession();
+    if (canonicalSession.sessionId !== snapshot.sessionId) {
+      clearPageLocalStateForSessionRollover();
+    }
+    setLiveSession(canonicalSession);
+    reportAttemptRef.current = canonicalSession.reportAttemptState;
+    return canonicalSession;
   }
 
   function scrollChatToEnd() {
@@ -154,13 +177,13 @@ export default function RoleFitPage() {
   }
 
   async function submitLiveMessage(textOverride?: string, sessionOverride?: RoleFitLiveSession) {
-    const currentSession = sessionOverride ?? liveSession;
+    const currentSession = resolveCanonicalSession(sessionOverride ?? liveSession);
     const submittedText = (textOverride ?? roleInput).trim();
     if (!submittedText || isSending || isAgentUnavailable) return;
     if (currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
-      appendLiveMessage({ role: "user", content: submittedText });
+      const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
       setRoleInput("");
-      await requestReport(currentSession);
+      await requestReport(sessionAfterUser);
       return;
     }
     const normalizedSubmittedText = normalizeRepeatedInput(submittedText);
@@ -243,6 +266,7 @@ export default function RoleFitPage() {
           reportModel: "",
           expandedEvidenceItemIds: null,
           pendingReportId: null,
+          reportAttemptState: null,
         } : {}),
       });
 
@@ -267,7 +291,7 @@ export default function RoleFitPage() {
   }
 
   async function requestReport(sessionOverride?: RoleFitLiveSession) {
-    const reportSession = sessionOverride ?? liveSession;
+    const reportSession = resolveCanonicalSession(sessionOverride ?? liveSession);
 
     if (reportRequestInFlightRef.current || isAgentUnavailable) return;
     if (reportSession.reportPayload) {
@@ -301,14 +325,15 @@ export default function RoleFitPage() {
     setErrorContext(null);
     setLiveReportState(null);
     const reportId = reportSession.pendingReportId ?? createReportId();
-    const reportAttemptNumber = reportAttemptRef.current?.reportId === reportId
-      ? reportAttemptRef.current.attempts + 1
+    const currentAttemptState = reportSession.reportAttemptState;
+    const reportAttemptNumber = currentAttemptState?.reportId === reportId
+      ? currentAttemptState.attempts + 1
       : 1;
     reportAttemptRef.current = { reportId, attempts: reportAttemptNumber };
     reportRequestInFlightRef.current = true;
     setIsReportRequestInFlight(true);
     setActivePane("report");
-    syncLiveSession({ state: "generating-report", pendingReportId: reportId });
+    syncLiveSession({ state: "generating-report", pendingReportId: reportId, reportAttemptState: reportAttemptRef.current });
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), reportRequestTimeoutMs);
 
@@ -355,6 +380,7 @@ export default function RoleFitPage() {
           pendingRoleField: isNoReport ? null : missingField ?? reportSession.pendingRoleField,
           pendingReportId: isRetryableReportFailure ? reportId : null,
           pendingReportConfirmation: canOfferRetry,
+          reportAttemptState: isRetryableReportFailure ? { reportId, attempts: reportAttemptNumber } : null,
         });
         if (isNoReport || (isRetryableReportFailure && isNarrowLayout)) {
           setActivePane("chat");
@@ -371,7 +397,7 @@ export default function RoleFitPage() {
         setIsAgentUnavailable(false);
         appendLiveMessage({ role: "agent", content: message });
         reportAttemptRef.current = null;
-        syncLiveSession({ state: "recoverable-error", pendingReportId: null, pendingReportConfirmation: false });
+        syncLiveSession({ state: "recoverable-error", pendingReportId: null, pendingReportConfirmation: false, reportAttemptState: null });
         if (isNarrowLayout) {
           setActivePane("chat");
           scrollChatToEnd();
@@ -408,6 +434,7 @@ export default function RoleFitPage() {
         pendingReportId: persisted ? null : reportId,
         pendingRoleField: null,
         pendingReportConfirmation: false,
+        reportAttemptState: null,
         expandedEvidenceItemIds: report.requirementMapping.defaultSelectedItemId
           ? [report.requirementMapping.defaultSelectedItemId]
           : report.requirementMapping.items[0]?.itemId ? [report.requirementMapping.items[0].itemId] : [],
@@ -427,6 +454,7 @@ export default function RoleFitPage() {
         state: "recoverable-error",
         pendingReportId: reportId,
         pendingReportConfirmation: canOfferRetry,
+        reportAttemptState: { reportId, attempts: reportAttemptNumber },
       });
       if (isNarrowLayout) {
         setActivePane("chat");
