@@ -1753,6 +1753,10 @@
 }
 
 @media (max-width: 70rem) {
+  .roleFitPage.narrowChatPage {
+    padding: 0;
+  }
+
   .liveSplitPage {
     height: auto;
     min-height: calc(100vh - var(--site-header-height));
@@ -1784,6 +1788,31 @@
   .liveSplitWorkspace .chatHistory {
     max-height: none;
     overflow: visible;
+  }
+
+  .liveSplitWorkspace.narrowChatWorkspace {
+    box-sizing: border-box;
+    height: calc(100dvh - var(--site-header-height));
+    min-height: 0;
+    overflow: hidden;
+    padding: calc(2.75rem + var(--ds-space-2xl)) var(--ds-grid-gutter) max(var(--ds-space-lg), env(safe-area-inset-bottom));
+  }
+
+  .narrowChatWorkspace .narrowPaneActive.splitChatPane {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .narrowChatWorkspace .chatHistory {
+    flex: 1;
+    margin-bottom: var(--ds-space-lg);
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .narrowChatWorkspace .chatBoxContainer {
+    flex: 0 0 auto;
   }
 
   .narrowPaneInactive {

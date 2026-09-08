@@ -38,6 +38,7 @@ export function isReportConfirmationText(value: string) {
   const normalized = value.trim().toLowerCase().replace(/[.!?…]+$/u, "").trim();
   const explicitReportAction = /^(?:(?:please|can you|could you|let's|lets)\s+)?(?:generate(?:\s+(?:the|this))?\s+report(?:\s+again)?|create(?:\s+(?:the|this))?\s+report|try\s+again|retry(?:\s+(?:the|this))?\s*report?|run(?:\s+(?:it|the report|report))?\s+again|start(?:\s+generating)?\s+(?:the\s+)?report)$/i;
   if (explicitReportAction.test(normalized)) return true;
+  if (/^(?:תנסי שוב|נסה שוב|ניסיון נוסף|אפשר לנסות שוב)$/.test(normalized)) return true;
   return /^(yes|yep|sure|ok|okay|go ahead|generate|continue|confirm|great|nice|sounds good|יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך)$/i.test(normalized);
 }
 
@@ -142,8 +143,8 @@ export function existingReportAnswer(language: "he" | "en" | "mixed") {
 
 export function reportLimitAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
-    ? "כבר יצרנו שני דוחות בסשן הזה, ולכן לא אכין כרגע דוח נוסף. אפשר להמשיך לשאול אותי על הדוחות הקיימים, לבדוק נקודת חוזק או פער, ליצור קשר עם שני, או לחזור בסשן חדש."
-    : "Two reports have already been created in this session, so I will not generate another one right now. You can continue asking about the existing reports, explore a strength or gap, contact Shani, or return in a new session.";
+    ? "הגעת למכסת יצירת הדוחות המותרת. אפשר להמשיך לשאול אותי על הדוח הפעיל, לבדוק נקודת חוזק או פער, וכמובן ליצור קשר ישירות עם שני :)"
+    : "You’ve reached the report-generation limit. You can keep asking me about the active report, explore a strength or gap, or contact Shani directly.";
 }
 
 export function reportLoadingAnswer(language: "he" | "en" | "mixed") {
@@ -154,8 +155,14 @@ export function reportLoadingAnswer(language: "he" | "en" | "mixed") {
 
 export function reportRetryableFailureAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
-    ? "לא הצלחתי להשלים את הדוח הפעם. פרטי המשרה עדיין כאן, ואפשר לנסות שוב בלי להדביק אותם מחדש."
-    : "I couldn’t finish the report this time. The role details are still here, so you can try again without pasting them again.";
+    ? "לא הצלחתי להשלים את הדוח הפעם. פרטי המשרה עדיין כאן. לנסות שוב?"
+    : "I couldn’t complete the report this time. The role details are still here. Would you like me to try again?";
+}
+
+export function reportRetryExhaustedAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "לא הצלחתי להשלים את הדוח גם בניסיון הנוסף. פרטי המשרה עדיין כאן, ואפשר להמשיך לשאול אותי על ההתאמה או לנסות שוב מאוחר יותר."
+    : "I couldn’t complete the report on the additional attempt either. The role details are still here, so you can continue asking about the fit or try again later.";
 }
 
 export function reportReadyAnswer(language: "he" | "en" | "mixed") {

@@ -452,9 +452,25 @@ export function resolveEnglishReportTitle(canonicalRoleTitle: string): string {
   return hasSeniorMarker && !/^senior\b/i.test(baseTitle) ? `Senior ${baseTitle}` : baseTitle;
 }
 
+function inferCompanyIntroduction(roleText: string) {
+  const explicitIntroductionPatterns = [
+    /\b[Ww]e(?:'|’)?re\s+([A-Z][A-Za-z0-9&.'’()-]*(?:\s+(?:[A-Z][A-Za-z0-9&.'’()-]*|&)){0,4})(?=\s*,)/,
+    /(?:^|[.!?]\s+|\n)At\s+((?:[A-Z][A-Za-z0-9&.'’()-]*(?:\s+(?:[A-Z][A-Za-z0-9&.'’()-]*|&)){0,4})|(?:[a-z0-9][a-z0-9.-]*\.[a-z]{2,}))(?=\s*,\s+(?:we|our)\b)/m,
+  ];
+  for (const pattern of explicitIntroductionPatterns) {
+    const introducedCompany = roleText.match(pattern)?.[1]?.trim();
+    if (introducedCompany) return introducedCompany;
+  }
+
+  return "";
+}
+
 function inferCompany(roleText: string): string {
   const labeledCompany = extractSection(roleText, ["company", "organization", "חברה", "ארגון"]);
   if (labeledCompany) return labeledCompany;
+
+  const introducedCompany = inferCompanyIntroduction(roleText);
+  if (introducedCompany) return introducedCompany;
 
   const match = roleText.match(/\b([A-Z][A-Z0-9&.-]{1,})\s+is looking\b/);
   return match?.[1] ?? "";
@@ -491,9 +507,10 @@ function inferWorkModel(roleText: string): string {
 }
 
 export function createRoleDraftFromText(roleText: string) {
+  const introducedCompany = inferCompanyIntroduction(roleText);
   roleText = extractRoleContent(roleText);
   const sourceId = "role_input_current_request";
-  const company = inferCompany(roleText);
+  const company = inferCompany(roleText) || introducedCompany;
   const title = inferTitle(roleText);
   const blocks = extractSectionBlocks(roleText);
   const description =

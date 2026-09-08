@@ -31,14 +31,73 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(page, /await requestReport\(currentSession\)/);
     assert.match(behavior, /generate\(\?:\\s\+\(\?:the\|this\)\)\?\\s\+report/);
     assert.match(behavior, /try\\s\+again/);
+    assert.match(page, /reportAttemptRef/);
+    assert.match(page, /pendingReportConfirmation: canOfferRetry/);
+    assert.match(page, /reportRetryExhaustedAnswer/);
+  });
+
+  it("clears only active-report state when a returned role starts a new analysis", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+    const transition = page.slice(
+      page.indexOf("const beginsRoleAnalysis"),
+      page.indexOf("if (!response.ok)", page.indexOf("const beginsRoleAnalysis")),
+    );
+
+    assert.match(transition, /awaiting-role-completion/);
+    assert.match(transition, /awaiting-report-confirmation/);
+    assert.match(transition, /reportPayload: null/);
+    assert.match(transition, /reportProvider: ""/);
+    assert.match(transition, /reportModel: ""/);
+    assert.match(transition, /expandedEvidenceItemIds: null/);
+    assert.match(transition, /pendingReportId: null/);
+    assert.match(transition, /activeRoleDraft: returnedRoleDraft/);
+    assert.doesNotMatch(transition, /resetRoleFitAnalysis/);
+    assert.doesNotMatch(transition, /sessionId:|conversationId:|completedReportCount:|messages:/);
+  });
+
+  it("allows one direct report retry and disables an immediate third attempt", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+
+    assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)[\s\S]*await requestReport\(currentSession\)/);
+    assert.match(page, /reportAttemptNumber === 1/);
+    assert.match(page, /pendingReportConfirmation: canOfferRetry/);
+    assert.match(page, /reportAttemptRef\.current = null/);
+    assert.doesNotMatch(page, /\/api\/role-fit\/chat[\s\S]{0,500}retry the report/);
   });
 
   it("automatically reveals the newest chat output", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
 
     assert.match(page, /chatHistory\.scrollTo\(\{ top: chatHistory\.scrollHeight/);
-    assert.match(page, /chatEndRef\.current\?\.scrollIntoView/);
+    assert.match(page, /if \(activePane === "chat"\) scrollChatToEnd\(\)/);
+    assert.match(page, /if \(nextPane === "chat"\) scrollChatToEnd\(\)/);
     assert.match(page, /prefers-reduced-motion: reduce/);
+  });
+
+  it("keeps narrow Chat bounded while leaving Report scrolling outside that state", async () => {
+    const css = await readFile(join(process.cwd(), "app", "minime", "page.module.css"), "utf8");
+    const narrowChat = css.slice(css.indexOf(".liveSplitWorkspace.narrowChatWorkspace"), css.indexOf(".narrowPaneInactive"));
+
+    assert.match(narrowChat, /height: calc\(100dvh - var\(--site-header-height\)\)/);
+    assert.match(narrowChat, /overflow: hidden/);
+    assert.match(narrowChat, /\.narrowChatWorkspace \.chatHistory[\s\S]*flex: 1[\s\S]*min-height: 0[\s\S]*overflow-y: auto/);
+    assert.match(narrowChat, /\.narrowChatWorkspace \.chatBoxContainer[\s\S]*flex: 0 0 auto/);
+    assert.doesNotMatch(narrowChat, /\.canvasPane[\s\S]*position: fixed/);
+    assert.match(css, /\.roleFitPage\.narrowChatPage[\s\S]*padding: 0/);
+  });
+
+  it("reveals report animation frames only after iframe load", async () => {
+    const [progress, css] = await Promise.all([
+      readFile(join(process.cwd(), "components", "role-fit", "role-fit-report-progress.tsx"), "utf8"),
+      readFile(join(process.cwd(), "components", "role-fit", "role-fit-report-progress.module.css"), "utf8"),
+    ]);
+
+    assert.match(progress, /loadedFrames\[index\]/);
+    assert.match(progress, /onLoad=\{\(\) => setLoadedFrames/);
+    assert.match(css, /\.backgroundCircle[\s\S]*background: #000000/);
+    assert.match(css, /\.visualFrame[\s\S]*opacity: 0/);
+    assert.match(css, /\.activeFrame[\s\S]*opacity: 1/);
+    assert.doesNotMatch(css, /margin-block-start: calc\(4\.5rem \+ 5\.462rem\)/);
   });
 
   it("keeps collecting role details after Generate Report is requested", async () => {

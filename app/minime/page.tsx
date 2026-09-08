@@ -11,6 +11,7 @@ import {
   missingDetailsAnswer,
   reportLimitAnswer,
   reportReadyAnswer,
+  reportRetryExhaustedAnswer,
   reportRetryableFailureAnswer,
   resolveConversationLanguage,
   roleFileErrorAnswer,
@@ -45,10 +46,6 @@ type ReportFailureResult = {
 
 function reportFailureMessage(result: ReportFailureResult, language: RoleFitLiveSession["activeLanguage"]): string {
   const useHebrew = isHebrewLanguage(language);
-
-  if (result.retryable) {
-    return reportRetryableFailureAnswer(language);
-  }
 
   if (result.state === "validation-failed") {
     const missingField = result.validation?.missingFields?.[0];
@@ -100,10 +97,9 @@ export default function RoleFitPage() {
   const [isAgentUnavailable, setIsAgentUnavailable] = useState(false);
   const [errorContext, setErrorContext] = useState<ErrorContext>(null);
   const reportRequestInFlightRef = useRef(false);
+  const reportAttemptRef = useRef<{ reportId: string; attempts: number } | null>(null);
   const chatPaneRef = useRef<HTMLDivElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const pageRef = useRef<HTMLElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
   const roleFileInputRef = useRef<HTMLInputElement>(null);
   const activeReport = liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined;
@@ -130,7 +126,7 @@ export default function RoleFitPage() {
         ? "A few role details are still missing"
         : "Fit review not created";
   const pageClassName = liveSplitCanvas
-    ? `${styles.roleFitPage} ${styles.liveSplitPage}`
+    ? `${styles.roleFitPage} ${styles.liveSplitPage} ${isNarrowLayout && activePane === "chat" ? styles.narrowChatPage : ""}`
     : hasConversation
       ? `${styles.roleFitPage} ${styles.conversationPage}`
       : styles.roleFitPage;
@@ -145,6 +141,16 @@ export default function RoleFitPage() {
     const nextSession = appendRoleFitMessage(message);
     setLiveSession(nextSession);
     return nextSession;
+  }
+
+  function scrollChatToEnd() {
+    const scrollBehavior: ScrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+
+    window.requestAnimationFrame(() => {
+      const chatHistory = chatHistoryRef.current;
+      if (!chatHistory) return;
+      chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: scrollBehavior });
+    });
   }
 
   async function submitLiveMessage(textOverride?: string, sessionOverride?: RoleFitLiveSession) {
@@ -209,17 +215,35 @@ export default function RoleFitPage() {
 
       const result = await response.json();
       const responseState = (result.state ?? "general-qa") as RoleFitLiveState;
+      const returnedRoleDraft = result.roleDraft ?? result.validation?.roleDraft;
+      const beginsRoleAnalysis = Boolean(
+        returnedRoleDraft
+        && (responseState === "awaiting-role-completion" || responseState === "awaiting-report-confirmation"),
+      );
       const nextState = currentSession.reportPayload && responseState === "general-qa" ? "report-ready" : responseState;
       appendLiveMessage({ role: "agent", content: result.answer ?? "I need a little more context before I can answer safely." });
+      if (beginsRoleAnalysis) {
+        reportAttemptRef.current = null;
+        setLiveReportState(null);
+        setApiStatusMessage("");
+        setErrorContext(null);
+      }
       syncLiveSession({
         state: nextState,
-        activeRoleDraft: result.roleDraft ?? result.validation?.roleDraft ?? currentSession.activeRoleDraft,
+        activeRoleDraft: returnedRoleDraft ?? currentSession.activeRoleDraft,
         pendingRoleField: result.pendingField !== undefined ? result.pendingField : currentSession.pendingRoleField,
         pendingReportConfirmation: nextState === "awaiting-report-confirmation",
         clarificationAttempts: nextState === "awaiting-role-completion" && !result.clarificationExhausted
           ? currentSession.clarificationAttempts + 1
           : 0,
         activeLanguage,
+        ...(beginsRoleAnalysis ? {
+          reportPayload: null,
+          reportProvider: "",
+          reportModel: "",
+          expandedEvidenceItemIds: null,
+          pendingReportId: null,
+        } : {}),
       });
 
       if (!response.ok) {
@@ -277,6 +301,10 @@ export default function RoleFitPage() {
     setErrorContext(null);
     setLiveReportState(null);
     const reportId = reportSession.pendingReportId ?? createReportId();
+    const reportAttemptNumber = reportAttemptRef.current?.reportId === reportId
+      ? reportAttemptRef.current.attempts + 1
+      : 1;
+    reportAttemptRef.current = { reportId, attempts: reportAttemptNumber };
     reportRequestInFlightRef.current = true;
     setIsReportRequestInFlight(true);
     setActivePane("report");
@@ -308,9 +336,16 @@ export default function RoleFitPage() {
       }));
 
       if (!response.ok || result.state !== "ready") {
-        const message = reportFailureMessage(result, reportSession.activeLanguage);
+        const isRetryableReportFailure = result.retryable === true;
+        const canOfferRetry = isRetryableReportFailure && reportAttemptNumber === 1;
+        const message = isRetryableReportFailure
+          ? canOfferRetry
+            ? reportRetryableFailureAnswer(reportSession.activeLanguage)
+            : reportRetryExhaustedAnswer(reportSession.activeLanguage)
+          : reportFailureMessage(result, reportSession.activeLanguage);
         const missingField = result.validation?.missingFields?.[0] ?? null;
         const isNoReport = result.state === "no-report";
+        if (!isRetryableReportFailure) reportAttemptRef.current = null;
         setApiStatusMessage(message);
         setErrorContext(isNoReport ? null : missingField ? "validation" : "report");
         setIsAgentUnavailable(false);
@@ -318,10 +353,13 @@ export default function RoleFitPage() {
         syncLiveSession({
           state: isNoReport ? "general-qa" : "recoverable-error",
           pendingRoleField: isNoReport ? null : missingField ?? reportSession.pendingRoleField,
-          pendingReportId: isNoReport ? null : reportId,
-          pendingReportConfirmation: isNoReport ? false : !missingField,
+          pendingReportId: isRetryableReportFailure ? reportId : null,
+          pendingReportConfirmation: canOfferRetry,
         });
-        if (isNoReport) setActivePane("chat");
+        if (isNoReport || (isRetryableReportFailure && isNarrowLayout)) {
+          setActivePane("chat");
+          scrollChatToEnd();
+        }
         return;
       }
 
@@ -332,7 +370,12 @@ export default function RoleFitPage() {
         setErrorContext("report");
         setIsAgentUnavailable(false);
         appendLiveMessage({ role: "agent", content: message });
-        syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
+        reportAttemptRef.current = null;
+        syncLiveSession({ state: "recoverable-error", pendingReportId: null, pendingReportConfirmation: false });
+        if (isNarrowLayout) {
+          setActivePane("chat");
+          scrollChatToEnd();
+        }
         return;
       }
 
@@ -369,21 +412,26 @@ export default function RoleFitPage() {
           ? [report.requirementMapping.defaultSelectedItemId]
           : report.requirementMapping.items[0]?.itemId ? [report.requirementMapping.items[0].itemId] : [],
       });
+      reportAttemptRef.current = null;
       setActivePane("report");
-    } catch (error) {
-      const timedOut = error instanceof Error && error.name === "AbortError";
-      const message = isHebrewLanguage(reportSession.activeLanguage)
-        ? timedOut
-          ? "העיבוד נמשך זמן רב מדי ולכן בדיקת ההתאמה לא הושלמה. פרטי המשרה עדיין כאן, ואפשר לנסות שוב."
-          : "השירות אינו זמין כרגע ולכן בדיקת ההתאמה לא הושלמה. פרטי המשרה עדיין כאן, ואפשר לנסות שוב מאוחר יותר."
-        : timedOut
-          ? "The fit review took too long to complete. Your role details are still here, and you can try again."
-          : "The service is unavailable, so the fit review was not completed. Your role details are still here, and you can try again later.";
+    } catch {
+      const canOfferRetry = reportAttemptNumber === 1;
+      const message = canOfferRetry
+        ? reportRetryableFailureAnswer(reportSession.activeLanguage)
+        : reportRetryExhaustedAnswer(reportSession.activeLanguage);
       setApiStatusMessage(message);
       setErrorContext("report");
       setIsAgentUnavailable(false);
       appendLiveMessage({ role: "agent", content: message });
-      syncLiveSession({ state: "recoverable-error", pendingReportConfirmation: true });
+      syncLiveSession({
+        state: "recoverable-error",
+        pendingReportId: reportId,
+        pendingReportConfirmation: canOfferRetry,
+      });
+      if (isNarrowLayout) {
+        setActivePane("chat");
+        scrollChatToEnd();
+      }
     } finally {
       window.clearTimeout(timeoutId);
       reportRequestInFlightRef.current = false;
@@ -417,24 +465,12 @@ export default function RoleFitPage() {
   }, [activeReport?.reportId, hasLiveReport, isNarrowLayout]);
 
   useEffect(() => {
-    const scrollBehavior: ScrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-
-    window.requestAnimationFrame(() => {
-      const chatHistory = chatHistoryRef.current;
-      if (chatHistory && chatHistory.scrollHeight > chatHistory.clientHeight) {
-        chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: scrollBehavior });
-        return;
-      }
-
-      const page = pageRef.current;
-      if (page && page.scrollHeight > page.clientHeight) {
-        page.scrollTo({ top: page.scrollHeight, behavior: scrollBehavior });
-        return;
-      }
-
-      chatEndRef.current?.scrollIntoView({ block: "end", behavior: scrollBehavior });
-    });
+    scrollChatToEnd();
   }, [liveSession.messages.length, isSending]);
+
+  useEffect(() => {
+    if (activePane === "chat") scrollChatToEnd();
+  }, [activePane]);
 
   useEffect(() => {
     if (!liveSplitCanvas || isNarrowLayout) return;
@@ -451,6 +487,7 @@ export default function RoleFitPage() {
     setActivePane(nextPane);
     window.requestAnimationFrame(() => {
       (nextPane === "chat" ? chatPaneRef.current : reportPaneRef.current)?.focus();
+      if (nextPane === "chat") scrollChatToEnd();
     });
   }
 
@@ -492,6 +529,7 @@ export default function RoleFitPage() {
     setIsAgentUnavailable(false);
     setIsReportRequestInFlight(false);
     reportRequestInFlightRef.current = false;
+    reportAttemptRef.current = null;
     setRoleInput("");
     setActivePane("chat");
   }
@@ -499,7 +537,7 @@ export default function RoleFitPage() {
   const chatMessages = liveSession.messages;
 
   return (
-    <main className={pageClassName} ref={pageRef}>
+    <main className={pageClassName}>
       <input
         accept=".txt,.md,.csv,text/plain,text/markdown,text/csv"
         aria-label="Upload job description"
@@ -567,7 +605,9 @@ export default function RoleFitPage() {
           </div>
         </section>
       ) : (
-        <section className={liveSplitCanvas ? `${styles.agentViewContainer} ${styles.liveSplitWorkspace}` : styles.agentViewContainer} id="role-fit-workspace" aria-label="Role Fit workspace">
+        <section className={liveSplitCanvas
+          ? `${styles.agentViewContainer} ${styles.liveSplitWorkspace} ${isNarrowLayout && activePane === "chat" ? styles.narrowChatWorkspace : ""}`
+          : styles.agentViewContainer} id="role-fit-workspace" aria-label="Role Fit workspace">
           <div
             aria-hidden={isNarrowLayout && splitCanvas && activePane !== "chat"}
             className={`${styles.chatPane} ${splitCanvas ? styles.splitChatPane : styles.fullWidth} ${activePane === "chat" ? styles.narrowPaneActive : styles.narrowPaneInactive}`}
@@ -585,7 +625,7 @@ export default function RoleFitPage() {
                   <span aria-hidden="true" />
                 </div>
               ) : null}
-              <div aria-hidden="true" className={styles.chatEndAnchor} ref={chatEndRef} />
+              <div aria-hidden="true" className={styles.chatEndAnchor} />
             </div>
 
             <div className={styles.chatBoxContainer}>
