@@ -98,6 +98,32 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(result.parseStatus, "valid-complete");
   });
 
+  it("extracts only high-confidence company introductions", () => {
+    const labeled = createRoleDraftFromText("Company: Base44\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
+    const introduced = createRoleDraftFromText("We're Base44, a newly acquired part of Wix.\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
+    const atCompany = createRoleDraftFromText("At monday.com, we build collaborative products.\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
+    const ambiguous = createRoleDraftFromText("Our team partners with Wix on shared initiatives.\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
+
+    assert.equal(labeled.company?.originalValue, "Base44");
+    assert.equal(introduced.company?.originalValue, "Base44");
+    assert.equal(atCompany.company?.originalValue, "monday.com");
+    assert.equal(ambiguous.company?.originalValue, "");
+  });
+
+  it("keeps company optional for an otherwise valid role", () => {
+    const roleDraft = createRoleDraftFromText("Title: Product Designer\nResponsibilities: Lead product discovery and align the delivery team\nRequirements: Strong product design and user research experience");
+    const result = validateStructuredRoleDraft({
+      conversationId: "conv_company_optional",
+      traceId: "trace_company_optional",
+      roleDraft,
+      detectedLanguage: "en",
+    });
+
+    assert.equal(roleDraft.company?.originalValue, "");
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.deepEqual(result.missingFields, []);
+  });
+
   it("maps key responsibilities and qualifications into required role fields", () => {
     const roleText = [
       "Product Designer",

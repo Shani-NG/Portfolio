@@ -12,6 +12,7 @@ import {
   reportLimitAnswer,
   reportLoadingAnswer,
   reportReadyAnswer,
+  reportRetryExhaustedAnswer,
   reportRetryableFailureAnswer,
   resolveConversationLanguage,
   roleFileErrorAnswer,
@@ -69,6 +70,10 @@ describe("Role Fit conversation behavior", () => {
     assert.equal(isReportConfirmationText("Please generate the report again"), true);
     assert.equal(isReportConfirmationText("let's try again"), true);
     assert.equal(isReportConfirmationText("retry the report"), true);
+    assert.equal(isReportConfirmationText("תנסי שוב"), true);
+    assert.equal(isReportConfirmationText("נסה שוב"), true);
+    assert.equal(isReportConfirmationText("ניסיון נוסף"), true);
+    assert.equal(isReportConfirmationText("אפשר לנסות שוב"), true);
     assert.equal(isReportConfirmationText("not yet"), false);
     assert.equal(isReportConfirmationText("continue exploring the portfolio"), false);
   });
@@ -109,8 +114,10 @@ describe("Role Fit conversation behavior", () => {
     assert.match(roleSubmissionSetupAnswer("he"), /אין צורך לסדר אותו במיוחד/);
     assert.match(roleSubmissionSetupAnswer("en"), /does not need to be specially formatted/);
     assert.match(existingReportAnswer("en"), /active report/);
-    assert.match(reportLimitAnswer("en"), /Two reports have already been created/);
-    assert.match(reportLimitAnswer("he"), /שני דוחות/);
+    assert.match(reportLimitAnswer("en"), /active report/);
+    assert.match(reportLimitAnswer("he"), /הדוח הפעיל/);
+    assert.doesNotMatch(reportLimitAnswer("en"), /session/i);
+    assert.doesNotMatch(reportLimitAnswer("he"), /סשן/);
     assert.doesNotMatch(reportLimitAnswer("en"), /sorry/i);
   });
 
@@ -129,8 +136,12 @@ describe("Role Fit conversation behavior", () => {
     assert.match(roleFileErrorAnswer("unreadable", "en"), /paste the job description/);
     assert.match(genericRecoverableErrorAnswer("he"), /פרטי המשרה עדיין כאן/);
     assert.match(genericRecoverableErrorAnswer("en"), /resend only the last part/);
-    assert.match(reportRetryableFailureAnswer("he"), /בלי להדביק אותם מחדש/);
-    assert.match(reportRetryableFailureAnswer("en"), /without pasting them again/);
+    assert.equal(reportRetryableFailureAnswer("he"), "לא הצלחתי להשלים את הדוח הפעם. פרטי המשרה עדיין כאן. לנסות שוב?");
+    assert.equal(reportRetryableFailureAnswer("en"), "I couldn’t complete the report this time. The role details are still here. Would you like me to try again?");
+    assert.match(reportRetryExhaustedAnswer("he"), /גם בניסיון הנוסף/);
+    assert.match(reportRetryExhaustedAnswer("en"), /additional attempt either/);
+    assert.doesNotMatch(reportRetryExhaustedAnswer("he"), /לנסות שוב\?/);
+    assert.doesNotMatch(reportRetryExhaustedAnswer("en"), /Would you like me to try again/i);
   });
 
   it("acknowledges an uncaptured previous title without implying the role draft was lost", () => {

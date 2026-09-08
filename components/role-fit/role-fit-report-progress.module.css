@@ -123,8 +123,9 @@
 
 @media (max-width: 70rem) {
   .progressShell {
+    box-sizing: border-box;
     min-height: min(42rem, calc(100svh - var(--site-header-height) - (var(--ds-space-xl) * 2)));
-    padding-inline: 1rem;
+    padding: calc(2.75rem + var(--ds-space-2xl)) 1rem var(--ds-space-xl);
   }
 
   .stageCopy {
@@ -135,7 +136,7 @@
 @media (max-width: 40rem) {
   .visualSurface {
     --frame-scale: 0.68;
-    margin-block-start: calc(4.5rem + 5.462rem);
+    margin-block-start: var(--ds-space-xl);
   }
 
   .visualFrame {

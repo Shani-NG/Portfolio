@@ -36,6 +36,7 @@ const stageTransitionDelays = [3500, 7500, 11500, 15500] as const;
 
 export function RoleFitReportProgress({ mode = "progress" }: RoleFitReportProgressProps) {
   const [stageIndex, setStageIndex] = useState(0);
+  const [loadedFrames, setLoadedFrames] = useState<boolean[]>(() => progressStages.map(() => false));
 
   useEffect(() => {
     if (mode !== "progress") return;
@@ -73,8 +74,11 @@ export function RoleFitReportProgress({ mode = "progress" }: RoleFitReportProgre
           <div className={styles.backgroundCircle} />
           {progressStages.map((progressStage, index) => (
             <iframe
-              className={`${styles.visualFrame} ${index === stageIndex ? styles.activeFrame : ""}`}
+              className={`${styles.visualFrame} ${index === stageIndex && loadedFrames[index] ? styles.activeFrame : ""}`}
               key={progressStage.visualSrc}
+              onLoad={() => setLoadedFrames((current) => current[index]
+                ? current
+                : current.map((loaded, frameIndex) => frameIndex === index ? true : loaded))}
               src={progressStage.visualSrc}
               tabIndex={-1}
               title=""
