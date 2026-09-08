@@ -76,6 +76,28 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(jobFitEvaluator, /maxOutputTokens: 2_500/);
   });
 
+  test("removes dedicated company metadata from public analysis while preserving report display metadata", async () => {
+    const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
+    const analysisDraft = route.indexOf("const roleDraftForAnalysis");
+    const validation = route.indexOf("const validation = validateStructuredRoleDraft");
+    const validationForAnalysis = route.indexOf("const validationForAnalysis", validation);
+    const evidence = route.indexOf("loadApprovedEvidence(boundedRoleText, roleItems)");
+    const initialRuntime = route.indexOf("runtimeState: JSON.stringify({ validation: validationForAnalysis, roleItems })");
+    const repairRuntime = route.indexOf("validation: validationForAnalysis", initialRuntime + 1);
+    const composition = route.indexOf("roleDraft: validation.roleDraft");
+
+    assert.ok(analysisDraft >= 0);
+    assert.match(route.slice(analysisDraft, validation), /company: undefined/);
+    assert.match(route, /serializeRoleDraftForBoundary\(roleDraftForAnalysis\)/);
+    assert.ok(validationForAnalysis > validation);
+    assert.match(route.slice(validationForAnalysis, evidence), /company: undefined/);
+    assert.ok(evidence > analysisDraft);
+    assert.ok(initialRuntime > evidence);
+    assert.ok(repairRuntime > initialRuntime);
+    assert.ok(composition > initialRuntime);
+    assert.doesNotMatch(route, /composeReportUIPayload\(\{[\s\S]{0,220}roleDraft: validationForAnalysis\.roleDraft/);
+  });
+
   test("keeps retryable provider failures before persistence while preserving the pending role flow", async () => {
     const page = await readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8");
     const route = await readFile(join(projectRoot, "app", "api", "role-fit", "report", "route.ts"), "utf8");
@@ -90,8 +112,8 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.ok(persistence > providerFailure);
     assert.match(route, /return NextResponse\.json\(failureContract\.body, \{ status: failureContract\.status \}\)/);
     assert.match(failedRequestBranch, /state: isNoReport \? "general-qa" : "recoverable-error"/);
-    assert.match(failedRequestBranch, /pendingReportId: isNoReport \? null : reportId/);
-    assert.match(failedRequestBranch, /pendingReportConfirmation: isNoReport \? false : !missingField/);
+    assert.match(failedRequestBranch, /pendingReportId: isRetryableReportFailure \? reportId : null/);
+    assert.match(failedRequestBranch, /pendingReportConfirmation: canOfferRetry/);
     assert.doesNotMatch(failedRequestBranch, /activeRoleDraft\s*:/);
     assert.doesNotMatch(failedRequestBranch, /completedReportCount\s*:/);
   });
@@ -111,7 +133,7 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(serverLimitBlock, /state: "blocked"/);
     assert.doesNotMatch(serverLimitBlock, /provider\.generateReport|model generation failed|retryable/);
     assert.doesNotMatch(page, /completedReportCount >= 2/);
-    assert.match(page, /reportRetryableFailureAnswer\(language\)/);
+    assert.match(page, /reportRetryableFailureAnswer\(reportSession\.activeLanguage\)/);
   });
 
   test("treats no-report as a non-error lifecycle result without a completed-report increment", async () => {
@@ -119,8 +141,8 @@ describe("Role Fit report lifecycle boundary", () => {
 
     assert.match(page, /const isNoReport = result\.state === "no-report"/);
     assert.match(page, /state: isNoReport \? "general-qa" : "recoverable-error"/);
-    assert.match(page, /pendingReportConfirmation: isNoReport \? false : !missingField/);
-    assert.match(page, /pendingReportId: isNoReport \? null : reportId/);
+    assert.match(page, /pendingReportConfirmation: canOfferRetry/);
+    assert.match(page, /pendingReportId: isRetryableReportFailure \? reportId : null/);
   });
 
   test("logs allowlisted composition and repair diagnostics at the existing failure boundary", async () => {

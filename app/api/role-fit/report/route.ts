@@ -87,7 +87,11 @@ export async function POST(request: Request) {
   const traceId = crypto.randomUUID();
   const conversationId = parsedRequest.data.conversationId ?? crypto.randomUUID();
   const sessionId = parsedRequest.data.sessionId;
-  const boundedRoleText = serializeRoleDraftForBoundary(parsedRequest.data.roleDraft);
+  const roleDraftForAnalysis = {
+    ...parsedRequest.data.roleDraft,
+    company: undefined,
+  };
+  const boundedRoleText = serializeRoleDraftForBoundary(roleDraftForAnalysis);
 
   if (boundedRoleText.length > policy.maxInputChars) {
     after(() =>
@@ -232,6 +236,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const validationForAnalysis = {
+    ...validation,
+    roleDraft: {
+      ...validation.roleDraft,
+      company: undefined,
+    },
+  };
+
   const canonicalRoleTitle = validation.roleDraft.title?.originalValue ?? "";
   const reportDisplayTitle = resolveEnglishReportTitle(canonicalRoleTitle);
 
@@ -269,7 +281,7 @@ export async function POST(request: Request) {
     task: "analysis",
     modelOverride: getGoogleAiStudioReportModel(),
     maxOutputTokens: reportAnalysisMaxOutputTokens,
-    runtimeState: JSON.stringify({ validation, roleItems }),
+    runtimeState: JSON.stringify({ validation: validationForAnalysis, roleItems }),
     approvedEvidence: approvedEvidence.promptContext,
   });
   let providerElapsedMs = modelResult.ok ? modelResult.diagnostics.providerElapsedMs : 0;
@@ -357,7 +369,7 @@ export async function POST(request: Request) {
       task: "analysis",
       maxOutputTokens: reportAnalysisMaxOutputTokens,
       runtimeState: JSON.stringify({
-        validation,
+        validation: validationForAnalysis,
         roleItems,
         repair: {
           previousCompositionDiagnostic: firstDiagnostic,

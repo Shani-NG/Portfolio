@@ -345,7 +345,11 @@ export function mergeRoleDraftClarification(
   value: string,
 ): StructuredRoleDraft {
   const next = roleDraft ?? createEmptyRoleDraft();
-  const normalizedValue = field === "title" ? normalizeRoleTitleClarification(value) : value.trim();
+  const normalizedValue = field === "title"
+    ? normalizeRoleTitleClarification(value)
+    : field === "company"
+      ? normalizeCompanyName(value)
+      : value.trim();
   const fieldValue = roleField(normalizedValue, `role_clarification_${field}`, { kind: "clarification", confidence: "high" });
 
   if (field === "responsibilities" || field === "requirements") {
@@ -465,15 +469,36 @@ function inferCompanyIntroduction(roleText: string) {
   return "";
 }
 
+export function normalizeCompanyName(value: string): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+
+  return normalized
+    .replace(
+      /\s*[,–—]\s*(?:a|an|the|which|who|where|part of)\b.*$/i,
+      "",
+    )
+    .replace(
+      /\s+(?:is|are)\s+(?:a|an|the)\b.*$/i,
+      "",
+    )
+    .trim();
+}
+
 function inferCompany(roleText: string): string {
   const labeledCompany = extractSection(roleText, ["company", "organization", "חברה", "ארגון"]);
-  if (labeledCompany) return labeledCompany;
+  if (labeledCompany) return normalizeCompanyName(labeledCompany);
 
   const introducedCompany = inferCompanyIntroduction(roleText);
-  if (introducedCompany) return introducedCompany;
+  if (introducedCompany) return normalizeCompanyName(introducedCompany);
+
+  const domainHiringMatch = roleText.match(
+    /\b([a-z0-9][a-z0-9.-]*\.[a-z]{2,})\s+is\s+(?:looking|hiring)\b/i,
+  );
+  if (domainHiringMatch) return normalizeCompanyName(domainHiringMatch[1]);
 
   const match = roleText.match(/\b([A-Z][A-Z0-9&.-]{1,})\s+is looking\b/);
-  return match?.[1] ?? "";
+  return normalizeCompanyName(match?.[1] ?? "");
 }
 
 function inferYearsOfExperience(roleText: string): number | undefined {
@@ -507,10 +532,10 @@ function inferWorkModel(roleText: string): string {
 }
 
 export function createRoleDraftFromText(roleText: string) {
-  const introducedCompany = inferCompanyIntroduction(roleText);
+  const preExtractCompany = inferCompany(roleText);
   roleText = extractRoleContent(roleText);
   const sourceId = "role_input_current_request";
-  const company = inferCompany(roleText) || introducedCompany;
+  const company = inferCompany(roleText) || preExtractCompany;
   const title = inferTitle(roleText);
   const blocks = extractSectionBlocks(roleText);
   const description =

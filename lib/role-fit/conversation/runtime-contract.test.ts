@@ -15,7 +15,7 @@ describe("Role Fit runtime conversation contract", () => {
   it("generates a report from chat only after an explicit confirmation", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
     const confirmationGuard = page.indexOf("currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)");
-    const guardedRequest = page.indexOf("await requestReport(currentSession);", confirmationGuard);
+    const guardedRequest = page.indexOf("await requestReport(sessionAfterUser);", confirmationGuard);
     const guardExit = page.indexOf("return;", guardedRequest);
 
     assert.ok(confirmationGuard >= 0);
@@ -28,7 +28,7 @@ describe("Role Fit runtime conversation contract", () => {
     const behavior = await readFile(join(process.cwd(), "lib", "role-fit", "conversation", "behavior.ts"), "utf8");
 
     assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)/);
-    assert.match(page, /await requestReport\(currentSession\)/);
+    assert.match(page, /await requestReport\(sessionAfterUser\)/);
     assert.match(behavior, /generate\(\?:\\s\+\(\?:the\|this\)\)\?\\s\+report/);
     assert.match(behavior, /try\\s\+again/);
     assert.match(page, /reportAttemptRef/);
@@ -50,6 +50,7 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(transition, /reportModel: ""/);
     assert.match(transition, /expandedEvidenceItemIds: null/);
     assert.match(transition, /pendingReportId: null/);
+    assert.match(transition, /reportAttemptState: null/);
     assert.match(transition, /activeRoleDraft: returnedRoleDraft/);
     assert.doesNotMatch(transition, /resetRoleFitAnalysis/);
     assert.doesNotMatch(transition, /sessionId:|conversationId:|completedReportCount:|messages:/);
@@ -58,11 +59,30 @@ describe("Role Fit runtime conversation contract", () => {
   it("allows one direct report retry and disables an immediate third attempt", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
 
-    assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)[\s\S]*await requestReport\(currentSession\)/);
+    assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)[\s\S]*await requestReport\(sessionAfterUser\)/);
     assert.match(page, /reportAttemptNumber === 1/);
     assert.match(page, /pendingReportConfirmation: canOfferRetry/);
-    assert.match(page, /reportAttemptRef\.current = null/);
+    assert.match(page, /reportAttemptState: null/);
     assert.doesNotMatch(page, /\/api\/role-fit\/chat[\s\S]{0,500}retry the report/);
+  });
+
+  it("blocks explicit report mutation before role correction or model follow-up", async () => {
+    const [route, behavior] = await Promise.all([
+      readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8"),
+      readFile(join(process.cwd(), "lib", "role-fit", "conversation", "behavior.ts"), "utf8"),
+    ]);
+    const guard = route.indexOf("looksLikeReportMutationRequest(parsedRequest.data.message)");
+    const correction = route.indexOf("detectRoleCorrection(parsedRequest.data.message)");
+    const modelCall = route.indexOf("provider.generateChat");
+
+    assert.ok(guard >= 0);
+    assert.ok(correction > guard);
+    assert.ok(modelCall > guard);
+    assert.match(route.slice(guard, correction), /state: "report-ready"/);
+    assert.match(route.slice(guard, correction), /safeMessageKey: "report\.immutable"/);
+    assert.match(behavior, /looksLikeReportMutationRequest/);
+    assert.match(route, /generated report is active and immutable/);
+    assert.match(route, /Do not claim to edit, update, change, fix, or correct/);
   });
 
   it("automatically reveals the newest chat output", async () => {
