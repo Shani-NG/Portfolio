@@ -156,8 +156,26 @@ describe("Role Fit report session persistence", () => {
 
     assert.equal(restored.state, "recoverable-error");
     assert.equal(restored.pendingReportId, "RTRY1");
-    assert.equal(restored.pendingReportConfirmation, false);
+    assert.equal(restored.pendingReportConfirmation, true);
     assert.deepEqual(restored.reportAttemptState, { reportId: "RTRY1", attempts: 1 });
+  });
+
+  test("restores an exhausted generating report without granting an extra retry", () => {
+    const session = updateRoleFitLiveSession({
+      state: "generating-report",
+      activeRoleDraft: roleDraft,
+      pendingReportId: "RTRY2",
+      pendingReportConfirmation: true,
+      reportAttemptState: { reportId: "RTRY2", attempts: 2 },
+    });
+    session.expiresAt = 0;
+
+    const restored = restoreRoleFitLiveSession();
+
+    assert.equal(restored.state, "recoverable-error");
+    assert.equal(restored.pendingReportId, "RTRY2");
+    assert.equal(restored.pendingReportConfirmation, false);
+    assert.deepEqual(restored.reportAttemptState, { reportId: "RTRY2", attempts: 2 });
   });
 
   test("migrates a valid v1 session without trusting sliding expiry", () => {
