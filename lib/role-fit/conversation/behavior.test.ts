@@ -88,17 +88,13 @@ describe("Role Fit conversation behavior", () => {
       language: "he",
       repeatedInput: false,
     });
-    assert.match(answer, /Senior Product Designer/);
-    assert.match(answer, /Lead product discovery/);
-    assert.match(answer, /^עכשיו התמונה מספיק ברורה לי:\n- משרת Senior Product Designer\n- Lead product discovery\n- Collaborate with engineering\n\n/);
+    assert.equal(answer, 'יש לי כל מה שאני צריכה כדי להכין את הדוח עבור "Senior Product Designer". אפשר להמשיך לניתוח ולהפקת הדוח?');
     assert.doesNotMatch(answer, /Acme/);
-    assert.match(answer, /אפשר שאכין את בדיקת ההתאמה/);
-    assert.match(answer, /אם משהו לא מדויק, אפשר לתקן אותו לפני שאמשיך/);
+    assert.doesNotMatch(answer, /Lead product discovery|Collaborate with engineering/);
     assert.doesNotMatch(answer, /התאמה חזקה|התאמה טובה|פער|נקודת חוזק/);
-    assert.doesNotMatch(answer, /[“”„"]/);
   });
 
-  it("uses pre-report confirmation bullets in English", () => {
+  it("uses title-only pre-report confirmation in English", () => {
     const answer = readyForReportAnswer({
       title: "AI Product Lead",
       companyName: "Harmony AI",
@@ -109,9 +105,9 @@ describe("Role Fit conversation behavior", () => {
 
     assert.equal(
       answer,
-      "I still have a clear enough picture:\n- AI Product Lead position\n- Design AI agent workflows\n- Partner with Product and Engineering\n\nIf that is accurate, I can prepare the fit review.\nIf anything is off, you can correct it before I continue.",
+      'I have everything I need to prepare the report for "AI Product Lead". Shall I continue with the analysis and generate the report?',
     );
-    assert.doesNotMatch(answer, /Harmony AI/);
+    assert.doesNotMatch(answer, /Harmony AI|Design AI agent workflows|Partner with Product and Engineering/);
   });
 
   it("blocks explicit report mutation requests without blocking explanation questions", () => {

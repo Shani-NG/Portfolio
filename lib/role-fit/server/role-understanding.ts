@@ -8,13 +8,64 @@ export type RoleCorrection = { field: RoleClarificationField; value: string };
 export type StructuredRoleDraft = RoleValidationResult["roleDraft"];
 
 const roleSectionHeadings: Array<{ kind: RoleSectionKind; labels: string[] }> = [
-  { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity", "Overview", "תיאור המשרה", "על התפקיד"] },
-  { kind: "responsibilities", labels: ["What You'll Do", "What You Will Do", "Responsibilities", "Key Responsibilities", "Your Responsibilities", "The Role", "תחומי אחריות", "אחריות", "מה תעשו", "מה תעשי"] },
+  { kind: "description", labels: ["About the job", "About the role", "Job description", "The opportunity", "Overview", "תיאור המשרה", "תיאור התפקיד", "על התפקיד"] },
+  {
+    kind: "responsibilities",
+    labels: [
+      "What You'll Do",
+      "What You Will Do",
+      "What You'll Be Doing",
+      "What You’ll Be Doing",
+      "Responsibilities",
+      "Key Responsibilities",
+      "Your Responsibilities",
+      "The Role",
+      "תחומי אחריות",
+      "תחומי אחריות מרכזיים",
+      "אחריות",
+      "אחריות מרכזית",
+      "אחריות בתפקיד",
+      "מה תעשה בתפקיד",
+      "מה תעשי בתפקיד",
+      "מה עושים בתפקיד",
+      "מה כולל התפקיד",
+      "מה תעשו",
+      "מה תעשי",
+    ],
+  },
   {
     kind: "requirements",
-    labels: ["Requirements", "What We're Looking For", "What You Have", "What You'll Bring To The Team", "Qualifications", "Required Qualifications", "Key Qualifications", "Must Have", "Skills", "דרישות", "כישורים נדרשים", "מה אנחנו מחפשים"],
+    labels: [
+      "Requirements",
+      "Qualifications",
+      "Required Qualifications",
+      "What You'll Bring",
+      "What You Bring",
+      "What You'll Bring To The Team",
+      "What You’ll Bring To The Team",
+      "What We're Looking For",
+      "What We’re Looking For",
+      "Who You Are",
+      "Skills",
+      "Experience & Qualifications",
+      "Key Qualifications",
+      "Must Have",
+      "What You Have",
+      "דרישות",
+      "דרישות התפקיד",
+      "השכלה וניסיון",
+      "ניסיון והשכלה",
+      "ידע וניסיון",
+      "ניסיון וכישורים",
+      "יכולות מקצועיות",
+      "מיומנויות מקצועיות",
+      "מיומנויות אישיות",
+      "כישורים",
+      "כישורים נדרשים",
+      "מה אנחנו מחפשים",
+    ],
   },
-  { kind: "preferred", labels: ["Nice to Have", "Preferred Qualifications", "Bonus Points", "Preferred", "יתרון", "כישורים מועדפים"] },
+  { kind: "preferred", labels: ["Preferred Qualifications", "Nice to Have", "Bonus", "Bonus Points", "Advantage", "Preferred", "יתרון", "יתרון משמעותי", "כישורים מועדפים"] },
 ];
 
 const normalizedHeadingEntries = roleSectionHeadings.flatMap((section) =>
@@ -22,14 +73,6 @@ const normalizedHeadingEntries = roleSectionHeadings.flatMap((section) =>
     { kind: section.kind, label },
     { kind: section.kind, label: label.replaceAll("'", "’") },
   ]),
-);
-
-const headingPattern = new RegExp(
-  normalizedHeadingEntries
-    .map(({ label }) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .sort((a, b) => b.length - a.length)
-    .join("|"),
-  "gi",
 );
 
 function roleField<T extends string | number>(
@@ -50,45 +93,143 @@ function roleField<T extends string | number>(
 
 function normalizeRoleText(roleText: string) {
   return roleText
+    .replaceAll("\u00a0", " ")
     .replaceAll("â€™", "'")
     .replaceAll("’", "'")
+    .replaceAll("‘", "'")
     .replaceAll("â€“", "-")
     .replaceAll("â€”", "-")
+    .replaceAll("–", "-")
+    .replaceAll("—", "-")
     .replaceAll("•", "\n")
     .replaceAll("·", "\n");
 }
 
-function extractSection(roleText: string, labels: string[]): string {
-  const lines = normalizeRoleText(roleText).split(/\r?\n/).map((line) => line.trim());
+function segmentInlineHeadings(roleText: string) {
+  const headingAlternatives = normalizedHeadingEntries
+    .filter(({ label }) => !/[\u0590-\u05ff]/.test(label))
+    .filter(({ label }) => normalizeDetectionText(label).toLowerCase() !== "the role")
+    .map(({ label }) => label)
+    .sort((left, right) => right.length - left.length)
+    .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replaceAll("'", "['’]"));
+  if (headingAlternatives.length === 0) return normalizeRoleText(roleText);
 
-  for (const label of labels) {
-    const variants = [label, label.replaceAll("'", "’")].map((value) => value.toLowerCase());
-    const match = lines.find((line) => variants.some((variant) => line.toLowerCase().startsWith(`${variant}:`)));
-    if (match) return match.slice(match.indexOf(":") + 1).trim();
+  return normalizeRoleText(roleText).replace(new RegExp(`\\s+(${headingAlternatives.join("|")})(?=\\s|:)`, "gi"), "\n$1");
+}
+
+function normalizeDetectionText(value: string) {
+  return normalizeRoleText(value)
+    .replace(/^\s{0,3}#{1,6}\s*/, "")
+    .replace(/^[-*]\s+/, "")
+    .replace(/^_{2,}(.+?)_{2,}$/g, "$1")
+    .replace(/^\*{1,3}(.+?)\*{1,3}$/g, "$1")
+    .replace(/([\u0590-\u05ff]+)\.(?=[\u0590-\u05ff])/g, "$1-")
+    .replace(/־/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripDetectionWrapper(value: string) {
+  return value
+    .trim()
+    .replace(/^\s{0,3}#{1,6}\s*/, "")
+    .replace(/\*{1,3}(.+?)\*{1,3}/g, "$1")
+    .replace(/_{2,}(.+?)_{2,}/g, "$1")
+    .replace(/^_{2,}(.+?)_{2,}$/g, "$1")
+    .replace(/^\*{1,3}(.+?)\*{1,3}$/g, "$1")
+    .trim();
+}
+
+function normalizeHeadingCandidate(value: string) {
+  return normalizeDetectionText(value).replace(/[:.]+$/, "").toLowerCase();
+}
+
+function matchKnownRoleHeading(value: string): { kind: RoleSectionKind; inlineValue: string } | null {
+  const stripped = stripDetectionWrapper(value);
+  const detectionLine = normalizeDetectionText(stripped);
+  for (const entry of normalizedHeadingEntries) {
+    const normalizedLabel = normalizeDetectionText(entry.label).toLowerCase();
+    const normalizedLine = detectionLine.toLowerCase();
+    if (normalizedLine === normalizedLabel) return { kind: entry.kind, inlineValue: "" };
+    if (normalizedLine.startsWith(`${normalizedLabel}:`) || new RegExp(`^${normalizedLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\([^)]{1,30}\\)\\s*:`).test(normalizedLine)) {
+      const colonIndex = stripped.indexOf(":");
+      return { kind: entry.kind, inlineValue: colonIndex >= 0 ? stripped.slice(colonIndex + 1).trim() : "" };
+    }
+    if (normalizedLine.startsWith(`${normalizedLabel} `)) {
+      return { kind: entry.kind, inlineValue: stripped.slice(entry.label.length).trim() };
+    }
+  }
+
+  return null;
+}
+
+const nonRoleHeadingSignal = /^(?:about\s+(?:the\s+)?(?:role|job|position|team|team\s*&\s*about\s+role|us|our\s+team|this\s+role|you|opportunity)|join\s+us|equal\s+opportunity|inclusion|diversity|location|job\s*id|based\s+in|מזהה\s+דרישה|מיקום|על\s+(?:התפקיד|המשרה|הצוות)|מי\s+אנחנו)$/i;
+
+function isStructuralStopHeading(value: string) {
+  const line = normalizeDetectionText(value);
+  if (!line) return false;
+  if (matchKnownRoleHeading(line)) return true;
+  if (nonRoleHeadingSignal.test(line)) return true;
+  if (/^about\s+/i.test(line) && line.split(/\s+/).length <= 5) return true;
+  if (/^\s{0,3}#{1,6}\s+/.test(value) && line.length <= 100 && !/[.!?]$/.test(line)) return true;
+  return line.length <= 80
+    && !/[.!?]$/.test(line)
+    && !/^[-*]\s/.test(value.trim())
+    && /^[A-Z][\w&.'()-]+(?:\s+[A-Z][\w&.'()-]+){0,7}$/.test(line);
+}
+
+function extractSection(roleText: string, labels: string[]): string {
+  const lines = segmentInlineHeadings(roleText).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = stripDetectionWrapper(lines[index]);
+    const normalizedLine = normalizeDetectionText(line).toLowerCase();
+    for (const label of labels) {
+      const normalizedLabel = normalizeDetectionText(label).toLowerCase();
+      if (normalizedLine.startsWith(`${normalizedLabel}:`)) {
+        const colonIndex = line.indexOf(":");
+        return colonIndex >= 0 ? line.slice(colonIndex + 1).trim() : "";
+      }
+      if (new RegExp(`^${normalizedLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\([^)]{1,30}\\)\\s*:`).test(normalizedLine)) {
+        const colonIndex = line.indexOf(":");
+        return colonIndex >= 0 ? line.slice(colonIndex + 1).trim() : "";
+      }
+      if (normalizedLine === normalizedLabel && lines[index + 1] && !isStructuralStopHeading(lines[index + 1])) {
+        return stripDetectionWrapper(lines[index + 1]);
+      }
+    }
   }
 
   return "";
 }
 
 function extractSectionBlocks(roleText: string): Record<RoleSectionKind, string[]> {
-  const normalizedText = normalizeRoleText(roleText);
-  const matches = Array.from(normalizedText.matchAll(headingPattern));
   const blocks: Record<RoleSectionKind, string[]> = {
     description: [],
     responsibilities: [],
     requirements: [],
     preferred: [],
   };
+  let currentKind: RoleSectionKind | null = null;
 
-  matches.forEach((match, index) => {
-    const heading = normalizedHeadingEntries.find(({ label }) => label.toLowerCase() === match[0].toLowerCase());
-    if (!heading || match.index === undefined) return;
+  for (const rawLine of segmentInlineHeadings(roleText).split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
 
-    const blockStart = match.index + match[0].length;
-    const blockEnd = matches[index + 1]?.index ?? normalizedText.length;
-    const block = normalizedText.slice(blockStart, blockEnd).replace(/^[\s:.-]+/, "").trim();
-    if (block) blocks[heading.kind].push(block);
-  });
+    const heading = matchKnownRoleHeading(line);
+    if (heading) {
+      currentKind = heading.kind;
+      if (heading.inlineValue) blocks[currentKind].push(heading.inlineValue);
+      continue;
+    }
+
+    if (currentKind && isStructuralStopHeading(line)) {
+      currentKind = null;
+      continue;
+    }
+
+    if (currentKind) blocks[currentKind].push(line);
+  }
 
   return blocks;
 }
@@ -97,7 +238,9 @@ function splitBlockItems(block: string): string[] {
   return block
     .split(/\r?\n|;|(?=\s[-*]\s)|(?=\s\d+[.)]\s)/)
     .map((item) => item.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((item) => !obviousNonTitleLineSignal.test(item))
+    .filter((item) => !/^(?:join\s+us|equal\s+opportunity|inclusion|diversity|about\s+|מזהה\s+דרישה|מיקום)\b/i.test(normalizeDetectionText(item)));
 }
 
 function extractList(roleText: string, labels: string[]): string[] {
@@ -108,10 +251,18 @@ function extractList(roleText: string, labels: string[]): string[] {
 }
 
 function inferListBySignals(roleText: string, signals: RegExp[]): string[] {
-  return splitBlockItems(normalizeRoleText(roleText))
+  return splitUnstructuredRoleItems(roleText)
     .filter((item) => item.length >= 18)
     .filter((item) => !/^(?:job title|title|role|תפקיד|שם המשרה)\s*:/i.test(item))
     .filter((item) => signals.some((signal) => signal.test(item)));
+}
+
+function splitUnstructuredRoleItems(roleText: string): string[] {
+  return normalizeRoleText(roleText)
+    .split(/\r?\n|;|(?=\s[-*]\s)|(?=\s\d+[.)]\s)|(?<=[.!?])\s+(?=[A-Z\u0590-\u05ff])/u)
+    .map((item) => stripDetectionWrapper(item).replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").trim())
+    .filter(Boolean)
+    .filter((item) => !obviousNonTitleLineSignal.test(item));
 }
 
 const roleTitleSignal = /\b(ux|ui|user experience|product|design(?:er)?|research(?:er)?|strateg(?:y|ist)|manager|management|lead|director|head|vice president|vp|chief|engineer|developer|architect|analyst|specialist|consultant|coordinator|innovation|implementation|operations)\b/i;
@@ -123,8 +274,12 @@ const hebrewRoleTitleSignal = /(?:^|\s)(?:מנהל(?:ת|[-־]ת)?|מעצב(?:ת|
 const standaloneTitleLabel = /^(?:job title|title|role|שם המשרה|תפקיד)\s*:\s*(.+)$/i;
 const roleFieldLabelSignal = /^(?:company|organization|title|job title|role|description|responsibilities|requirements|qualifications|skills|location|job location|חברה|ארגון|תפקיד|שם המשרה|תיאור|תיאור המשרה|תחומי אחריות|אחריות|דרישות|כישורים נדרשים)\s*:/i;
 const priorTitleReferenceSignal = /(?:שם\s+המשרה|הכותרת|התפקיד).{0,50}(?:כתוב|כתובה|הופיע|הופיעה|נמצא|נמצאת|שורה\s+ראשונה|למעלה|בהתחלה)|(?:כתוב|כתובה|הופיע|הופיעה|נמצא|נמצאת).{0,50}(?:שורה\s+ראשונה|למעלה|בהתחלה)|\b(?:title|role)\b.{0,50}\b(?:first line|above|previous|already|pasted)\b|\b(?:first line|above|previous|already pasted)\b.{0,50}\b(?:title|role)\b/i;
-const obviousNonTitleLineSignal = /(?:https?:\/\/|www\.|\b[\w.-]+\.[a-z]{2,}(?:\/\S*)?|\byoutube\b|\b(?:sneak\s+pe[ae]k|watch|learn more|read more)\b)/i;
+const obviousNonTitleLineSignal = /(?:https?:\/\/|www\.|\b[\w.-]+\.[a-z]{2,}(?:\/\S*)?|\byoutube\b|\b(?:sneak\s+pe[ae]k|watch|learn more|read more|red\s+dot|if\s+design\s+award|gartner\s+magic\s+quadrant|leader|ipo|arr|linkedin|medium\s+page|job\s*id|hybrid|remote|equal\s+opportunity|inclusion|join\s+us)\b|מזהה\s+דרישה|מיקום)/i;
 const titleRejectionSignal = /(?:שם\s+המשרה\s+לא\s+נכון|הכותרת\s+לא\s+נכונה|התפקיד\s+שזיהית\s+לא\s+נכון|זה\s+לא\s+שם\s+המשרה)|\b(?:the\s+)?(?:job\s+)?title\s+is\s+(?:wrong|incorrect)\b|\bthat's\s+not\s+the\s+role\s+title\b|\byou\s+got\s+the\s+title\s+wrong\b/i;
+const englishResponsibilitySignal = /\b(lead|own|manage|drive|define|create|build|develop|collaborate|partner|work with|deliver|support|shape|facilitate|design|implement)\b/i;
+const englishRequirementSignal = /\b(experience|years|proven|strong|excellent|ability|knowledge|familiar|expertise|background|degree|portfolio|proficiency|skilled)\b/i;
+const hebrewResponsibilitySignal = /(?:להוביל|הובלת|ניהול|לנהל|אחריות|עבודה\s+עם|שיתוף\s+פעולה|לפתח|פיתוח|לתכנן|תכנון|להגדיר|הגדרת|ליצור|יצירת|לבנות|בניית|ליישם|יישום|להטמיע|הטמעת|לתמוך|תמיכה|לרכז|ריכוז)/;
+const hebrewRequirementSignal = /(?:ניסיון|יכולת|יכולות|ידע|היכרות|שליטה|השכלה|תואר|מיומנות|מיומנויות|כישורים|מומחיות|רקע|חובה|נדרש(?:ת|ים|ות)?|יתרון|לפחות\s+\d+|\d+\s*שנ(?:ה|ים|ות))/;
 
 function hasStrongTitleLexiconMatch(value: string) {
   return findLexiconMatches({ text: value, language: "mixed" })
@@ -132,55 +287,61 @@ function hasStrongTitleLexiconMatch(value: string) {
 }
 
 export function isPlausibleRoleTitle(value: string): boolean {
-  const title = value.trim();
-  const words = title.split(/\s+/);
+  const title = stripDetectionWrapper(value);
+  const detectionTitle = normalizeDetectionText(title);
+  const words = detectionTitle.split(/\s+/);
 
-  if (!title || title.length > 100 || words.length > 12) return false;
-  if (obviousNonTitleLineSignal.test(title)) return false;
-  if (/[.!?]$/.test(title) || setupInstructionSignal.test(title)) return false;
-  if (/^(about|company|organization|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(title)) return false;
+  if (!detectionTitle || detectionTitle.length > 100 || words.length > 12) return false;
+  if (obviousNonTitleLineSignal.test(detectionTitle)) return false;
+  if (/[.!?]$/.test(detectionTitle) || setupInstructionSignal.test(detectionTitle)) return false;
+  if (/^(about|company|organization|description|responsibilities|requirements|qualifications|skills)\s*:/i.test(detectionTitle)) return false;
 
-  return roleTitleSignal.test(title) || hebrewRoleTitleSignal.test(title) || hasStrongTitleLexiconMatch(title);
+  return roleTitleSignal.test(detectionTitle) || hebrewRoleTitleSignal.test(detectionTitle) || hasStrongTitleLexiconMatch(detectionTitle);
 }
 
 export function extractStandaloneRoleTitle(value: string): string | null {
   const input = value.trim();
   if (!input || input.includes("\n") || input.length > 100) return null;
 
-  const labeledTitle = input.match(standaloneTitleLabel)?.[1]?.trim();
-  const title = labeledTitle ?? input;
-  if (!title || conversationalQuestionSignal.test(title) || hebrewConversationalQuestionSignal.test(title) || !isPlausibleRoleTitle(title)) return null;
-
-  if (labeledTitle || roleTitleSignal.test(title) || hebrewRoleTitleSignal.test(title)) {
-    return normalizeRoleTitleClarification(title);
-  }
-
-  return null;
+  if (conversationalQuestionSignal.test(input) || hebrewConversationalQuestionSignal.test(input)) return null;
+  const title = resolveSourceBackedRoleTitle(input, { allowUnframed: true });
+  return title || null;
 }
 
 function isKnownSectionHeading(value: string) {
-  const normalized = value.trim().replace(/[:.]+$/, "").toLowerCase();
-  return normalizedHeadingEntries.some(({ label }) => label.toLowerCase() === normalized);
+  const normalized = normalizeHeadingCandidate(value);
+  return normalizedHeadingEntries.some(({ label }) => normalizeDetectionText(label).toLowerCase() === normalized);
 }
 
-function startsWithPlausibleTitleBeforeHeading(value: string) {
-  const normalized = normalizeRoleText(value);
-  const firstHeadingIndex = normalized.search(headingPattern);
-  if (firstHeadingIndex <= 0) return false;
-  return isPlausibleRoleTitle(normalized.slice(0, firstHeadingIndex).trim());
+function hasRoleStructureAfter(lines: string[], startIndex: number) {
+  return lines.slice(startIndex + 1, startIndex + 12).some((line) =>
+    Boolean(matchKnownRoleHeading(line)) || roleFieldLabelSignal.test(normalizeDetectionText(line)),
+  );
 }
 
-function isRoleBoundaryLine(value: string) {
+function hasRoleEvidenceAfter(lines: string[], startIndex: number) {
+  const followingLines = lines.slice(startIndex + 1, startIndex + 9);
+  const hasResponsibility = followingLines.some((line) => englishResponsibilitySignal.test(line) || hebrewResponsibilitySignal.test(line));
+  const hasRequirement = followingLines.some((line) => englishRequirementSignal.test(line) || hebrewRequirementSignal.test(line));
+  return hasResponsibility && hasRequirement;
+}
+
+function isRoleBoundaryLine(value: string, lines: string[] = [], index = 0) {
   const line = value.trim();
-  return roleFieldLabelSignal.test(line) || isKnownSectionHeading(line) || isPlausibleRoleTitle(line) || startsWithPlausibleTitleBeforeHeading(line);
+  const detectionLine = normalizeDetectionText(line);
+  return roleFieldLabelSignal.test(detectionLine)
+    || isKnownSectionHeading(line)
+    || (isPlausibleRoleTitle(line) && hasRoleStructureAfter(lines, index))
+    || /\bwe(?:\s+are|'re)\s+(?:looking\s+for|hiring)\b|\bin\s+this\s+role\s+as\b/i.test(detectionLine)
+    || /(?:דרוש[.-]?ה|מגייסת|מגייסים)/.test(detectionLine);
 }
 
 export function extractRoleContent(message: string): string {
-  const normalized = normalizeRoleText(message).trim();
+  const normalized = segmentInlineHeadings(message).trim();
   if (!normalized) return "";
 
   const lines = normalized.split(/\r?\n/);
-  const firstRoleLine = lines.findIndex(isRoleBoundaryLine);
+  const firstRoleLine = lines.findIndex((line, index) => isRoleBoundaryLine(line, lines, index));
   if (firstRoleLine < 0) return normalized;
   return lines.slice(firstRoleLine).join("\n").trim();
 }
@@ -201,27 +362,97 @@ function inferSemanticTitle(roleText: string): string {
   return best.entry.preferred_label;
 }
 
+function cleanTitleCandidate(value: string) {
+  return stripDetectionWrapper(value)
+    .replace(/^(?:a|an|the)\s+/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanHiringTitleCandidate(value: string) {
+  return cleanTitleCandidate(value)
+    .replace(/^(?:highly[-\s]skilled|skilled|experienced|talented|passionate)\s+/i, "")
+    .trim();
+}
+
+function extractTitleFromRecruitmentStatement(roleText: string) {
+  const lines = normalizeRoleText(roleText).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const englishPatterns = [
+    /\bwe(?:\s+are|'re)\s+(?:looking\s+for|hiring)\s+(?:an|a|the)?\s*(.+?)(?=\s+(?:for|who|with|at|in)\b|\s+to\s+(?:join|build|lead|own|manage|drive|define|create|develop|collaborate|partner|deliver|support|shape|work)\b|[,.]|$)/i,
+    /\bin\s+this\s+role\s+as\s+(?:an|a|the)?\s*(.+?)(?=\s+(?:who|with|at|in)\b|\s+to\s+(?:join|build|lead|own|manage|drive|define|create|develop|collaborate|partner|deliver|support|shape|work)\b|[,.]|$)/i,
+    /\b(?:actually,?\s*)?(?:the\s+)?role\s+is\s+(?:an|a|the)?\s*(.+?)(?=\s+(?:who|with|at|in)\b|\s+to\s+(?:join|build|lead|own|manage|drive|define|create|develop|collaborate|partner|deliver|support|shape|work)\b|[,.]|$)/i,
+  ];
+  const hebrewPatterns = [
+    /(?:דרוש[.-]?ה|דרושה|דרוש)\s+(.+?)(?=\s+(?:לחברת|ב|עבור|לאגף|למחלקה)|,|\.(?:\s|$)|$)/,
+    /(?:מגייסת|מגייסים)\s+(.+?)(?=\s+(?:לחברת|ב|עבור|לאגף|למחלקה)|,|\.(?:\s|$)|$)/,
+  ];
+
+  for (const line of lines.slice(0, 30)) {
+    for (const pattern of englishPatterns) {
+      const englishCandidate = line.match(pattern)?.[1];
+      if (englishCandidate) {
+        const title = cleanHiringTitleCandidate(englishCandidate);
+        if (isPlausibleRoleTitle(title)) return title;
+      }
+    }
+
+    for (const pattern of hebrewPatterns) {
+      const hebrewCandidate = line.match(pattern)?.[1];
+      if (hebrewCandidate) {
+        const title = cleanHiringTitleCandidate(hebrewCandidate);
+        if (isPlausibleRoleTitle(title)) return title;
+      }
+    }
+  }
+
+  return "";
+}
+
+function resolveSourceBackedRoleTitle(value: string, options: { allowUnframed: boolean }): string {
+  const input = stripDetectionWrapper(value).trim();
+  if (!input) return "";
+
+  const labeledTitle = input.match(standaloneTitleLabel)?.[1]?.trim();
+  if (labeledTitle) {
+    const title = cleanTitleCandidate(labeledTitle);
+    return isPlausibleRoleTitle(title) ? title : "";
+  }
+
+  const recruitmentTitle = extractTitleFromRecruitmentStatement(input);
+  if (recruitmentTitle) return recruitmentTitle;
+
+  if (!options.allowUnframed) return "";
+  const title = cleanTitleCandidate(input).replace(/[.!?]+$/u, "").trim();
+  return isPlausibleRoleTitle(title) ? title : "";
+}
+
+function extractStructuralTitle(roleText: string) {
+  const lines = splitUnstructuredRoleItems(segmentInlineHeadings(roleText));
+  const firstRoleSectionIndex = lines.findIndex((line) => Boolean(matchKnownRoleHeading(line)));
+  const titleSearchEnd = firstRoleSectionIndex >= 0 ? firstRoleSectionIndex : Math.min(lines.length, 12);
+  const candidates = lines.slice(0, titleSearchEnd);
+
+  for (let index = 0; index < candidates.length; index += 1) {
+    const line = candidates[index];
+    if (!isPlausibleRoleTitle(line)) continue;
+    if (!hasRoleStructureAfter(lines, index) && !hasRoleEvidenceAfter(lines, index) && !/^#{1,6}\s/.test(line.trim())) continue;
+    return resolveSourceBackedRoleTitle(line, { allowUnframed: true });
+  }
+
+  return "";
+}
+
 function inferTitle(roleText: string): { value: string; confidence: "high" | "medium" | "low"; confirmed: boolean } {
-  const labeledTitle = extractSection(roleText, ["title", "role", "תפקיד", "שם המשרה"]);
-  if (labeledTitle && isPlausibleRoleTitle(labeledTitle)) return { value: labeledTitle, confidence: "high", confirmed: true };
+  const labeledTitle = resolveSourceBackedRoleTitle(extractSection(roleText, ["job title", "title", "role", "תפקיד", "שם המשרה"]), { allowUnframed: true });
+  if (labeledTitle) return { value: labeledTitle, confidence: "high", confirmed: true };
 
-  const normalizedText = normalizeRoleText(roleText);
-  const firstHeadingIndex = normalizedText.search(headingPattern);
-  const titleSource = firstHeadingIndex >= 0 ? normalizedText.slice(0, firstHeadingIndex) : normalizedText;
-  const inferredTitle = titleSource
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) =>
-      line &&
-      !line.startsWith("http") &&
-      !line.includes("applicants") &&
-      !line.includes("District") &&
-      isPlausibleRoleTitle(line),
-    );
+  const structuralTitle = extractStructuralTitle(roleText);
+  if (structuralTitle) return { value: structuralTitle, confidence: "medium", confirmed: true };
 
-  if (inferredTitle) return { value: inferredTitle, confidence: "medium", confirmed: true };
-  const semanticTitle = inferSemanticTitle(roleText);
-  return { value: semanticTitle, confidence: semanticTitle ? "low" : "medium", confirmed: false };
+  const recruitmentTitle = resolveSourceBackedRoleTitle(roleText, { allowUnframed: false });
+  if (recruitmentTitle) return { value: recruitmentTitle, confidence: "medium", confirmed: true };
+
+  return { value: "", confidence: "medium", confirmed: false };
 }
 
 const genericRoleTitles = new Map([
@@ -245,7 +476,8 @@ export function isRoleTitleRejection(value: string): boolean {
 }
 
 export function normalizeRoleTitleClarification(value: string): string {
-  return genericRoleTitles.get(value.trim().toLowerCase()) ?? value.trim();
+  const genericTitle = genericRoleTitles.get(value.trim().toLowerCase());
+  return genericTitle ?? resolveSourceBackedRoleTitle(value, { allowUnframed: true });
 }
 
 export function isValidRoleClarificationAnswer(field: RoleClarificationField, value: string): boolean {
@@ -350,6 +582,7 @@ export function mergeRoleDraftClarification(
     : field === "company"
       ? normalizeCompanyName(value)
       : value.trim();
+  if (!normalizedValue) return next;
   const fieldValue = roleField(normalizedValue, `role_clarification_${field}`, { kind: "clarification", confidence: "high" });
 
   if (field === "responsibilities" || field === "requirements") {
@@ -460,6 +693,11 @@ function inferCompanyIntroduction(roleText: string) {
   const explicitIntroductionPatterns = [
     /\b[Ww]e(?:'|’)?re\s+([A-Z][A-Za-z0-9&.'’()-]*(?:\s+(?:[A-Z][A-Za-z0-9&.'’()-]*|&)){0,4})(?=\s*,)/,
     /(?:^|[.!?]\s+|\n)At\s+((?:[A-Z][A-Za-z0-9&.'’()-]*(?:\s+(?:[A-Z][A-Za-z0-9&.'’()-]*|&)){0,4})|(?:[a-z0-9][a-z0-9.-]*\.[a-z]{2,}))(?=\s*,\s+(?:we|our)\b)/m,
+    /(?:^|[.!?]\s+|\n)([a-z0-9][a-z0-9.-]*\.[a-z]{2,})\s+is\s+(?:looking|hiring)\b/im,
+    /(?:^|[.!?]\s+|\n)([A-Z][A-Z0-9&.-]{1,})\s+is\s+(?:looking|hiring)\b/m,
+    /(?:^|\n)ב([א-ת][א-תA-Za-z0-9&.'’()-]{1,40})\s+דרוש[.-]?ה/m,
+    /(?:^|\n)([א-ת][א-תA-Za-z0-9&.'’()-]{1,40})\s+מגייסת/m,
+    /(?:^|\n)לחברת\s+([א-תA-Za-z0-9&.'’()-]{2,40})\s+דרוש[.-]?ה/m,
   ];
   for (const pattern of explicitIntroductionPatterns) {
     const introducedCompany = roleText.match(pattern)?.[1]?.trim();
@@ -473,7 +711,7 @@ export function normalizeCompanyName(value: string): string {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (!normalized) return "";
 
-  return normalized
+  const company = normalized
     .replace(
       /\s*[,–—]\s*(?:a|an|the|which|who|where|part of)\b.*$/i,
       "",
@@ -483,22 +721,34 @@ export function normalizeCompanyName(value: string): string {
       "",
     )
     .trim();
+  if (/^(?:company|organization|the company|team|group|department|our team|החברה|חברה|קבוצה|צוות|מחלקה)$/i.test(company)) return "";
+  return company;
+}
+
+function inferCompanyFromAboutHeading(roleText: string) {
+  const excludedAbout = /^(?:about\s+(?:the\s+)?(?:role|job|position|team|team\s*&\s*about\s+role|us|our\s+team|this\s+role|you|opportunity)|על\s+(?:התפקיד|המשרה|הצוות)|מי\s+אנחנו)$/i;
+  const lines = normalizeRoleText(roleText).split(/\r?\n/).map((line) => stripDetectionWrapper(line.trim())).filter(Boolean);
+
+  for (const line of lines.slice(0, 30)) {
+    const detectionLine = normalizeDetectionText(line);
+    if (excludedAbout.test(detectionLine)) continue;
+    const englishCompany = detectionLine.match(/^about\s+([A-Z][A-Za-z0-9&.'()-]*(?:\s+[A-Z][A-Za-z0-9&.'()-]*){0,3}|[a-z0-9][a-z0-9.-]*\.[a-z]{2,})$/i)?.[1];
+    if (englishCompany) return normalizeCompanyName(englishCompany);
+  }
+
+  return "";
 }
 
 function inferCompany(roleText: string): string {
   const labeledCompany = extractSection(roleText, ["company", "organization", "חברה", "ארגון"]);
   if (labeledCompany) return normalizeCompanyName(labeledCompany);
 
+  const aboutCompany = inferCompanyFromAboutHeading(roleText);
+  if (aboutCompany) return aboutCompany;
+
   const introducedCompany = inferCompanyIntroduction(roleText);
   if (introducedCompany) return normalizeCompanyName(introducedCompany);
-
-  const domainHiringMatch = roleText.match(
-    /\b([a-z0-9][a-z0-9.-]*\.[a-z]{2,})\s+is\s+(?:looking|hiring)\b/i,
-  );
-  if (domainHiringMatch) return normalizeCompanyName(domainHiringMatch[1]);
-
-  const match = roleText.match(/\b([A-Z][A-Z0-9&.-]{1,})\s+is looking\b/);
-  return normalizeCompanyName(match?.[1] ?? "");
+  return "";
 }
 
 function inferYearsOfExperience(roleText: string): number | undefined {
@@ -541,19 +791,19 @@ export function createRoleDraftFromText(roleText: string) {
   const description =
     extractSection(roleText, ["description", "summary", "תיאור", "תיאור המשרה"]) ||
     blocks.description.join("\n");
-  const labeledResponsibilities = extractList(roleText, ["responsibilities", "responsibility", "key responsibilities", "תחומי אחריות", "אחריות"]);
-  const labeledRequirements = extractList(roleText, ["requirements", "must have", "required", "qualifications", "skills", "דרישות", "כישורים נדרשים"]);
-  const responsibilities = labeledResponsibilities.length > 0
-    ? labeledResponsibilities
-    : blocks.responsibilities.flatMap(splitBlockItems);
-  const requirements = labeledRequirements.length > 0
-    ? labeledRequirements
-    : blocks.requirements.flatMap(splitBlockItems);
+  const labeledResponsibilities = extractList(roleText, ["what you'll do", "what you will do", "what you'll be doing", "responsibilities", "responsibility", "key responsibilities", "your responsibilities", "the role", "תחומי אחריות", "תחומי אחריות מרכזיים", "אחריות", "אחריות מרכזית", "אחריות בתפקיד", "מה תעשה בתפקיד", "מה תעשי בתפקיד", "מה עושים בתפקיד", "מה כולל התפקיד"]);
+  const labeledRequirements = extractList(roleText, ["requirements", "must have", "required", "qualifications", "required qualifications", "what you'll bring", "what you bring", "what you'll bring to the team", "what we're looking for", "who you are", "skills", "experience & qualifications", "דרישות", "דרישות התפקיד", "השכלה וניסיון", "ניסיון והשכלה", "ידע וניסיון", "ניסיון וכישורים", "יכולות מקצועיות", "מיומנויות מקצועיות", "מיומנויות אישיות", "כישורים", "כישורים נדרשים"]);
+  const blockResponsibilities = blocks.responsibilities.flatMap(splitBlockItems);
+  const blockRequirements = blocks.requirements.flatMap(splitBlockItems);
+  const responsibilities = blockResponsibilities.length > 0 ? blockResponsibilities : labeledResponsibilities;
+  const requirements = blockRequirements.length > 0 ? blockRequirements : labeledRequirements;
   const inferredResponsibilities = responsibilities.length > 0 ? responsibilities : inferListBySignals(roleText, [
-    /\b(lead|own|manage|drive|define|create|build|develop|collaborate|partner|work with|deliver|support|shape)\b/i,
+    englishResponsibilitySignal,
+    hebrewResponsibilitySignal,
   ]);
   const inferredRequirements = requirements.length > 0 ? requirements : inferListBySignals(roleText, [
-    /\b(experience|years|proven|strong|excellent|ability|knowledge|familiar|expertise|background|degree|portfolio|figma|ux|product)\b/i,
+    englishRequirementSignal,
+    hebrewRequirementSignal,
   ]);
   const preferredQualifications = blocks.preferred.flatMap(splitBlockItems);
   const yearsOfExperience = inferYearsOfExperience(roleText);
@@ -631,9 +881,35 @@ export function shouldTreatAsRoleClarification(pendingField: RoleClarificationFi
 }
 
 export function looksLikeRoleInput(message: string) {
-  const lower = normalizeRoleText(message).toLowerCase();
+  const normalized = normalizeRoleText(message).trim();
+  const lower = normalized.toLowerCase();
   const labeledFieldCount = ["company:", "organization:", "title:", "role:", "description:", "responsibilities:", "requirements:", "qualifications:", "skills:"].filter((label) => lower.includes(label)).length;
-  const linkedInSectionCount = normalizedHeadingEntries.filter(({ label }) => lower.includes(label.toLowerCase())).length;
+  const linkedInSectionCount = new Set(
+    normalizedHeadingEntries
+      .map(({ label }) => normalizeDetectionText(label).toLowerCase())
+      .filter((label) => lower.includes(label)),
+  ).size;
 
-  return labeledFieldCount >= 2 || linkedInSectionCount >= 2 || /responsibilities|key responsibilities|requirements|qualifications|job description/i.test(message) || /דרישות|אחריות|תיאור משרה|תיאור תפקיד/.test(message);
+  if (labeledFieldCount >= 2 || linkedInSectionCount >= 2) return true;
+
+  const conversational = conversationalQuestionSignal.test(normalized)
+    || hebrewConversationalQuestionSignal.test(normalized)
+    || /\?\s*$/u.test(normalized);
+  if (conversational) return false;
+
+  const lines = normalized.split(/\r?\n/).filter(Boolean);
+  const hasExactHeading = lines.some((line) => Boolean(matchKnownRoleHeading(line)));
+  const hasSingleRoleMarker = /responsibilities|key responsibilities|requirements|qualifications|job description/i.test(message)
+    || /דרישות|אחריות|תיאור משרה|תיאור תפקיד/.test(message);
+  if ((hasExactHeading && normalized.length >= 80) || hasSingleRoleMarker) return true;
+  if (normalized.length < 180) return false;
+
+  const items = splitUnstructuredRoleItems(normalized);
+  const hasResponsibility = items.some((item) => englishResponsibilitySignal.test(item) || hebrewResponsibilitySignal.test(item));
+  const hasRequirement = items.some((item) => englishRequirementSignal.test(item) || hebrewRequirementSignal.test(item));
+  const hasRoleIdentity = Boolean(resolveSourceBackedRoleTitle(normalized, { allowUnframed: false }))
+    || items.slice(0, 4).some((item) => isPlausibleRoleTitle(item));
+  const hasDocumentStructure = items.length >= 3 || lines.length >= 3;
+
+  return hasDocumentStructure && hasResponsibility && hasRequirement && hasRoleIdentity;
 }

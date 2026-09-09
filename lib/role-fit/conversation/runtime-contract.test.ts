@@ -106,7 +106,7 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(css, /\.roleFitPage\.narrowChatPage[\s\S]*padding: 0/);
   });
 
-  it("reveals report animation frames only after iframe load", async () => {
+  it("reveals report animation frames only after iframe load while preserving the approved mobile offset", async () => {
     const [progress, css] = await Promise.all([
       readFile(join(process.cwd(), "components", "role-fit", "role-fit-report-progress.tsx"), "utf8"),
       readFile(join(process.cwd(), "components", "role-fit", "role-fit-report-progress.module.css"), "utf8"),
@@ -117,7 +117,7 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(css, /\.backgroundCircle[\s\S]*background: #000000/);
     assert.match(css, /\.visualFrame[\s\S]*opacity: 0/);
     assert.match(css, /\.activeFrame[\s\S]*opacity: 1/);
-    assert.doesNotMatch(css, /margin-block-start: calc\(4\.5rem \+ 5\.462rem\)/);
+    assert.match(css, /@media \(max-width: 40rem\)[\s\S]*\.visualSurface[\s\S]*margin-block-start: calc\(4\.5rem \+ 5\.462rem\)/);
   });
 
   it("keeps collecting role details after Generate Report is requested", async () => {
