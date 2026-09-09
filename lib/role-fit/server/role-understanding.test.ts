@@ -693,4 +693,80 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(merged.title?.originalValue, "AI Implementation Lead");
     assert.equal(merged.responsibilities.some((item) => /discovery research/i.test(item.originalValue)), false);
   });
+
+  it("uses one source-backed title policy across full JD, standalone, clarification, and correction paths", () => {
+    const fullJd = createRoleDraftFromText([
+      "We are hiring an AI Product Design Lead to build responsible AI workflows.",
+      "Responsibilities: Lead product discovery and define AI interaction patterns",
+      "Requirements: Strong product design experience and knowledge of AI systems",
+    ].join("\n"));
+    assert.equal(fullJd.title?.originalValue, "AI Product Design Lead");
+    assert.equal(extractStandaloneRoleTitle("In this role as Principal UX/UI Designer, you'll lead discovery"), "Principal UX/UI Designer");
+
+    const details = createRoleDraftFromText("Responsibilities: Lead product discovery across complex workflows\nRequirements: Strong product design experience and stakeholder leadership");
+    const clarified = mergeRoleDraftClarification(details, "title", "We’re looking for a Senior Staff Product Designer");
+    assert.equal(clarified.title?.originalValue, "Senior Staff Product Designer");
+
+    const corrected = applyRoleDraftCorrection(clarified, { field: "title", value: "Actually, the role is Principal Product Designer." });
+    assert.equal(corrected.title?.originalValue, "Principal Product Designer");
+    assert.deepEqual(corrected.responsibilities, clarified.responsibilities);
+    assert.deepEqual(corrected.requirements, clarified.requirements);
+  });
+
+  it("rejects awards and product-preview text on every direct title path", () => {
+    assert.equal(extractStandaloneRoleTitle("Red Dot design Award"), null);
+    assert.equal(extractStandaloneRoleTitle("Sneak peak to our product: https://example.com/video"), null);
+
+    const details = createRoleDraftFromText("Responsibilities: Lead discovery across product teams\nRequirements: Strong UX strategy and research experience");
+    const awardClarification = mergeRoleDraftClarification(details, "title", "Red Dot design Award");
+    assert.equal(awardClarification.title?.originalValue, "");
+    assert.deepEqual(awardClarification.responsibilities, details.responsibilities);
+  });
+
+  it("recovers source-faithful Hebrew role items from continuous and degraded structure", () => {
+    const roleText = [
+      "מנהלת מוצר AI בכירה",
+      "מוקדי עשייה הובלת Use Cases מורכבים מקצה לקצה; עבודה עם UX ו-R&D להגדרת תהליכי מוצר.",
+      "מה נדרש ניסיון בהובלת מוצר במערכות מורכבות; ידע ב-AI ויכולת עבודה עם בעלי עניין",
+    ].join("   ;   ");
+    const result = validateRoleText({ conversationId: "conv_he_degraded", traceId: "trace_he_degraded", roleText, detectedLanguage: "he" });
+
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.equal(result.roleDraft.title?.originalValue, "מנהלת מוצר AI בכירה");
+    assert.ok(result.roleDraft.responsibilities.some((item) => /הובלת Use Cases מורכבים/.test(item.originalValue)));
+    assert.ok(result.roleDraft.requirements.some((item) => /ניסיון בהובלת מוצר/.test(item.originalValue)));
+    assert.ok(result.roleDraft.requirements.some((item) => /ידע ב-AI/.test(item.originalValue)));
+  });
+
+  it("recovers role statements beneath unfamiliar headings", () => {
+    const roleText = [
+      "Principal Product Designer",
+      "Your impact zone",
+      "Lead discovery and define interaction models for complex operational products.",
+      "What makes you effective here",
+      "Proven experience designing enterprise products and strong facilitation ability.",
+    ].join("\n");
+    const result = validateRoleText({ conversationId: "conv_unknown_headings", traceId: "trace_unknown_headings", roleText, detectedLanguage: "en" });
+
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.ok(result.roleDraft.responsibilities.some((item) => /Lead discovery/.test(item.originalValue)));
+    assert.ok(result.roleDraft.requirements.some((item) => /Proven experience/.test(item.originalValue)));
+  });
+
+  it("recognizes substantial unformatted JDs while protecting professional conversation", () => {
+    const unformattedJd = [
+      "Senior Product Strategy Lead",
+      "Lead product discovery across complex services and collaborate with design, engineering, and business teams to define a clear roadmap.",
+      "The candidate brings proven product strategy experience, strong facilitation ability, and knowledge of research methods in enterprise environments.",
+    ].join("\n");
+    const longQuestion = "How can a UX strategist help a startup define product direction, collaborate with engineering, build a research practice, and develop strong stakeholder alignment when the team has limited experience and needs practical knowledge?";
+    const hebrewQuestion = "איך מנהלת מוצר יכולה להוביל תהליכי גילוי, לעבוד עם צוותי פיתוח ולבנות אסטרטגיה כאשר לצוות חסרים ניסיון, ידע ויכולת מחקר?";
+
+    assert.equal(looksLikeRoleInput(unformattedJd), true);
+    assert.equal(looksLikeRoleInput(longQuestion), false);
+    assert.equal(looksLikeRoleInput(hebrewQuestion), false);
+    assert.equal(looksLikeRoleInput("What are the requirements for a Product Manager?"), false);
+    assert.equal(looksLikeRoleInput("מה הדרישות לתפקיד מנהלת מוצר?"), false);
+    assert.equal(looksLikeRoleInput("Tell me about product strategy"), false);
+  });
 });

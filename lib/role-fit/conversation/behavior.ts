@@ -98,13 +98,6 @@ export function clarificationLimitAnswer(language: "he" | "en" | "mixed") {
     : "I still do not have enough information to complete the role. You can paste the full job description when ready.";
 }
 
-function conciseResponsibilityItems(values: string[] | undefined) {
-  return (values ?? [])
-    .map((value) => value.replace(/\s+/g, " ").trim().replace(/[.;,]+$/u, "").slice(0, 140))
-    .filter(Boolean)
-    .slice(0, 2);
-}
-
 export function readyForReportAnswer(input: {
   title: string;
   companyName?: string;
@@ -112,19 +105,11 @@ export function readyForReportAnswer(input: {
   language: "he" | "en" | "mixed";
   repeatedInput: boolean;
 }) {
-  const responsibilities = conciseResponsibilityItems(input.responsibilities);
-
   if (isHebrewLanguage(input.language)) {
-    const opening = input.repeatedInput ? "התמונה עדיין מספיק ברורה לי:" : "עכשיו התמונה מספיק ברורה לי:";
-    const roleLabel = input.title ? `משרת ${input.title}` : "התפקיד שתיארת";
-    const bullets = [roleLabel, ...responsibilities].map((item) => `- ${item}`).join("\n");
-    return `${opening}\n${bullets}\n\nאם זה מתאר נכון את התפקיד, אפשר שאכין את בדיקת ההתאמה.\nאם משהו לא מדויק, אפשר לתקן אותו לפני שאמשיך.`;
+    return `יש לי כל מה שאני צריכה כדי להכין את הדוח עבור "${input.title}". אפשר להמשיך לניתוח ולהפקת הדוח?`;
   }
 
-  const opening = input.repeatedInput ? "I still have a clear enough picture:" : "I have a clear enough picture now:";
-  const roleLabel = input.title ? `${input.title} position` : "the role you described";
-  const bullets = [roleLabel, ...responsibilities].map((item) => `- ${item}`).join("\n");
-  return `${opening}\n${bullets}\n\nIf that is accurate, I can prepare the fit review.\nIf anything is off, you can correct it before I continue.`;
+  return `I have everything I need to prepare the report for "${input.title}". Shall I continue with the analysis and generate the report?`;
 }
 
 export function looksLikeReportMutationRequest(message: string) {
