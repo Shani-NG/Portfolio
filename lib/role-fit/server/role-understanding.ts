@@ -223,7 +223,7 @@ function parseRoleStructure(roleText: string) {
     }
     if (isMetadataLine(line) || (!section && isStandaloneSourceChrome(line, titleCandidate)) || isNonRoleReferenceLine(line) || isNonRoleReferenceLine(item.text) || section === "boilerplate") continue;
 
-    if (section && section !== "boilerplate") {
+    if (section) {
       if (looksLikeSubheading(item.text, section, item.isListItem)) continue;
       const optionalClause = section !== "preferred" ? splitExplicitOptionalClause(item.text) : null;
       if (optionalClause) {
