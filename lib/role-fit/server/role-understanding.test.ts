@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { goldenCorpusFixtures } from "./golden-corpus/fixtures.ts";
 import { applyRoleDraftCorrection, clearRoleDraftField, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, isPlausibleRoleTitle, isRoleTitleRejection, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeCompanyName, normalizeRoleTitleClarification, referencesPreviouslyProvidedTitle, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
@@ -33,16 +35,102 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(result.roleDraft.preferredQualifications.length, 1);
   });
 
-  it("recognizes headings embedded in continuous text", () => {
-    const roleText =
+  it("requires structural lines for headings instead of detecting them inside continuous prose", () => {
+    const continuous =
       "Product Design Lead About the role Own the end-to-end product design practice. Responsibilities Lead discovery and align teams. What You Have 8+ years in product design. Preferred Qualifications Enterprise SaaS experience.";
+    const structured = [
+      "Product Design Lead",
+      "About the role",
+      "Own the end-to-end product design practice.",
+      "Responsibilities",
+      "Lead discovery and align teams.",
+      "What You Have",
+      "8+ years in product design.",
+      "Preferred Qualifications",
+      "Enterprise SaaS experience.",
+    ].join("\n");
 
-    const draft = createRoleDraftFromText(roleText);
+    const continuousDraft = createRoleDraftFromText(continuous);
+    const structuredDraft = createRoleDraftFromText(structured);
 
-    assert.equal(looksLikeRoleInput(roleText), true);
-    assert.equal(draft.responsibilities.length, 1);
-    assert.equal(draft.requirements.length, 1);
-    assert.equal(draft.preferredQualifications.length, 1);
+    assert.equal(continuousDraft.responsibilities.length, 0);
+    assert.equal(continuousDraft.requirements.length, 0);
+    assert.equal(continuousDraft.preferredQualifications.length, 0);
+    assert.equal(looksLikeRoleInput(continuous), false);
+    assert.equal(structuredDraft.responsibilities.length, 1);
+    assert.equal(structuredDraft.requirements.length, 1);
+    assert.equal(structuredDraft.preferredQualifications.length, 1);
+  });
+
+  it("preserves the frozen Golden Corpus structure and source-backed content", async () => {
+    const normalize = (value: string) => value
+      .normalize("NFKC")
+      .replaceAll("’", "'")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+    for (const fixture of goldenCorpusFixtures) {
+      const sourceText = await readFile(new URL(`./golden-corpus/source/${fixture.sourceFile}`, import.meta.url), "utf8");
+      const draft = createRoleDraftFromText(sourceText);
+      const validation = validateStructuredRoleDraft({
+        conversationId: `golden_${fixture.id}`,
+        traceId: `golden_${fixture.id}`,
+        roleDraft: draft,
+        detectedLanguage: /[\u0590-\u05ff]/.test(sourceText) ? "mixed" : "en",
+      });
+      const outputItems = [
+        ...(draft.description?.originalValue ?? "").split(/\r?\n/).filter(Boolean),
+        ...draft.responsibilities.map((item) => item.originalValue),
+        ...draft.requirements.map((item) => item.originalValue),
+        ...draft.preferredQualifications.map((item) => item.originalValue),
+      ];
+      const searchableOutput = normalize(outputItems.join("\n"));
+      const searchableSource = normalize(sourceText);
+
+      assert.equal(validation.parseStatus, "valid-complete", `${fixture.id} should be structurally complete`);
+      assert.equal(looksLikeRoleInput(sourceText), true, `${fixture.id} should pass structural admission`);
+      assert.equal(draft.title?.originalValue, fixture.expectedTitle, `${fixture.id} title`);
+      assert.deepEqual({
+        responsibilities: draft.responsibilities.length,
+        requirements: draft.requirements.length,
+        preferred: draft.preferredQualifications.length,
+      }, fixture.expectedCounts, `${fixture.id} structural cardinality`);
+      for (const item of outputItems.filter(Boolean)) {
+        assert.equal(searchableSource.includes(normalize(item)), true, `${fixture.id} output must remain source-backed: ${item}`);
+      }
+      for (const fragment of fixture.criticalSourceFragments) {
+        assert.equal(searchableOutput.includes(normalize(fragment)), true, `${fixture.id} lost critical source fragment: ${fragment}`);
+      }
+      for (const fragment of fixture.contaminationFragments) {
+        assert.equal(searchableOutput.includes(normalize(fragment)), false, `${fixture.id} contains contamination: ${fragment}`);
+      }
+
+      const uploadedDraft = createRoleDraftFromText(`Uploaded file: ${fixture.sourceFile}\n\n${sourceText}`);
+      assert.deepEqual(uploadedDraft, draft, `${fixture.id} upload transport must converge with pasted text`);
+      assert.equal(looksLikeRoleInput(`Uploaded file: ${fixture.sourceFile}\n\n${sourceText}`), true, `${fixture.id} upload should pass structural admission`);
+    }
+  });
+
+  it("does not admit isolated headings, professional keywords, or long prose without role structure", () => {
+    const negativeCases = [
+      "Job Description",
+      "Qualifications",
+      "Can you explain product strategy requirements?",
+      "I am a product designer and want advice about responsibilities, qualifications, stakeholder alignment, research, and design systems for my next career move.",
+      "Job Description\nThis paragraph describes a collaborative workplace but supplies no source-backed title, responsibilities, or requirements.",
+    ];
+
+    for (const message of negativeCases) assert.equal(looksLikeRoleInput(message), false, message);
+  });
+
+  it("admits structured role details without a title so the existing title clarification can complete them", () => {
+    const details = "Responsibilities: Lead product discovery with stakeholders\nRequirements: Strong UX strategy experience";
+    assert.equal(looksLikeRoleInput(details), true);
+    const draft = createRoleDraftFromText(details);
+    const completed = mergeRoleDraftClarification(draft, "title", "Senior UX Strategist");
+    const validation = validateStructuredRoleDraft({ conversationId: "conv_structured", traceId: "trace_structured", roleDraft: completed, detectedLanguage: "en" });
+    assert.equal(validation.parseStatus, "valid-complete");
   });
 
   it("recognizes Hebrew gender-hyphen role titles at the start of a pasted JD", () => {

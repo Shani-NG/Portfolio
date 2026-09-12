@@ -100,7 +100,7 @@ export function clarificationLimitAnswer(language: "he" | "en" | "mixed") {
 
 function conciseResponsibilityItems(values: string[] | undefined) {
   return (values ?? [])
-    .map((value) => value.replace(/\s+/g, " ").trim().replace(/[.;,]+$/u, "").slice(0, 140))
+    .map((value) => value.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .slice(0, 2);
 }

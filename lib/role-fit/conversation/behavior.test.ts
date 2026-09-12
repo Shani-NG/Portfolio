@@ -114,6 +114,22 @@ describe("Role Fit conversation behavior", () => {
     assert.doesNotMatch(answer, /Harmony AI/);
   });
 
+  it("preserves the first two source responsibilities without truncating or stripping punctuation", () => {
+    const longResponsibility = "Lead the complete source-backed responsibility through discovery, detailed validation, cross-functional alignment, implementation, measurement, and iteration; preserving its final punctuation.";
+    const answer = readyForReportAnswer({
+      title: "Product Lead",
+      companyName: "Excluded Company",
+      responsibilities: [longResponsibility, "Partner with Engineering, Product, and Design.", "This third responsibility must not appear."],
+      language: "en",
+      repeatedInput: false,
+    });
+
+    assert.match(answer, new RegExp(longResponsibility.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(answer, /Partner with Engineering, Product, and Design\./);
+    assert.doesNotMatch(answer, /This third responsibility/);
+    assert.doesNotMatch(answer, /Excluded Company/);
+  });
+
   it("blocks explicit report mutation requests without blocking explanation questions", () => {
     assert.equal(looksLikeReportMutationRequest("Please fix the company in this report"), true);
     assert.equal(looksLikeReportMutationRequest("Update the report title to Product Designer"), true);
