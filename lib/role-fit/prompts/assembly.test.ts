@@ -56,11 +56,19 @@ describe("Portfolio Agent prompt assembly", () => {
     const generalChatPrompt = buildPortfolioAgentPrompt({ ...commonInput, mode: "general-chat" });
     const reportFollowUpPrompt = buildPortfolioAgentPrompt({ ...commonInput, mode: "report-follow-up" });
     const fitAnalysisPrompt = buildPortfolioAgentPrompt({ ...commonInput, mode: "fit-analysis" });
-    const chatOnlyInstruction = /Answer the user's actual question first in simple professional language/;
+    const chatOnlyInstruction = /Optimize for relevance, not information coverage/;
+    const nonPromotionalInstruction = /never sell, exaggerate, or force a fit/;
+    const noProbingInstruction = /Do not add probing, end with a question by default, or append a generic contact invitation/;
 
     assert.match(generalChatPrompt, chatOnlyInstruction);
+    assert.match(generalChatPrompt, nonPromotionalInstruction);
+    assert.match(generalChatPrompt, noProbingInstruction);
     assert.doesNotMatch(reportFollowUpPrompt, chatOnlyInstruction);
+    assert.doesNotMatch(reportFollowUpPrompt, nonPromotionalInstruction);
+    assert.doesNotMatch(reportFollowUpPrompt, noProbingInstruction);
     assert.doesNotMatch(fitAnalysisPrompt, chatOnlyInstruction);
+    assert.doesNotMatch(fitAnalysisPrompt, nonPromotionalInstruction);
+    assert.doesNotMatch(fitAnalysisPrompt, noProbingInstruction);
   });
 
   it("fails clearly when the canonical prompt is missing", () => {
