@@ -138,8 +138,42 @@ describe("recruiter-facing copy boundaries", () => {
     if (!result.ok || result.report.overallFitVisual.mode !== "fit") return;
     const rationale = result.report.overallFitVisual.rationale;
     assert.ok(rationale.length <= 180);
-    assert.doesNotMatch(rationale, /specifi\.$/);
-    assert.match(rationale, /[.!?]$/);
+    assert.doesNotMatch(rationale, /specifi…$/);
+    assert.match(rationale, /…$/);
+  });
+
+  it("removes a trailing dependent clause instead of manufacturing a complete sentence", () => {
+    const completeClause = "The role requires strategic leadership and innovation within internal audit processes in a complex multidisciplinary organization";
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        fitRationale: `${completeClause}, whereas approved evidence demonstrates adjacent systems leadership and digital transformation work across several complex domains`,
+      }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok || result.report.overallFitVisual.mode !== "fit") return;
+    const rationale = result.report.overallFitVisual.rationale;
+    assert.equal(rationale, `${completeClause}.`);
+    assert.doesNotMatch(rationale, /whereas approved evidence demonstrates\.$/);
+  });
+
+  it("marks last-resort word-boundary shortening as visibly truncated", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({ fitRationale: "Documented leadership experience supports complex multidisciplinary delivery across operational environments with sustained stakeholder alignment and structured decision making throughout demanding transformation initiatives without a defensible internal clause boundary" }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok || result.report.overallFitVisual.mode !== "fit") return;
+    const rationale = result.report.overallFitVisual.rationale;
+    assert.ok(rationale.length <= 180);
+    assert.match(rationale, /…$/);
+    assert.doesNotMatch(rationale, /\.$/);
   });
 
   it("keeps safely bounded Hebrew text valid", () => {
@@ -155,7 +189,7 @@ describe("recruiter-facing copy boundaries", () => {
     const rationale = result.report.overallFitVisual.rationale;
     assert.ok(rationale.length <= 180);
     assert.doesNotMatch(rationale, /�/);
-    assert.match(rationale, /[.!?]$/);
+    assert.match(rationale, /[.!?…]$/);
   });
 
   it("joins already-punctuated semantic rationale fragments without duplicates", () => {

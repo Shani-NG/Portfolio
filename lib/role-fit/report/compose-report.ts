@@ -134,7 +134,7 @@ export function resolveStableFitLevel(analysis: QualitativeReportAnalysis): Qual
 }
 
 function splitSentences(value: string): string[] {
-  return value.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) ?? [];
+  return value.replace(/\s+/g, " ").trim().match(/[^.!?…]+[.!?…]+|[^.!?…]+$/g)?.map((item) => item.trim()).filter(Boolean) ?? [];
 }
 
 function normalizeTrailingPunctuation(value: string) {
@@ -143,7 +143,20 @@ function normalizeTrailingPunctuation(value: string) {
 
 function completeSentenceFragment(value: string) {
   const normalized = normalizeTrailingPunctuation(value);
-  return normalized && !/[.!?]$/.test(normalized) ? `${normalized}.` : normalized;
+  return normalized && !/[.!?…]$/.test(normalized) ? `${normalized}.` : normalized;
+}
+
+function safeClausePrefix(value: string) {
+  const boundaries = [
+    ...value.matchAll(/[;–—](?=\s)/g),
+    ...value.matchAll(/,\s+(?=(?:whereas|while|although|though|but|however|yet|because|which|who|whose|where|despite|rather than)\b)/gi),
+  ]
+    .map((match) => match.index)
+    .filter((index): index is number => index !== undefined && index >= 40)
+    .sort((left, right) => right - left);
+
+  const boundary = boundaries[0];
+  return boundary === undefined ? "" : value.slice(0, boundary).trimEnd();
 }
 
 function conciseSentences(value: string, maxSentences: number, maxChars: number) {
@@ -161,9 +174,13 @@ function conciseSentences(value: string, maxSentences: number, maxChars: number)
   if (completeWithinLimit.length > 0) return normalizeTrailingPunctuation(completeWithinLimit.join(" "));
 
   const bounded = text.slice(0, maxChars).trimEnd();
+  const clausePrefix = safeClausePrefix(bounded);
+  if (clausePrefix) return completeSentenceFragment(clausePrefix);
+
   const lastWordBoundary = bounded.lastIndexOf(" ");
   const safelyBounded = lastWordBoundary > 0 ? bounded.slice(0, lastWordBoundary) : "";
-  return completeSentenceFragment(safelyBounded);
+  const visiblyTruncated = safelyBounded.replace(/[,:;.!?-]+\s*$/, "").trimEnd();
+  return visiblyTruncated ? `${visiblyTruncated}…` : "";
 }
 
 function normalizeItemText(value: string, fallback: string, maxChars: number) {
