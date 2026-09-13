@@ -39,10 +39,53 @@ type CompositionResult =
   | { ok: false; diagnostic: string };
 
 const fitPresentation = {
-  strong: { value: 82, illustrationKey: "fit-strong", colorToken: "fit.strong", label: "Strong fit" },
-  good: { value: 68, illustrationKey: "fit-good", colorToken: "fit.good", label: "Good fit" },
-  partial: { value: 45, illustrationKey: "fit-partial", colorToken: "fit.partial", label: "Partial fit" },
+  strong: { illustrationKey: "fit-strong", colorToken: "fit.strong", label: "Strong fit" },
+  good: { illustrationKey: "fit-good", colorToken: "fit.good", label: "Good fit" },
+  partial: { illustrationKey: "fit-partial", colorToken: "fit.partial", label: "Partial fit" },
 } as const;
+
+type VisibleFitLevel = keyof typeof fitPresentation;
+
+export const fitVisualBands = {
+  partial: { min: 50, max: 77 },
+  good: { min: 78, max: 92 },
+  strong: { min: 93, max: 97 },
+} as const;
+
+const importanceWeights: Record<ReportItem["importance"], number> = {
+  "must-have": 3,
+  core: 2,
+  supporting: 1,
+};
+
+const evidenceConfidenceMultipliers: Record<ReportItem["evidenceConfidence"], number> = {
+  high: 1,
+  medium: 0.85,
+  low: 0.65,
+  insufficient: 0,
+};
+
+function matchContribution(item: Pick<ReportItem, "matchType" | "clusterIds">) {
+  if (item.matchType === "direct") return 1;
+  if (item.matchType === "semantic") return 0.9;
+  if (item.matchType === "transferable") return 0.75;
+  if (item.matchType === "partial" && item.clusterIds.length > 0) return 0.4;
+  return 0;
+}
+
+export function calculateFitVisualValue(
+  fitLevel: VisibleFitLevel,
+  items: ReadonlyArray<Pick<ReportItem, "importance" | "matchType" | "evidenceConfidence" | "clusterIds">>,
+) {
+  const totalImportance = items.reduce((total, item) => total + importanceWeights[item.importance], 0);
+  const weightedSupport = items.reduce((total, item) => {
+    const importance = importanceWeights[item.importance];
+    return total + importance * matchContribution(item) * evidenceConfidenceMultipliers[item.evidenceConfidence];
+  }, 0);
+  const supportRatio = totalImportance > 0 ? Math.min(1, Math.max(0, weightedSupport / totalImportance)) : 0;
+  const band = fitVisualBands[fitLevel];
+  return Math.round(band.min + supportRatio * (band.max - band.min));
+}
 
 const positiveMatchTypes = new Set<AnalysisItem["matchType"]>(["direct", "semantic", "transferable"]);
 const limitationMatchTypes = new Set<AnalysisItem["matchType"]>(["partial", "real-gap"]);
@@ -91,13 +134,53 @@ export function resolveStableFitLevel(analysis: QualitativeReportAnalysis): Qual
 }
 
 function splitSentences(value: string): string[] {
-  return value.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) ?? [];
+  return value.replace(/\s+/g, " ").trim().match(/[^.!?…]+[.!?…]+|[^.!?…]+$/g)?.map((item) => item.trim()).filter(Boolean) ?? [];
+}
+
+function normalizeTrailingPunctuation(value: string) {
+  return value.trim().replace(/[,:;-]\s*$/, ".");
+}
+
+function completeSentenceFragment(value: string) {
+  const normalized = normalizeTrailingPunctuation(value);
+  return normalized && !/[.!?…]$/.test(normalized) ? `${normalized}.` : normalized;
+}
+
+function safeClausePrefix(value: string) {
+  const boundaries = [
+    ...value.matchAll(/[;–—](?=\s)/g),
+    ...value.matchAll(/,\s+(?=(?:whereas|while|although|though|but|however|yet|because|which|who|whose|where|despite|rather than)\b)/gi),
+  ]
+    .map((match) => match.index)
+    .filter((index): index is number => index !== undefined && index >= 40)
+    .sort((left, right) => right - left);
+
+  const boundary = boundaries[0];
+  return boundary === undefined ? "" : value.slice(0, boundary).trimEnd();
 }
 
 function conciseSentences(value: string, maxSentences: number, maxChars: number) {
   const sentences = splitSentences(value).slice(0, maxSentences);
-  const text = (sentences.length ? sentences.join(" ") : value.replace(/\s+/g, " ").trim()).slice(0, maxChars).trim();
-  return text.replace(/[,:;-]\s*$/, ".");
+  const text = sentences.length ? sentences.join(" ") : value.replace(/\s+/g, " ").trim();
+  if (text.length <= maxChars) return normalizeTrailingPunctuation(text);
+
+  const completeWithinLimit: string[] = [];
+  for (const sentence of sentences) {
+    if (!/[.!?]$/.test(sentence)) break;
+    const candidate = [...completeWithinLimit, sentence].join(" ");
+    if (candidate.length > maxChars) break;
+    completeWithinLimit.push(sentence);
+  }
+  if (completeWithinLimit.length > 0) return normalizeTrailingPunctuation(completeWithinLimit.join(" "));
+
+  const bounded = text.slice(0, maxChars).trimEnd();
+  const clausePrefix = safeClausePrefix(bounded);
+  if (clausePrefix) return completeSentenceFragment(clausePrefix);
+
+  const lastWordBoundary = bounded.lastIndexOf(" ");
+  const safelyBounded = lastWordBoundary > 0 ? bounded.slice(0, lastWordBoundary) : "";
+  const visiblyTruncated = safelyBounded.replace(/[,:;.!?-]+\s*$/, "").trimEnd();
+  return visiblyTruncated ? `${visiblyTruncated}…` : "";
 }
 
 function normalizeItemText(value: string, fallback: string, maxChars: number) {
@@ -122,9 +205,15 @@ function semanticRationale(item: AnalysisItem, language: "he" | "en" | "mixed") 
     ? ["יכולת משותפת", "הבדל בהקשר", "למה ניתן לגישור", "טרם הוכח"]
     : ["Shared capability", "Context difference", "Why bridgeable", "Not yet proven"];
   const details = [item.sharedCapability, item.contextDifference, item.bridgeability, item.unproven]
-    .map((value, index) => `${labels[index]}: ${normalizeItemText(value ?? "", "", 120)}`);
+    .map((value, index) => {
+      const detail = normalizeItemText(value ?? "", "", 120);
+      return detail ? `${labels[index]}: ${detail}` : "";
+    });
+  const fragments = [base, ...details]
+    .filter(Boolean)
+    .map((fragment) => completeSentenceFragment(fragment));
 
-  return conciseSentences([base, ...details].filter(Boolean).join(". "), 5, 620);
+  return conciseSentences(fragments.join(" "), 5, 620);
 }
 
 function semanticDiagnostic(
@@ -523,7 +612,7 @@ export function composeReportUIPayload(input: {
     : {
         mode: "fit" as const,
         level: fitLevel,
-        fitVisualValue: fitPresentation[fitLevel].value,
+        fitVisualValue: calculateFitVisualValue(fitLevel, reportItems),
         illustrationKey: fitPresentation[fitLevel].illustrationKey,
         colorToken: fitPresentation[fitLevel].colorToken,
         label: fitPresentation[fitLevel].label,
@@ -569,7 +658,7 @@ export function composeReportUIPayload(input: {
     keyGaps: { items: gaps },
     disclaimer: {
       copyKey: "report.disclaimer.v1",
-      text: "This qualitative report is based on the submitted role description and approved portfolio evidence. It is not an ATS decision, does not replace human judgment, and the visual fit indicator is not a literal numeric score.",
+      text: "This qualitative report is based on the submitted role description and approved portfolio evidence. The FIT value is an evidence-calibrated indicator within the qualitative result; it is not a percentage, hiring probability, or prediction of success, and it does not replace human judgment.",
     },
     contactCta: {
       variant: fitLevel,

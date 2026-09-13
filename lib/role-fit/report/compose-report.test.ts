@@ -96,6 +96,126 @@ describe("stable qualitative fit", () => {
   });
 });
 
+describe("recruiter-facing copy boundaries", () => {
+  it("keeps short copy unchanged", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({ fitRationale: "Short source-backed rationale" }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok || result.report.overallFitVisual.mode !== "fit") return;
+    assert.equal(result.report.overallFitVisual.rationale, "Short source-backed rationale");
+  });
+
+  it("uses a complete sentence within the limit when one is available", () => {
+    const completeSentence = "The documented experience supports the central responsibilities.";
+    const result = composeReportUIPayload({
+      analysis: analysis({ fitRationale: `${completeSentence} ${"Additional supporting context ".repeat(12)}` }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok || result.report.overallFitVisual.mode !== "fit") return;
+    assert.equal(result.report.overallFitVisual.rationale, completeSentence);
+  });
+
+  it("falls back to a safe word boundary without exceeding the limit", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        fitRationale: "The candidate demonstrates relevant systems leadership and cross-functional delivery experience but lacks specific formal audit methodology ownership across regulated enterprise environments",
+      }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok || result.report.overallFitVisual.mode !== "fit") return;
+    const rationale = result.report.overallFitVisual.rationale;
+    assert.ok(rationale.length <= 180);
+    assert.doesNotMatch(rationale, /specifi…$/);
+    assert.match(rationale, /…$/);
+  });
+
+  it("removes a trailing dependent clause instead of manufacturing a complete sentence", () => {
+    const completeClause = "The role requires strategic leadership and innovation within internal audit processes in a complex multidisciplinary organization";
+    const result = composeReportUIPayload({
+      analysis: analysis({
+        fitRationale: `${completeClause}, whereas approved evidence demonstrates adjacent systems leadership and digital transformation work across several complex domains`,
+      }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok || result.report.overallFitVisual.mode !== "fit") return;
+    const rationale = result.report.overallFitVisual.rationale;
+    assert.equal(rationale, `${completeClause}.`);
+    assert.doesNotMatch(rationale, /whereas approved evidence demonstrates\.$/);
+  });
+
+  it("marks last-resort word-boundary shortening as visibly truncated", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({ fitRationale: "Documented leadership experience supports complex multidisciplinary delivery across operational environments with sustained stakeholder alignment and structured decision making throughout demanding transformation initiatives without a defensible internal clause boundary" }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok || result.report.overallFitVisual.mode !== "fit") return;
+    const rationale = result.report.overallFitVisual.rationale;
+    assert.ok(rationale.length <= 180);
+    assert.match(rationale, /…$/);
+    assert.doesNotMatch(rationale, /\.$/);
+  });
+
+  it("keeps safely bounded Hebrew text valid", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({ fitRationale: "הניסיון המתועד תומך בהובלת מערכות מורכבות ושיתופי פעולה חוצי ארגון תוך שמירה על חשיבה מערכתית וקבלת החלטות מבוססת נתונים בסביבות מקצועיות מורכבות ורבות ממשקים הדורשות אחריות והובלה עקבית לאורך זמן" }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "he",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok || result.report.overallFitVisual.mode !== "fit") return;
+    const rationale = result.report.overallFitVisual.rationale;
+    assert.ok(rationale.length <= 180);
+    assert.doesNotMatch(rationale, /�/);
+    assert.match(rationale, /[.!?…]$/);
+  });
+
+  it("joins already-punctuated semantic rationale fragments without duplicates", () => {
+    const semanticItem = {
+      ...item(0, "semantic"),
+      shortRationale: "Relevant product-design practice is documented.",
+      sharedCapability: "Complex workflow design.",
+      contextDifference: "The target uses a node-based canvas?",
+      bridgeability: "The interaction principles transfer directly!",
+      unproven: "Direct production work on sophisticated node-based creative tools remains unproven despite adjacent implementation experience.",
+    } satisfies QualitativeReportAnalysis["items"][number];
+    const result = composeReportUIPayload({
+      analysis: analysis({ items: [semanticItem] }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    const rationale = result.report.requirementMapping.items[0]?.shortRationale ?? "";
+    assert.doesNotMatch(rationale, /\.\.|\.\s+\.|\?\.|:\s*\./);
+    assert.doesNotMatch(rationale, /implementatio\./);
+  });
+});
+
 function reportItem(
   index: number,
   matchType: ReportUIPayload["requirementMapping"]["items"][number]["matchType"],
@@ -290,7 +410,22 @@ describe("Task C evidence and report integrity", () => {
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.report.overallFitVisual.mode, "insufficient");
+    assert.equal("fitVisualValue" in result.report.overallFitVisual, false);
     assert.equal(result.report.requirementMapping.items[0]?.matchType, "insufficient-evidence");
+  });
+
+  it("keeps out-of-scope reports non-numeric", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({ fitLevel: "out-of-scope" }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.overallFitVisual.mode, "out-of-scope");
+    assert.equal("fitVisualValue" in result.report.overallFitVisual, false);
   });
 
   it("keeps the canonical title separate while rendering the English report display title", () => {

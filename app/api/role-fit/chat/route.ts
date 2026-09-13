@@ -8,6 +8,7 @@ import {
   clarificationLimitAnswer,
   existingReportAnswer,
   genericRoleTitleAnswer,
+  hasSameRoleSourceFingerprint,
   looksLikeNewReportRequest,
   looksLikeReportMutationRequest,
   looksLikeRoleSubmissionSetup,
@@ -18,6 +19,7 @@ import {
   reportLimitAnswer,
   reportMutationBlockedAnswer,
   roleSubmissionSetupAnswer,
+  shouldPreBlockReportAttempt,
 } from "@/lib/role-fit/conversation/behavior";
 import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
@@ -136,24 +138,18 @@ export async function POST(request: Request) {
     : null;
   const isRoleCorrection = Boolean(roleCorrection);
 
-  if (
-    parsedRequest.data.completedReportCount >= policy.maxReportsPerSession
-    && hasReportIntent
-    && (!parsedRequest.data.reportContext || looksLikeNewReportRequest(parsedRequest.data.message))
-  ) {
+  if (shouldPreBlockReportAttempt({
+    completedReportCount: parsedRequest.data.completedReportCount,
+    maxReportsPerSession: policy.maxReportsPerSession,
+    hasStructuralRoleInput: hasRoleInput,
+    hasReportIntent,
+    hasActiveReport: Boolean(parsedRequest.data.reportContext),
+    looksLikeNewReport: looksLikeNewReportRequest(parsedRequest.data.message),
+  })) {
     return NextResponse.json({
       state: parsedRequest.data.reportContext ? "report-ready" : "general-qa",
       answer: reportLimitAnswer(parsedRequest.data.language),
       safeMessageKey: "report.limit_reached",
-    });
-  }
-
-  if (parsedRequest.data.reportContext && parsedRequest.data.repeatedInput && hasRoleInput) {
-    return NextResponse.json({
-      state: "report-ready",
-      answer: existingReportAnswer(parsedRequest.data.language),
-      roleDraft: roleContext?.roleDraft,
-      safeMessageKey: "report.existing_role",
     });
   }
 
@@ -223,6 +219,21 @@ export async function POST(request: Request) {
   const incomingRoleDraft = hasRoleInput && !isFieldClarification
     ? createRoleDraftFromText(parsedRequest.data.message)
     : createEmptyRoleDraft();
+  if (
+    parsedRequest.data.reportContext
+    && hasRoleInput
+    && (
+      parsedRequest.data.repeatedInput
+      || hasSameRoleSourceFingerprint(currentRoleDraft, incomingRoleDraft)
+    )
+  ) {
+    return NextResponse.json({
+      state: "report-ready",
+      answer: existingReportAnswer(parsedRequest.data.language),
+      roleDraft: currentRoleDraft,
+      safeMessageKey: "report.existing_role",
+    });
+  }
   const roleDraftForValidation = standaloneRoleTitle
     ? mergeRoleDraftClarification(createEmptyRoleDraft(), "title", standaloneRoleTitle)
     : roleCorrection && currentRoleDraft

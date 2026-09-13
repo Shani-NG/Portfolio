@@ -1,5 +1,9 @@
+import type { RoleValidationResult } from "../contracts/index.ts";
+
 export type ConversationLanguage = "he" | "en";
 export type ConversationRoleField = "company" | "title" | "responsibilities" | "requirements";
+
+type RoleDraft = RoleValidationResult["roleDraft"];
 
 export const maxRoleClarificationAttempts = 3;
 
@@ -100,7 +104,7 @@ export function clarificationLimitAnswer(language: "he" | "en" | "mixed") {
 
 function conciseResponsibilityItems(values: string[] | undefined) {
   return (values ?? [])
-    .map((value) => value.replace(/\s+/g, " ").trim().replace(/[.;,]+$/u, "").slice(0, 140))
+    .map((value) => value.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .slice(0, 2);
 }
@@ -143,8 +147,46 @@ export function reportMutationBlockedAnswer(language: "he" | "en" | "mixed") {
 
 export function roleSubmissionSetupAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
-    ? "אפשר להעלות קובץ או להדביק כאן את תיאור המשרה. אין צורך לסדר אותו במיוחד — אני אעבור עליו ואבין מה חשוב בתפקיד."
-    : "You can upload a file or paste the job description here. It does not need to be specially formatted—I’ll work out what matters in the role.";
+    ? "אפשר להעלות קובץ או להדביק כאן את תיאור המשרה.\n\nכדי שאוכל לבדוק התאמה, חשוב שיופיעו:\n- שם המשרה\n- תחומי האחריות המרכזיים\n- הדרישות או הכישורים המרכזיים\n\nשם החברה עוזר אם הוא מופיע, אבל אינו חובה.\nאם יחסר פרט מהותי, אבקש רק אותו."
+    : "You can upload a file or paste the job description here.\n\nTo assess the fit, please make sure it includes:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\n\nThe company name is helpful if included, but it is not required.\nIf an essential detail is missing, I’ll ask only for that.";
+}
+
+function normalizeRoleFingerprintValue(value: string) {
+  return value.normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim().toLowerCase();
+}
+
+export function createRoleSourceFingerprint(roleDraft: RoleDraft | null | undefined) {
+  const title = normalizeRoleFingerprintValue(roleDraft?.title?.originalValue ?? "");
+  const responsibilities = (roleDraft?.responsibilities ?? [])
+    .map((field) => normalizeRoleFingerprintValue(field.originalValue))
+    .filter(Boolean)
+    .sort();
+  const requirements = (roleDraft?.requirements ?? [])
+    .map((field) => normalizeRoleFingerprintValue(field.originalValue))
+    .filter(Boolean)
+    .sort();
+
+  if (!title || responsibilities.length === 0 || requirements.length === 0) return null;
+  return JSON.stringify({ title, responsibilities, requirements });
+}
+
+export function hasSameRoleSourceFingerprint(currentRole: RoleDraft | null | undefined, incomingRole: RoleDraft | null | undefined) {
+  const currentFingerprint = createRoleSourceFingerprint(currentRole);
+  const incomingFingerprint = createRoleSourceFingerprint(incomingRole);
+  return Boolean(currentFingerprint && incomingFingerprint && currentFingerprint === incomingFingerprint);
+}
+
+export function shouldPreBlockReportAttempt(input: {
+  completedReportCount: number;
+  maxReportsPerSession: number;
+  hasStructuralRoleInput: boolean;
+  hasReportIntent: boolean;
+  hasActiveReport: boolean;
+  looksLikeNewReport: boolean;
+}) {
+  if (input.completedReportCount < input.maxReportsPerSession) return false;
+  if (input.hasStructuralRoleInput) return true;
+  return input.hasReportIntent && (!input.hasActiveReport || input.looksLikeNewReport);
 }
 
 export function existingReportAnswer(language: "he" | "en" | "mixed") {

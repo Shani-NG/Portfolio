@@ -6,6 +6,19 @@ import { describe, test } from "node:test";
 const projectRoot = process.cwd();
 
 describe("Role Fit report lifecycle boundary", () => {
+  test("renders one non-percentage FIT value and removes requirement-count presentation", async () => {
+    const report = await readFile(join(projectRoot, "components", "role-fit", "role-fit-live-report.tsx"), "utf8");
+
+    assert.match(report, />FIT<\/span>/);
+    assert.match(report, /\{fit\.fitVisualValue\}/);
+    assert.doesNotMatch(report, /Verified Requirements|Core Skills Coverage|coveragePercent|coverageCounts/);
+    assert.doesNotMatch(report, /fitVisualValue\}\s*%|FIT percentage|Fit percentage/i);
+
+    const composer = await readFile(join(projectRoot, "lib", "role-fit", "report", "compose-report.ts"), "utf8");
+    assert.match(composer, /FIT value is an evidence-calibrated indicator within the qualitative result/);
+    assert.match(composer, /not a percentage, hiring probability, or prediction of success/);
+  });
+
   test("keeps the public loading presentation timed and presentation-only", async () => {
     const [page, progress] = await Promise.all([
       readFile(join(projectRoot, "app", "minime", "page.tsx"), "utf8"),

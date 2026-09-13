@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { QualitativeReportAnalysis } from "../model/provider.ts";
 import { createRoleDraftFromText } from "../server/role-understanding.ts";
-import { getRoleAnalysisItems, resolveStableFitLevel } from "./compose-report.ts";
+import { calculateFitVisualValue, fitVisualBands, getRoleAnalysisItems, resolveStableFitLevel } from "./compose-report.ts";
 
 type AnalysisItem = QualitativeReportAnalysis["items"][number];
 
@@ -187,6 +187,58 @@ describe("deterministic three-level Overall Fit calibration", () => {
     assert.equal(resolveStableFitLevel(analysis([
       item({ roleItemIndex: 0, importance: "core", matchType: "insufficient-evidence" }),
     ], "insufficient")), "insufficient");
+  });
+});
+
+type FitScoreItem = Parameters<typeof calculateFitVisualValue>[1][number];
+
+function fitScoreItem(overrides: Partial<FitScoreItem> = {}): FitScoreItem {
+  return {
+    importance: "core",
+    matchType: "direct",
+    evidenceConfidence: "high",
+    clusterIds: ["evidence-c4i"],
+    ...overrides,
+  };
+}
+
+describe("evidence-calibrated FIT presentation", () => {
+  it("keeps every qualitative result inside its continuous approved band", () => {
+    const unsupported = [fitScoreItem({ matchType: "real-gap", evidenceConfidence: "insufficient", clusterIds: [] })];
+    const fullySupported = [fitScoreItem()];
+
+    for (const level of ["partial", "good", "strong"] as const) {
+      assert.equal(calculateFitVisualValue(level, unsupported), fitVisualBands[level].min);
+      assert.equal(calculateFitVisualValue(level, fullySupported), fitVisualBands[level].max);
+    }
+    assert.equal(fitVisualBands.partial.max + 1, fitVisualBands.good.min);
+    assert.equal(fitVisualBands.good.max + 1, fitVisualBands.strong.min);
+    assert.equal(fitVisualBands.strong.max, 97);
+  });
+
+  it("positions direct high-confidence evidence above transferable or partial evidence within the same band", () => {
+    const direct = calculateFitVisualValue("good", [fitScoreItem()]);
+    const transferable = calculateFitVisualValue("good", [fitScoreItem({ matchType: "transferable", evidenceConfidence: "low" })]);
+    const partial = calculateFitVisualValue("good", [fitScoreItem({ matchType: "partial", evidenceConfidence: "medium" })]);
+
+    assert.ok(direct > transferable);
+    assert.ok(transferable > partial);
+  });
+
+  it("weights central evidence more heavily than supporting evidence", () => {
+    const unsupportedMustHave = fitScoreItem({ importance: "must-have", matchType: "real-gap", evidenceConfidence: "insufficient", clusterIds: [] });
+    const centralSupport = calculateFitVisualValue("good", [unsupportedMustHave, fitScoreItem({ importance: "core" })]);
+    const supportingSupport = calculateFitVisualValue("good", [unsupportedMustHave, fitScoreItem({ importance: "supporting" })]);
+
+    assert.ok(centralSupport > supportingSupport);
+  });
+
+  it("gives partial evidence a positive contribution only when resolved evidence remains attached", () => {
+    const withEvidence = calculateFitVisualValue("partial", [fitScoreItem({ matchType: "partial", evidenceConfidence: "medium" })]);
+    const withoutEvidence = calculateFitVisualValue("partial", [fitScoreItem({ matchType: "partial", evidenceConfidence: "medium", clusterIds: [] })]);
+
+    assert.ok(withEvidence > withoutEvidence);
+    assert.equal(withoutEvidence, fitVisualBands.partial.min);
   });
 });
 

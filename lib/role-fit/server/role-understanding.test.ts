@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { goldenCorpusFixtures } from "./golden-corpus/fixtures.ts";
+import { getRoleAnalysisItems } from "../report/compose-report.ts";
 import { applyRoleDraftCorrection, clearRoleDraftField, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, isPlausibleRoleTitle, isRoleTitleRejection, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeCompanyName, normalizeRoleTitleClarification, referencesPreviouslyProvidedTitle, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
@@ -33,16 +36,126 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(result.roleDraft.preferredQualifications.length, 1);
   });
 
-  it("recognizes headings embedded in continuous text", () => {
-    const roleText =
+  it("requires structural lines for headings instead of detecting them inside continuous prose", () => {
+    const continuous =
       "Product Design Lead About the role Own the end-to-end product design practice. Responsibilities Lead discovery and align teams. What You Have 8+ years in product design. Preferred Qualifications Enterprise SaaS experience.";
+    const structured = [
+      "Product Design Lead",
+      "About the role",
+      "Own the end-to-end product design practice.",
+      "Responsibilities",
+      "Lead discovery and align teams.",
+      "What You Have",
+      "8+ years in product design.",
+      "Preferred Qualifications",
+      "Enterprise SaaS experience.",
+    ].join("\n");
 
-    const draft = createRoleDraftFromText(roleText);
+    const continuousDraft = createRoleDraftFromText(continuous);
+    const structuredDraft = createRoleDraftFromText(structured);
 
-    assert.equal(looksLikeRoleInput(roleText), true);
-    assert.equal(draft.responsibilities.length, 1);
-    assert.equal(draft.requirements.length, 1);
-    assert.equal(draft.preferredQualifications.length, 1);
+    assert.equal(continuousDraft.responsibilities.length, 0);
+    assert.equal(continuousDraft.requirements.length, 0);
+    assert.equal(continuousDraft.preferredQualifications.length, 0);
+    assert.equal(looksLikeRoleInput(continuous), false);
+    assert.equal(structuredDraft.responsibilities.length, 1);
+    assert.equal(structuredDraft.requirements.length, 1);
+    assert.equal(structuredDraft.preferredQualifications.length, 1);
+  });
+
+  it("recognizes standalone bold Markdown headings without treating prose as structure", () => {
+    const structured = [
+      "We're looking for a Senior Product Designer to join the team.",
+      "**About The Role**",
+      "- Design complex workflows",
+      "- Validate solutions with customers",
+      "**Requirements**",
+      "- 5+ years of product design experience",
+      "**Nice to have**",
+      "- Conversational interface experience",
+    ].join("\n");
+    const prose = "Our team discusses **requirements** and **nice to have** ideas as part of ordinary product planning.";
+
+    const draft = createRoleDraftFromText(structured);
+    assert.equal(looksLikeRoleInput(structured), true);
+    assert.equal(draft.title?.originalValue, "Senior Product Designer");
+    assert.deepEqual(draft.responsibilities.map((item) => item.originalValue), ["Design complex workflows", "Validate solutions with customers"]);
+    assert.deepEqual(draft.requirements.map((item) => item.originalValue), ["5+ years of product design experience"]);
+    assert.deepEqual(draft.preferredQualifications.map((item) => item.originalValue), ["Conversational interface experience"]);
+    assert.equal(looksLikeRoleInput(prose), false);
+  });
+
+  it("preserves the frozen Golden Corpus structure and source-backed content", async () => {
+    const normalize = (value: string) => value
+      .normalize("NFKC")
+      .replaceAll("’", "'")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+    for (const fixture of goldenCorpusFixtures) {
+      const sourceText = await readFile(new URL(`./golden-corpus/source/${fixture.sourceFile}`, import.meta.url), "utf8");
+      const draft = createRoleDraftFromText(sourceText);
+      const validation = validateStructuredRoleDraft({
+        conversationId: `golden_${fixture.id}`,
+        traceId: `golden_${fixture.id}`,
+        roleDraft: draft,
+        detectedLanguage: /[\u0590-\u05ff]/.test(sourceText) ? "mixed" : "en",
+      });
+      const outputItems = [
+        ...(draft.description?.originalValue ?? "").split(/\r?\n/).filter(Boolean),
+        ...draft.responsibilities.map((item) => item.originalValue),
+        ...draft.requirements.map((item) => item.originalValue),
+        ...draft.preferredQualifications.map((item) => item.originalValue),
+      ];
+      const searchableOutput = normalize(outputItems.join("\n"));
+      const searchableSource = normalize(sourceText);
+
+      assert.equal(validation.parseStatus, "valid-complete", `${fixture.id} should be structurally complete`);
+      assert.equal(looksLikeRoleInput(sourceText), true, `${fixture.id} should pass structural admission`);
+      if (fixture.expectedCompany) assert.equal(draft.company?.originalValue, fixture.expectedCompany, `${fixture.id} company`);
+      assert.equal(draft.title?.originalValue, fixture.expectedTitle, `${fixture.id} title`);
+      assert.deepEqual({
+        responsibilities: draft.responsibilities.length,
+        requirements: draft.requirements.length,
+        preferred: draft.preferredQualifications.length,
+      }, fixture.expectedCounts, `${fixture.id} structural cardinality`);
+      assert.equal(getRoleAnalysisItems(draft).length, draft.responsibilities.length + draft.requirements.length, `${fixture.id} roleItems integrity`);
+      for (const item of outputItems.filter(Boolean)) {
+        assert.equal(searchableSource.includes(normalize(item)), true, `${fixture.id} output must remain source-backed: ${item}`);
+      }
+      for (const fragment of fixture.criticalSourceFragments) {
+        assert.equal(searchableOutput.includes(normalize(fragment)), true, `${fixture.id} lost critical source fragment: ${fragment}`);
+      }
+      for (const fragment of fixture.contaminationFragments) {
+        assert.equal(searchableOutput.includes(normalize(fragment)), false, `${fixture.id} contains contamination: ${fragment}`);
+      }
+
+      const uploadedDraft = createRoleDraftFromText(`Uploaded file: ${fixture.sourceFile}\n\n${sourceText}`);
+      assert.deepEqual(uploadedDraft, draft, `${fixture.id} upload transport must converge with pasted text`);
+      assert.equal(looksLikeRoleInput(`Uploaded file: ${fixture.sourceFile}\n\n${sourceText}`), true, `${fixture.id} upload should pass structural admission`);
+    }
+  });
+
+  it("does not admit isolated headings, professional keywords, or long prose without role structure", () => {
+    const negativeCases = [
+      "Job Description",
+      "Qualifications",
+      "Can you explain product strategy requirements?",
+      "I am a product designer and want advice about responsibilities, qualifications, stakeholder alignment, research, and design systems for my next career move.",
+      "Job Description\nThis paragraph describes a collaborative workplace but supplies no source-backed title, responsibilities, or requirements.",
+    ];
+
+    for (const message of negativeCases) assert.equal(looksLikeRoleInput(message), false, message);
+  });
+
+  it("admits structured role details without a title so the existing title clarification can complete them", () => {
+    const details = "Responsibilities: Lead product discovery with stakeholders\nRequirements: Strong UX strategy experience";
+    assert.equal(looksLikeRoleInput(details), true);
+    const draft = createRoleDraftFromText(details);
+    const completed = mergeRoleDraftClarification(draft, "title", "Senior UX Strategist");
+    const validation = validateStructuredRoleDraft({ conversationId: "conv_structured", traceId: "trace_structured", roleDraft: completed, detectedLanguage: "en" });
+    assert.equal(validation.parseStatus, "valid-complete");
   });
 
   it("recognizes Hebrew gender-hyphen role titles at the start of a pasted JD", () => {
@@ -105,6 +218,8 @@ describe("Role Fit pasted job understanding", () => {
     const domainHiring = createRoleDraftFromText("monday.com is looking for a Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
     const labeledDescription = createRoleDraftFromText("Company: monday.com is a work operating system\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
     const ambiguous = createRoleDraftFromText("Our team partners with Wix on shared initiatives.\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
+    const ownedProduct = createRoleDraftFromText("Harmony is a voice-agent platform.\nWe're a monday.com company.\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
+    const productOnly = createRoleDraftFromText("Harmony is a voice-agent platform.\nTitle: Product Designer\nResponsibilities: Lead discovery\nRequirements: Product design experience");
 
     assert.equal(normalizeCompanyName("Base44, a newly acquired part of Wix"), "Base44");
     assert.equal(labeled.company?.originalValue, "Base44");
@@ -113,6 +228,22 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(domainHiring.company?.originalValue, "monday.com");
     assert.equal(labeledDescription.company?.originalValue, "monday.com");
     assert.equal(ambiguous.company?.originalValue, "");
+    assert.equal(ownedProduct.company?.originalValue, "monday.com");
+    assert.equal(productOnly.company?.originalValue, "");
+  });
+
+  it("keeps an explicitly optional Hebrew qualification out of hard requirements", () => {
+    const draft = createRoleDraftFromText([
+      "שם המשרה: מנהל.ת מוצר",
+      "תחומי אחריות",
+      "הובלת מפת דרכים ותהליכי מוצר",
+      "דרישות",
+      "ניסיון של 3 שנים בניהול מוצר – חובה",
+      "ניסיון בניהול תוכניות מורכבות – יתרון משמעותי",
+    ].join("\n"));
+
+    assert.deepEqual(draft.requirements.map((item) => item.originalValue), ["ניסיון של 3 שנים בניהול מוצר – חובה"]);
+    assert.deepEqual(draft.preferredQualifications.map((item) => item.originalValue), ["ניסיון בניהול תוכניות מורכבות – יתרון משמעותי"]);
   });
 
   it("normalizes explicit company clarifications before report generation", () => {
@@ -202,13 +333,16 @@ describe("Role Fit pasted job understanding", () => {
     assert.deepEqual(result.missingFields, ["title"]);
   });
 
-  it("rejects Rubrik-like promo links and low-confidence semantic inference as confirmed titles", () => {
+  it("uses an explicit hiring sentence in a Rubrik-like JD without promoting chrome or awards", () => {
     const roleText = [
       "Based in Tel Aviv office, in hybrid model.",
       "About Rubrik",
       "Rubrik helps organizations protect and recover business data.",
       "About Team & About Role",
       "We are looking for a highly-skilled UX Designer for our Israel site to join a product team.",
+      "- Red Dot design Award",
+      "- iF Design Award",
+      "- Rubrik Design Medium Page",
       "Sneak peak to our product:",
       "https://www.youtube.com/watch?v=F9949Q-_onc&t=9s",
       "What You'll Do",
@@ -217,6 +351,8 @@ describe("Role Fit pasted job understanding", () => {
       "What You'll Bring To The Team",
       "Strong UX design experience in product teams",
       "Ability to translate complex requirements into clear interaction flows",
+      "Rubrik is an Equal Opportunity Employer.",
+      "Join Us in Securing the World's Data",
     ].join("\n");
 
     const result = validateRoleText({
@@ -230,13 +366,20 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(isPlausibleRoleTitle("Product Designer example.com/apply"), false);
     assert.equal(isPlausibleRoleTitle("Sneak peek to our product:"), false);
     assert.equal(isPlausibleRoleTitle("Watch our product overview"), false);
-    assert.equal(result.parseStatus, "valid-incomplete");
-    assert.deepEqual(result.missingFields, ["title"]);
+    assert.equal(isPlausibleRoleTitle("Rubrik"), false);
+    assert.equal(isPlausibleRoleTitle("Red Dot design Award"), false);
+    assert.equal(isPlausibleRoleTitle("iF Design Award"), false);
+    assert.equal(isPlausibleRoleTitle("Rubrik Design Medium Page"), false);
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.deepEqual(result.missingFields, []);
+    assert.equal(result.roleDraft.company?.originalValue, "Rubrik");
+    assert.equal(result.roleDraft.title?.originalValue, "UX Designer");
     assert.notEqual(result.roleDraft.title?.originalValue, "Sneak peak to our product:");
     assert.notEqual(result.roleDraft.title?.originalValue, "https://www.youtube.com/watch?v=F9949Q-_onc&t=9s");
-    assert.equal(result.roleDraft.title?.confirmed, false);
+    assert.equal(result.roleDraft.title?.confirmed, true);
     assert.ok(result.roleDraft.responsibilities.length >= 2);
     assert.ok(result.roleDraft.requirements.length >= 2);
+    assert.doesNotMatch(serializeRoleDraftForBoundary(result.roleDraft), /Red Dot|iF Design|Medium Page|Equal Opportunity/);
   });
 
   it("separates a conversational prefix from a complete English JD", () => {

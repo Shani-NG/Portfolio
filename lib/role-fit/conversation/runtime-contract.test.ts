@@ -56,6 +56,54 @@ describe("Role Fit runtime conversation contract", () => {
     assert.doesNotMatch(transition, /sessionId:|conversationId:|completedReportCount:|messages:/);
   });
 
+  it("uses the retained source role fingerprint to reject the same JD after intervening conversation", async () => {
+    const route = await readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8");
+    const fingerprintGuard = route.indexOf("hasSameRoleSourceFingerprint(currentRoleDraft, incomingRoleDraft)");
+    const validation = route.indexOf("const roleDraftForValidation", fingerprintGuard);
+    const branch = route.slice(fingerprintGuard, validation);
+
+    assert.ok(fingerprintGuard >= 0);
+    assert.ok(validation > fingerprintGuard);
+    assert.match(branch, /state: "report-ready"/);
+    assert.match(branch, /safeMessageKey: "report\.existing_role"/);
+    assert.doesNotMatch(branch, /validateStructuredRoleDraft|pendingReportConfirmation|requestReport/);
+  });
+
+  it("pre-blocks a structurally admitted third JD before parsing, confirmation, or generation", async () => {
+    const route = await readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8");
+    const structuralAdmission = route.indexOf("const hasRoleInput");
+    const limitGuard = route.indexOf("shouldPreBlockReportAttempt({", structuralAdmission);
+    const newDraft = route.indexOf("createRoleDraftFromText(parsedRequest.data.message)");
+    const guard = route.slice(limitGuard, newDraft);
+
+    assert.ok(structuralAdmission >= 0);
+    assert.ok(limitGuard > structuralAdmission);
+    assert.ok(newDraft > limitGuard);
+    assert.match(guard, /hasStructuralRoleInput: hasRoleInput/);
+    assert.match(guard, /safeMessageKey: "report\.limit_reached"/);
+    assert.doesNotMatch(guard, /awaiting-report-confirmation|generateReport|requestReport/);
+  });
+
+  it("removes reset-based report navigation while preserving the transcript-owned transition", async () => {
+    const [page, report] = await Promise.all([
+      readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8"),
+      readFile(join(process.cwd(), "components", "role-fit", "role-fit-live-report.tsx"), "utf8"),
+    ]);
+
+    assert.doesNotMatch(page, /resetRoleFitAnalysis|startNewAnalysis|onStartNewAnalysis/);
+    assert.doesNotMatch(report, /Start new analysis|onStartNewAnalysis/);
+    assert.match(page, /const chatMessages = liveSession\.messages/);
+    assert.match(page, /completedReportCount: currentSession\.completedReportCount/);
+  });
+
+  it("uses conversational role-input placeholders without requiring labeled fields", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+
+    assert.match(page, /Paste a job description or ask about my work\./);
+    assert.match(page, /Paste another job description or ask a follow-up question\./);
+    assert.doesNotMatch(page, /Company:\s*,?\s*Title:|using labels/);
+  });
+
   it("allows one direct report retry and disables an immediate third attempt", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
 
@@ -106,7 +154,7 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(css, /\.roleFitPage\.narrowChatPage[\s\S]*padding: 0/);
   });
 
-  it("reveals report animation frames only after iframe load", async () => {
+  it("reveals report animation frames only after iframe load while preserving the approved mobile offset", async () => {
     const [progress, css] = await Promise.all([
       readFile(join(process.cwd(), "components", "role-fit", "role-fit-report-progress.tsx"), "utf8"),
       readFile(join(process.cwd(), "components", "role-fit", "role-fit-report-progress.module.css"), "utf8"),
@@ -117,7 +165,7 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(css, /\.backgroundCircle[\s\S]*background: #000000/);
     assert.match(css, /\.visualFrame[\s\S]*opacity: 0/);
     assert.match(css, /\.activeFrame[\s\S]*opacity: 1/);
-    assert.doesNotMatch(css, /margin-block-start: calc\(4\.5rem \+ 5\.462rem\)/);
+    assert.match(css, /@media \(max-width: 40rem\)[\s\S]*\.visualSurface[\s\S]*margin-block-start: calc\(4\.5rem \+ 5\.462rem\)/);
   });
 
   it("keeps collecting role details after Generate Report is requested", async () => {
