@@ -137,10 +137,33 @@ function splitSentences(value: string): string[] {
   return value.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) ?? [];
 }
 
+function normalizeTrailingPunctuation(value: string) {
+  return value.trim().replace(/[,:;-]\s*$/, ".");
+}
+
+function completeSentenceFragment(value: string) {
+  const normalized = normalizeTrailingPunctuation(value);
+  return normalized && !/[.!?]$/.test(normalized) ? `${normalized}.` : normalized;
+}
+
 function conciseSentences(value: string, maxSentences: number, maxChars: number) {
   const sentences = splitSentences(value).slice(0, maxSentences);
-  const text = (sentences.length ? sentences.join(" ") : value.replace(/\s+/g, " ").trim()).slice(0, maxChars).trim();
-  return text.replace(/[,:;-]\s*$/, ".");
+  const text = sentences.length ? sentences.join(" ") : value.replace(/\s+/g, " ").trim();
+  if (text.length <= maxChars) return normalizeTrailingPunctuation(text);
+
+  const completeWithinLimit: string[] = [];
+  for (const sentence of sentences) {
+    if (!/[.!?]$/.test(sentence)) break;
+    const candidate = [...completeWithinLimit, sentence].join(" ");
+    if (candidate.length > maxChars) break;
+    completeWithinLimit.push(sentence);
+  }
+  if (completeWithinLimit.length > 0) return normalizeTrailingPunctuation(completeWithinLimit.join(" "));
+
+  const bounded = text.slice(0, maxChars).trimEnd();
+  const lastWordBoundary = bounded.lastIndexOf(" ");
+  const safelyBounded = lastWordBoundary > 0 ? bounded.slice(0, lastWordBoundary) : "";
+  return completeSentenceFragment(safelyBounded);
 }
 
 function normalizeItemText(value: string, fallback: string, maxChars: number) {
@@ -165,9 +188,15 @@ function semanticRationale(item: AnalysisItem, language: "he" | "en" | "mixed") 
     ? ["יכולת משותפת", "הבדל בהקשר", "למה ניתן לגישור", "טרם הוכח"]
     : ["Shared capability", "Context difference", "Why bridgeable", "Not yet proven"];
   const details = [item.sharedCapability, item.contextDifference, item.bridgeability, item.unproven]
-    .map((value, index) => `${labels[index]}: ${normalizeItemText(value ?? "", "", 120)}`);
+    .map((value, index) => {
+      const detail = normalizeItemText(value ?? "", "", 120);
+      return detail ? `${labels[index]}: ${detail}` : "";
+    });
+  const fragments = [base, ...details]
+    .filter(Boolean)
+    .map((fragment) => completeSentenceFragment(fragment));
 
-  return conciseSentences([base, ...details].filter(Boolean).join(". "), 5, 620);
+  return conciseSentences(fragments.join(" "), 5, 620);
 }
 
 function semanticDiagnostic(

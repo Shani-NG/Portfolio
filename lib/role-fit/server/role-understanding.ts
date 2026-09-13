@@ -702,6 +702,12 @@ export function resolveEnglishReportTitle(canonicalRoleTitle: string): string {
     baseTitle = [domain, roleNoun].filter(Boolean).join(" ");
   }
 
+  if (baseTitle === "Lead") {
+    const modifier = /אסטרטג/.test(title) ? "Strategic" : "";
+    const context = /ביקורת/.test(title) ? "Audit" : "";
+    baseTitle = [modifier, context, baseTitle].filter(Boolean).join(" ");
+  }
+
   const hasSeniorMarker = /בכיר(?:ה|ים|ות)?/.test(title);
   return hasSeniorMarker && !/^senior\b/i.test(baseTitle) ? `Senior ${baseTitle}` : baseTitle;
 }
