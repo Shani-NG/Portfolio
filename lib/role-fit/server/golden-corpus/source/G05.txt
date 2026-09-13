@@ -1,0 +1,42 @@
+Product Manager
+
+Tel Aviv, Israel
+R&D and Innovation Center
+
+Description
+
+We are looking for an experienced Technical Product Manager to lead the discovery, delivery, and evolution of AI-enabled and agentic products. You will combine strong product judgment with enough technical depth to make informed decisions about agent architecture, data, model performance, tool integrations, evaluation, and delivery trade-offs.
+
+Working closely with engineering, data science, design, and business teams, you will turn complex opportunities into secure, scalable, user-centred products that create measurable value. This role is ideal for a product leader who enjoys moving between customer needs, technical constraints, and business outcomes.
+
+In this role, you will
+
+* Lead the end-to-end lifecycle of AI-enabled and agentic products, from discovery to launch and continuous improvement.
+* Define product vision, strategy, roadmaps, and measurable business outcomes.
+* Collaborate with engineering and data science teams to deliver scalable, secure AI solutions and workflows.
+* Conduct customer and market research to identify opportunities and validate product directions.
+* Translate business needs into clear product requirements, user stories, and technical specifications.
+* Prioritize backlog and make data-driven trade-offs based on value, impact, and feasibility.
+* Define success metrics, quality standards, and evaluation frameworks for AI capabilities.
+* Partner with UX and engineering teams to deliver intuitive, production-ready products.
+* Monitor KPIs, user feedback, and product performance to drive adoption and continuous enhancement.
+* Communicate product strategy, progress, and outcomes to stakeholders and leadership.
+* Stay up to date with AI, machine learning, cloud, and product management trends.
+
+Requirements
+
+* 4+ years of product management experience, ideally with digital, data-driven, or AI-powered products.
+* Proven experience leading cross-functional teams including engineers, data scientists, designers, and business stakeholders.
+* Strong technical understanding of APIs, cloud services, data pipelines, integrations, and software development.
+* Solid knowledge of AI and GenAI concepts, including agents, RAG, evaluation, data quality, and Responsible AI.
+* Experience with agentic AI frameworks such as LangChain, LangGraph, Langfuse, or similar platforms.
+* Familiarity with secure AI system design, access controls, privacy, governance, and enterprise integrations.
+* Strong ability to translate complex business needs into clear product requirements and delivery plans.
+* Excellent analytical, prioritization, and communication skills.
+* Experience with Agile methodologies and tools such as Jira and Confluence.
+* Familiarity with AWS, Azure, or GCP is an advantage.
+* Bachelor’s degree in Computer Science, Engineering, Information Systems, Business, or a related field (or equivalent experience)
+
+Location: Tel Aviv, Hybrid
+
+We at Deloitte believe that diversity and inclusion among our people is a critical component of our success and that is why we cultivate an organizational culture that contains and embraces diversity in all its forms.

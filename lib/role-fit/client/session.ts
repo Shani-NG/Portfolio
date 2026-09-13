@@ -157,7 +157,7 @@ function normalizeRestoredState(input: {
 }): RoleFitLiveState {
   if (input.reportPayload) return "report-ready";
   if (input.state !== "generating-report") return input.state;
-  if (input.pendingReportId && (input.reportAttemptState?.attempts ?? 0) < 2) return "recoverable-error";
+  if (input.pendingReportId) return "recoverable-error";
   return "awaiting-report-confirmation";
 }
 
@@ -279,9 +279,13 @@ function readPersistedSession(): RoleFitLiveSession | null {
 
     const pendingReportId = typeof value.pendingReportId === "string" ? value.pendingReportId : null;
     const reportAttemptState = value.version === 2 ? sanitizeReportAttemptState(value.reportAttemptState) : null;
-    const pendingReportConfirmation = value.version === 2
+    const restoredGeneratingWithPendingReport = value.state === "generating-report" && Boolean(pendingReportId) && !reportPayload;
+    const persistedPendingReportConfirmation = value.version === 2
       ? Boolean(value.pendingReportConfirmation)
       : Boolean(pendingReportId && !reportPayload);
+    const pendingReportConfirmation = restoredGeneratingWithPendingReport
+      ? (reportAttemptState?.attempts ?? 0) < 2
+      : persistedPendingReportConfirmation;
     const state = normalizeRestoredState({
       state: value.state as RoleFitLiveState,
       reportPayload,

@@ -1,0 +1,44 @@
+## About the job
+
+Harmony is a cutting edge platform for building and deploying AI voice agents.
+
+We're a monday.com company, which means startup speed with enterprise reach.
+
+We're looking for a Senior Product Designer to join us in Tel Aviv. We're focused on creating a seamless and innovative experience for creating and optimizing the agents. Everything we design exists around it, how someone builds an agent, shapes how it thinks, hears what it said, corrects it, and learns to trust it with real customers and real revenue. Almost none of these patterns are settled. Most of them we're inventing.
+
+You'll work as an equal alongside Product and Engineering, owning problems end to end. This is a high-impact role for a designer who thrives on ambiguity, builds with AI tools rather than just designing for them, and knows how to make something complex feel simple and human.
+
+Full-time, hybrid: 3 days a week from the Tel Aviv office.
+
+**About The Role**
+
+- Own problems from a vague business goal through research, exploration, and shipped solution, leading decisions and defending them with reasoning, not waiting for direction.
+- Define and ship agent experiences that break open the black box: helping users understand what the agent did, why, and how to shape it.
+- Design the connective tissue between a voice conversation and the interface around it, configuration, review, handoff, and reporting.
+- Use coding agents and vibe-coding tools to take your own work to production, not just to prototype.
+- Partner with Product and Engineering to set strategic priorities for your domain.
+- Validate through research, experimentation, and real usage data.
+- Raise the craft bar and the people around you, push new processes, share what you learn.
+
+**Requirements**
+
+- 5+ years designing and shipping digital products, including 0→1 work.
+- High AI fluency with a proven track record using coding agents and vibe-coding tools (Cursor, Claude Code, and similar) to ship to production.
+- Strong portfolio of shipped products that drove real impact.
+- Exceptional interaction and visual craft. You turn complex problems into experiences that land emotionally, not just logically.
+- Systems thinking: you see how individual interactions add up to one coherent experience.
+- Experience working with and extending a design system.
+- Ability to thrive in a fast-paced, ambiguous environment.
+- Strong prioritization and organizational skills.
+- Excellent collaboration and communication; team-first mindset.
+- High level of written and spoken English.
+
+**Nice to have**
+
+- Experience designing conversational or agent-based interfaces.
+- Prior B2B SaaS or sales-tech experience.
+- A degree in visual communication from a leading academic institution.
+
+**Why this role**
+
+This isn't another design role on an established product. Voice agents are a genuinely new interface category, and almost none of the patterns are settled. You'd be one of the people deciding what they become with the reach of monday.com behind you and the freedom of a small team in front of you.
