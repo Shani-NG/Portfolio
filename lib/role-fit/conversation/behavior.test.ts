@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { RoleValidationResult } from "../contracts/index.ts";
 
 import {
+  createRoleSourceFingerprint,
   existingReportAnswer,
   genericRecoverableErrorAnswer,
   genericRoleTitleAnswer,
+  hasSameRoleSourceFingerprint,
   isReportConfirmationText,
   looksLikeReportMutationRequest,
   missingDetailsAnswer,
@@ -19,7 +22,29 @@ import {
   resolveConversationLanguage,
   roleFileErrorAnswer,
   roleSubmissionSetupAnswer,
+  shouldPreBlockReportAttempt,
 } from "./behavior.ts";
+
+function fingerprintRole(input: {
+  title?: string;
+  company?: string;
+  responsibilities?: string[];
+  requirements?: string[];
+}): RoleValidationResult["roleDraft"] {
+  const field = (originalValue: string) => ({
+    originalValue,
+    sourceRef: { sourceId: "test", kind: "user-text" as const },
+    confidence: "high" as const,
+    confirmed: true,
+  });
+  return {
+    ...(input.title ? { title: field(input.title) } : {}),
+    ...(input.company ? { company: field(input.company) } : {}),
+    responsibilities: (input.responsibilities ?? []).map(field),
+    requirements: (input.requirements ?? []).map(field),
+    preferredQualifications: [],
+  };
+}
 
 describe("Role Fit conversation behavior", () => {
   it("keeps a Hebrew conversation in Hebrew when an English JD is pasted", () => {
@@ -141,14 +166,54 @@ describe("Role Fit conversation behavior", () => {
   });
 
   it("provides contextual deterministic copy without generic chatbot filler", () => {
-    assert.match(roleSubmissionSetupAnswer("he"), /אין צורך לסדר אותו במיוחד/);
-    assert.match(roleSubmissionSetupAnswer("en"), /does not need to be specially formatted/);
+    assert.equal(
+      roleSubmissionSetupAnswer("he"),
+      "אפשר להעלות קובץ או להדביק כאן את תיאור המשרה.\n\nכדי שאוכל לבדוק התאמה, חשוב שיופיעו:\n- שם המשרה\n- תחומי האחריות המרכזיים\n- הדרישות או הכישורים המרכזיים\n\nשם החברה עוזר אם הוא מופיע, אבל אינו חובה.\nאם יחסר פרט מהותי, אבקש רק אותו.",
+    );
+    assert.equal(
+      roleSubmissionSetupAnswer("en"),
+      "You can upload a file or paste the job description here.\n\nTo assess the fit, please make sure it includes:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\n\nThe company name is helpful if included, but it is not required.\nIf an essential detail is missing, I’ll ask only for that.",
+    );
     assert.match(existingReportAnswer("en"), /active report/);
     assert.match(reportLimitAnswer("en"), /active report/);
     assert.match(reportLimitAnswer("he"), /הדוח הפעיל/);
     assert.doesNotMatch(reportLimitAnswer("en"), /session/i);
     assert.doesNotMatch(reportLimitAnswer("he"), /סשן/);
     assert.doesNotMatch(reportLimitAnswer("en"), /sorry/i);
+  });
+
+  it("fingerprints only complete source-backed title, responsibilities, and requirements", () => {
+    const role = fingerprintRole({
+      company: "Company A",
+      title: "Senior Product Manager",
+      responsibilities: ["Lead discovery", "Partner with Engineering"],
+      requirements: ["5+ years of product experience", "Strong systems thinking"],
+    });
+    const sameRoleWithDifferentCompany = fingerprintRole({
+      company: "Company B",
+      title: " senior product manager ",
+      responsibilities: ["Partner with Engineering!", "Lead discovery."],
+      requirements: ["Strong systems thinking", "5+ years of product experience"],
+    });
+    const differentRole = fingerprintRole({
+      title: "Senior Product Manager",
+      responsibilities: ["Lead discovery", "Partner with Engineering"],
+      requirements: ["Production TypeScript experience", "Strong systems thinking"],
+    });
+
+    assert.ok(createRoleSourceFingerprint(role));
+    assert.equal(hasSameRoleSourceFingerprint(role, sameRoleWithDifferentCompany), true);
+    assert.equal(hasSameRoleSourceFingerprint(role, differentRole), false);
+    assert.equal(createRoleSourceFingerprint(fingerprintRole({ title: "Product Manager" })), null);
+  });
+
+  it("pre-blocks structurally admitted roles at the report limit without blocking ordinary Q&A", () => {
+    const atLimit = { completedReportCount: 2, maxReportsPerSession: 2, hasActiveReport: true };
+    assert.equal(shouldPreBlockReportAttempt({ ...atLimit, hasStructuralRoleInput: true, hasReportIntent: false, looksLikeNewReport: false }), true);
+    assert.equal(shouldPreBlockReportAttempt({ ...atLimit, hasStructuralRoleInput: false, hasReportIntent: false, looksLikeNewReport: false }), false);
+    assert.equal(shouldPreBlockReportAttempt({ ...atLimit, hasStructuralRoleInput: false, hasReportIntent: true, looksLikeNewReport: false }), false);
+    assert.equal(shouldPreBlockReportAttempt({ ...atLimit, hasStructuralRoleInput: false, hasReportIntent: true, looksLikeNewReport: true }), true);
+    assert.equal(shouldPreBlockReportAttempt({ ...atLimit, completedReportCount: 1, hasStructuralRoleInput: true, hasReportIntent: true, looksLikeNewReport: true }), false);
   });
 
   it("keeps report transition copy conversational and free of internal terminology", () => {

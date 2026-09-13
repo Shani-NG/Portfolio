@@ -3,7 +3,7 @@
 import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { RoleFitReportProgress } from "@/components/role-fit/role-fit-report-progress";
-import { appendRoleFitMessage, consumePendingHomeRoleFitInput, resetRoleFitAnalysis, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import { appendRoleFitMessage, consumePendingHomeRoleFitInput, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
 import {
   genericRecoverableErrorAnswer,
   isHebrewLanguage,
@@ -548,20 +548,6 @@ export default function RoleFitPage() {
       });
   }
 
-  function startNewAnalysis() {
-    const nextSession = resetRoleFitAnalysis();
-    setLiveSession(nextSession);
-    setLiveReportState(null);
-    setApiStatusMessage("");
-    setErrorContext(null);
-    setIsAgentUnavailable(false);
-    setIsReportRequestInFlight(false);
-    reportRequestInFlightRef.current = false;
-    reportAttemptRef.current = null;
-    setRoleInput("");
-    setActivePane("chat");
-  }
-
   const chatMessages = liveSession.messages;
 
   return (
@@ -604,7 +590,7 @@ export default function RoleFitPage() {
 
           <div className={styles.chatBoxContainer}>
             <textarea
-              placeholder="Paste role details using labels: Company:, Title:, Description:, Responsibilities:, Requirements:"
+              placeholder="Paste a job description or ask about my work."
               aria-label="Role Fit message"
               disabled={isAgentUnavailable}
               value={roleInput}
@@ -658,7 +644,7 @@ export default function RoleFitPage() {
 
             <div className={styles.chatBoxContainer}>
               <textarea
-                placeholder="Paste or refine role details using labels: Company:, Title:, Description:, Responsibilities:, Requirements:"
+                placeholder="Paste another job description or ask a follow-up question."
                 aria-label="Role Fit follow-up"
                 disabled={isAgentUnavailable}
                 value={roleInput}
@@ -697,7 +683,6 @@ export default function RoleFitPage() {
               ) : (
                 activeReport ? (
                   <RoleFitLiveReport
-                    onStartNewAnalysis={startNewAnalysis}
                     onOpenEvidenceItemIdsChange={(expandedEvidenceItemIds) => syncLiveSession({ expandedEvidenceItemIds })}
                     openEvidenceItemIds={liveSession.expandedEvidenceItemIds}
                     report={activeReport}

@@ -290,7 +290,22 @@ describe("Task C evidence and report integrity", () => {
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.report.overallFitVisual.mode, "insufficient");
+    assert.equal("fitVisualValue" in result.report.overallFitVisual, false);
     assert.equal(result.report.requirementMapping.items[0]?.matchType, "insufficient-evidence");
+  });
+
+  it("keeps out-of-scope reports non-numeric", () => {
+    const result = composeReportUIPayload({
+      analysis: analysis({ fitLevel: "out-of-scope" }),
+      roleDraft: roleDraft(),
+      evidence,
+      language: "en",
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.report.overallFitVisual.mode, "out-of-scope");
+    assert.equal("fitVisualValue" in result.report.overallFitVisual, false);
   });
 
   it("keeps the canonical title separate while rendering the English report display title", () => {

@@ -39,10 +39,53 @@ type CompositionResult =
   | { ok: false; diagnostic: string };
 
 const fitPresentation = {
-  strong: { value: 82, illustrationKey: "fit-strong", colorToken: "fit.strong", label: "Strong fit" },
-  good: { value: 68, illustrationKey: "fit-good", colorToken: "fit.good", label: "Good fit" },
-  partial: { value: 45, illustrationKey: "fit-partial", colorToken: "fit.partial", label: "Partial fit" },
+  strong: { illustrationKey: "fit-strong", colorToken: "fit.strong", label: "Strong fit" },
+  good: { illustrationKey: "fit-good", colorToken: "fit.good", label: "Good fit" },
+  partial: { illustrationKey: "fit-partial", colorToken: "fit.partial", label: "Partial fit" },
 } as const;
+
+type VisibleFitLevel = keyof typeof fitPresentation;
+
+export const fitVisualBands = {
+  partial: { min: 50, max: 77 },
+  good: { min: 78, max: 92 },
+  strong: { min: 93, max: 97 },
+} as const;
+
+const importanceWeights: Record<ReportItem["importance"], number> = {
+  "must-have": 3,
+  core: 2,
+  supporting: 1,
+};
+
+const evidenceConfidenceMultipliers: Record<ReportItem["evidenceConfidence"], number> = {
+  high: 1,
+  medium: 0.85,
+  low: 0.65,
+  insufficient: 0,
+};
+
+function matchContribution(item: Pick<ReportItem, "matchType" | "clusterIds">) {
+  if (item.matchType === "direct") return 1;
+  if (item.matchType === "semantic") return 0.9;
+  if (item.matchType === "transferable") return 0.75;
+  if (item.matchType === "partial" && item.clusterIds.length > 0) return 0.4;
+  return 0;
+}
+
+export function calculateFitVisualValue(
+  fitLevel: VisibleFitLevel,
+  items: ReadonlyArray<Pick<ReportItem, "importance" | "matchType" | "evidenceConfidence" | "clusterIds">>,
+) {
+  const totalImportance = items.reduce((total, item) => total + importanceWeights[item.importance], 0);
+  const weightedSupport = items.reduce((total, item) => {
+    const importance = importanceWeights[item.importance];
+    return total + importance * matchContribution(item) * evidenceConfidenceMultipliers[item.evidenceConfidence];
+  }, 0);
+  const supportRatio = totalImportance > 0 ? Math.min(1, Math.max(0, weightedSupport / totalImportance)) : 0;
+  const band = fitVisualBands[fitLevel];
+  return Math.round(band.min + supportRatio * (band.max - band.min));
+}
 
 const positiveMatchTypes = new Set<AnalysisItem["matchType"]>(["direct", "semantic", "transferable"]);
 const limitationMatchTypes = new Set<AnalysisItem["matchType"]>(["partial", "real-gap"]);
@@ -523,7 +566,7 @@ export function composeReportUIPayload(input: {
     : {
         mode: "fit" as const,
         level: fitLevel,
-        fitVisualValue: fitPresentation[fitLevel].value,
+        fitVisualValue: calculateFitVisualValue(fitLevel, reportItems),
         illustrationKey: fitPresentation[fitLevel].illustrationKey,
         colorToken: fitPresentation[fitLevel].colorToken,
         label: fitPresentation[fitLevel].label,
@@ -569,7 +612,7 @@ export function composeReportUIPayload(input: {
     keyGaps: { items: gaps },
     disclaimer: {
       copyKey: "report.disclaimer.v1",
-      text: "This qualitative report is based on the submitted role description and approved portfolio evidence. It is not an ATS decision, does not replace human judgment, and the visual fit indicator is not a literal numeric score.",
+      text: "This qualitative report is based on the submitted role description and approved portfolio evidence. The FIT value is an evidence-calibrated indicator within the qualitative result; it is not a percentage, hiring probability, or prediction of success, and it does not replace human judgment.",
     },
     contactCta: {
       variant: fitLevel,

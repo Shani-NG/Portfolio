@@ -34,20 +34,11 @@ function roleFitCaseStudyHref(href: string) {
   return `${pathAndQuery}${separator}source=role-fit-report${hash ? `#${hash}` : ""}`;
 }
 
-function coverageCounts(report: ReportUIPayload) {
-  const coverage = report.skillsMatch.visualCoverage;
-  if (coverage.mode === "traceable-count") return coverage;
-  const matchedCount = report.requirementMapping.items.filter((item) =>
-    ["direct", "semantic", "transferable"].includes(item.matchType) && item.clusterIds.length > 0,
-  ).length;
-  return { matchedCount, totalCount: report.requirementMapping.items.length };
-}
-
 function optionalValue(value: string) {
   return value || "Not provided";
 }
 
-function Stat({ icon, label, tone, value }: { icon: string; label: string; tone: "success" | "purple" | "pink" | "gold"; value: string }) {
+function Stat({ icon, label, tone, value }: { icon: string; label: string; tone: "pink" | "gold"; value: string }) {
   const toneClass = `stat${tone[0].toUpperCase()}${tone.slice(1)}` as keyof typeof styles;
   return (
     <div className={`${styles.stat} ${styles[toneClass]}`}>
@@ -74,7 +65,7 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
     return (
       <section className={`${styles.card} ${styles.fitCard} ${styles.limitedFit}`} aria-labelledby="fit-summary-title">
         <MaterialIcon className={styles.limitedIcon} name={fit.mode === "insufficient" ? "search_off" : "outbound"} />
-        <span className={styles.eyebrow}>Role Fit Result</span>
+        <span className={styles.eyebrow}>FIT</span>
         <h2 id="fit-summary-title">{fit.label}</h2>
       </section>
     );
@@ -87,9 +78,9 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
 
   return (
     <section className={`${styles.card} ${styles.fitCard}`} aria-labelledby="fit-summary-title">
-      <span className={styles.eyebrow}>Role Fit Result</span>
+      <span className={styles.eyebrow}>FIT</span>
       <span className={styles.fitBadge}>{fit.label}</span>
-      <div className={styles.ring} style={ringStyle} aria-label={fit.label}>
+      <div className={styles.ring} style={ringStyle} aria-label={`${fit.label}, FIT ${fit.fitVisualValue}`}>
         <svg viewBox="0 0 120 120" aria-hidden="true">
           <circle className={styles.ringTrack} cx="60" cy="60" r="52" />
           <circle className={styles.ringValue} cx="60" cy="60" r="52" />
@@ -97,6 +88,7 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
         <div className={styles.ringCenter}>
           <Image alt="" aria-hidden="true" fill priority sizes="104px" src={fitAssets[fit.illustrationKey]} />
         </div>
+        <strong className={styles.fitValue} aria-hidden="true">{fit.fitVisualValue}</strong>
       </div>
       <h2 id="fit-summary-title">Core Matching Skills</h2>
       <p className={styles.skillsSubtitle}>The strongest capabilities supporting this fit.</p>
@@ -111,8 +103,6 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
 
 function ProfileCard({ report }: { report: ReportUIPayload }) {
   const location = [report.roleSnapshot.location, report.roleSnapshot.workModel].filter(Boolean).join(" | ");
-  const coverage = coverageCounts(report);
-  const coveragePercent = coverage.totalCount > 0 ? Math.round((coverage.matchedCount / coverage.totalCount) * 100) : 0;
   const experience = "12+ years";
 
   return (
@@ -123,8 +113,6 @@ function ProfileCard({ report }: { report: ReportUIPayload }) {
       <div className={styles.profileDetails}>
         <p className={styles.profileSummary}>{report.overallFitVisual.rationale}</p>
         <div className={styles.stats}>
-          <Stat icon="verified" label="Verified Requirements" tone="success" value={`${coverage.matchedCount} / ${coverage.totalCount}`} />
-          <Stat icon="psychology" label="Core Skills Coverage" tone="purple" value={`${coveragePercent}%`} />
           <Stat icon="location_on" label="Location & Work Model" tone="pink" value={optionalValue(location)} />
           <Stat icon="workspace_premium" label="Relevant Experience" tone="gold" value={experience} />
         </div>
@@ -300,12 +288,10 @@ function ListCard({ title, tone, items, wide = false }: { title: string; tone: "
 
 export function RoleFitLiveReport({
   report,
-  onStartNewAnalysis,
   openEvidenceItemIds,
   onOpenEvidenceItemIdsChange,
 }: {
   report: ReportUIPayload;
-  onStartNewAnalysis: () => void;
   openEvidenceItemIds: string[] | null;
   onOpenEvidenceItemIdsChange: (itemIds: string[]) => void;
 }) {
@@ -324,7 +310,6 @@ export function RoleFitLiveReport({
         </div>
         <div className={styles.headerActions}>
           <span className={styles.outcomeBadge}>{report.overallFitVisual.label}</span>
-          <button className={styles.newAnalysisButton} onClick={onStartNewAnalysis} type="button">Start new analysis</button>
         </div>
       </header>
 
