@@ -38,7 +38,7 @@ function optionalValue(value: string) {
   return value || "Not provided";
 }
 
-function Stat({ icon, label, tone, value }: { icon: string; label: string; tone: "pink" | "gold"; value: string }) {
+function Stat({ icon, label, tone, value }: { icon: string; label: string; tone: "success" | "purple" | "pink" | "gold"; value: string }) {
   const toneClass = `stat${tone[0].toUpperCase()}${tone.slice(1)}` as keyof typeof styles;
   return (
     <div className={`${styles.stat} ${styles[toneClass]}`}>
@@ -88,7 +88,6 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
         <div className={styles.ringCenter}>
           <Image alt="" aria-hidden="true" fill priority sizes="104px" src={fitAssets[fit.illustrationKey]} />
         </div>
-        <strong className={styles.fitValue} aria-hidden="true">{fit.fitVisualValue}</strong>
       </div>
       <h2 id="fit-summary-title">Core Matching Skills</h2>
       <p className={styles.skillsSubtitle}>The strongest capabilities supporting this fit.</p>
@@ -103,6 +102,7 @@ function FitSummary({ report }: { report: ReportUIPayload }) {
 
 function ProfileCard({ report }: { report: ReportUIPayload }) {
   const location = [report.roleSnapshot.location, report.roleSnapshot.workModel].filter(Boolean).join(" | ");
+  const fitValue = report.overallFitVisual.mode === "fit" ? String(report.overallFitVisual.fitVisualValue) : "Not provided";
   const experience = "12+ years";
 
   return (
@@ -113,6 +113,8 @@ function ProfileCard({ report }: { report: ReportUIPayload }) {
       <div className={styles.profileDetails}>
         <p className={styles.profileSummary}>{report.overallFitVisual.rationale}</p>
         <div className={styles.stats}>
+          <Stat icon="verified" label="FIT" tone="success" value={fitValue} />
+          <Stat icon="psychology" label="Requirements Assessed" tone="purple" value={String(report.requirementMapping.items.length)} />
           <Stat icon="location_on" label="Location & Work Model" tone="pink" value={optionalValue(location)} />
           <Stat icon="workspace_premium" label="Relevant Experience" tone="gold" value={experience} />
         </div>

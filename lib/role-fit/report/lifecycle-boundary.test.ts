@@ -6,13 +6,19 @@ import { describe, test } from "node:test";
 const projectRoot = process.cwd();
 
 describe("Role Fit report lifecycle boundary", () => {
-  test("renders one non-percentage FIT value and removes requirement-count presentation", async () => {
+  test("renders profile stats without percentage or matched-count presentation", async () => {
     const report = await readFile(join(projectRoot, "components", "role-fit", "role-fit-live-report.tsx"), "utf8");
 
     assert.match(report, />FIT<\/span>/);
-    assert.match(report, /\{fit\.fitVisualValue\}/);
-    assert.doesNotMatch(report, /Verified Requirements|Core Skills Coverage|coveragePercent|coverageCounts/);
+    assert.match(report, /const fitValue = report\.overallFitVisual\.mode === "fit" \? String\(report\.overallFitVisual\.fitVisualValue\) : "Not provided"/);
+    assert.match(report, /label="FIT"[\s\S]{0,120}value=\{fitValue\}/);
+    assert.match(report, /label="Requirements Assessed"[\s\S]{0,140}value=\{String\(report\.requirementMapping\.items\.length\)\}/);
+    assert.match(report, /label="Location & Work Model"/);
+    assert.match(report, /label="Relevant Experience"/);
+    assert.doesNotMatch(report, /Verified Requirements|Core Skills Coverage|coveragePercent|coverageCounts|matchedCount/);
+    assert.doesNotMatch(report, /className=\{styles\.fitValue\}|styles\.fitValue/);
     assert.doesNotMatch(report, /fitVisualValue\}\s*%|FIT percentage|Fit percentage/i);
+    assert.doesNotMatch(report, /matchedCount\}\s*\/|items\.length\}\s*\/|\$\{coverage/);
 
     const composer = await readFile(join(projectRoot, "lib", "role-fit", "report", "compose-report.ts"), "utf8");
     assert.match(composer, /FIT value is an evidence-calibrated indicator within the qualitative result/);

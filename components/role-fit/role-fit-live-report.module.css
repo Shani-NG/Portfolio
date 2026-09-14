@@ -167,15 +167,6 @@
   transform: scale(1.38);
 }
 
-.fitValue {
-  color: var(--ds-color-text-primary);
-  font-family: var(--ds-font-family-display);
-  font-size: var(--ds-type-heading-28-size);
-  line-height: 1;
-  position: absolute;
-  z-index: 1;
-}
-
 .fitCard h2 {
   font-family: var(--ds-font-family-display);
   font-size: var(--ds-type-heading-18-size);
