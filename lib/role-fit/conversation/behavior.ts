@@ -40,10 +40,16 @@ function fieldQuestion(field: ConversationRoleField | undefined, language: "he" 
 
 export function isReportConfirmationText(value: string) {
   const normalized = value.trim().toLowerCase().replace(/[.!?…]+$/u, "").trim();
+  const correctionOrNegation = /\b(?:no|not\s+yet|wait|but|before\s+you\s+continue|change|correct(?:ion)?|wrong|missing)\b|(?:לא\s+עדיין|לא|חכי|רגע|אבל|לפני\s+זה|תשני|שנה|תיקון|לא\s+נכו(?:ן|נה)|חסר(?:ה|ה)?)/i;
+  if (correctionOrNegation.test(normalized)) return false;
+
   const explicitReportAction = /^(?:(?:please|can you|could you|let's|lets)\s+)?(?:generate(?:\s+(?:the|this))?\s+report(?:\s+again)?|create(?:\s+(?:the|this))?\s+report|try\s+again|retry(?:\s+(?:the|this))?\s*report?|run(?:\s+(?:it|the report|report))?\s+again|start(?:\s+generating)?\s+(?:the\s+)?report)$/i;
   if (explicitReportAction.test(normalized)) return true;
   if (/^(?:תנסי שוב|נסה שוב|ניסיון נוסף|אפשר לנסות שוב)$/.test(normalized)) return true;
-  return /^(yes|yep|sure|ok|okay|go ahead|generate|continue|confirm|great|nice|sounds good|יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך)$/i.test(normalized);
+  const englishAffirmative = /^(?:yes|yep|sure|ok|okay|great|nice|sounds good|looks right)(?:\s*,?\s*(?:please(?:\s*,?\s*(?:go ahead|continue|proceed|generate(?:\s+(?:the|this))?\s+report|create(?:\s+(?:the|this))?\s+report))?|go ahead|continue|proceed|generate(?:\s+(?:the|this))?\s+report|create(?:\s+(?:the|this))?\s+report))?$/i;
+  const hebrewAffirmative = /^(?:יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך|נשמע\s+נכון)(?:\s*,?\s*(?:קדימה|בואי\s+נמשיך|אפשר\s+להמשיך|תמשיכי|תכיני(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)|תייצרי(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)))?$/;
+  return englishAffirmative.test(normalized) || hebrewAffirmative.test(normalized)
+    || /^(?:go ahead|generate|continue|confirm)$/.test(normalized);
 }
 
 function fieldLabel(field: ConversationRoleField, language: "he" | "en" | "mixed") {

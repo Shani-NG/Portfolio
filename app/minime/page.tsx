@@ -176,7 +176,11 @@ export default function RoleFitPage() {
     });
   }
 
-  async function submitLiveMessage(textOverride?: string, sessionOverride?: RoleFitLiveSession) {
+  async function submitLiveMessage(
+    textOverride?: string,
+    sessionOverride?: RoleFitLiveSession,
+    options?: { appendUserMessage?: boolean; revalidateRoleContext?: boolean },
+  ) {
     const currentSession = resolveCanonicalSession(sessionOverride ?? liveSession);
     const submittedText = (textOverride ?? roleInput).trim();
     if (!submittedText || isSending || isAgentUnavailable) return;
@@ -199,13 +203,20 @@ export default function RoleFitPage() {
     const messageForAgent = submittedText;
     const activeLanguage = resolveConversationLanguage(submittedText, currentSession.activeLanguage);
 
-    const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
+    const sessionAfterUser = options?.appendUserMessage === false
+      ? currentSession
+      : appendLiveMessage({ role: "user", content: submittedText });
     setRoleInput("");
     setIsSending(true);
     setApiStatusMessage("");
     setLiveReportState(null);
+    const inFlightState = currentSession.reportPayload
+      ? "report-ready"
+      : currentSession.state === "awaiting-role-completion" || currentSession.state === "awaiting-report-confirmation"
+        ? currentSession.state
+        : "general-qa";
     syncLiveSession({
-      state: currentSession.reportPayload ? "report-ready" : "general-qa",
+      state: inFlightState,
       draftInput: "",
       activeLanguage,
     });
@@ -222,7 +233,8 @@ export default function RoleFitPage() {
           message: messageForAgent,
           language: activeLanguage,
           repeatedInput,
-          roleCollectionActive: currentSession.state === "awaiting-role-completion" && !currentSession.reportPayload,
+          roleCollectionActive: Boolean(currentSession.activeRoleDraft) && !currentSession.reportPayload,
+          revalidateRoleContext: options?.revalidateRoleContext ?? false,
           clarificationAttempts: currentSession.clarificationAttempts,
           completedReportCount: currentSession.completedReportCount,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)).slice(-12000),
@@ -256,9 +268,11 @@ export default function RoleFitPage() {
         activeRoleDraft: returnedRoleDraft ?? currentSession.activeRoleDraft,
         pendingRoleField: result.pendingField !== undefined ? result.pendingField : currentSession.pendingRoleField,
         pendingReportConfirmation: nextState === "awaiting-report-confirmation",
-        clarificationAttempts: nextState === "awaiting-role-completion" && !result.clarificationExhausted
-          ? currentSession.clarificationAttempts + 1
-          : 0,
+        clarificationAttempts: result.preserveClarificationAttempts
+          ? currentSession.clarificationAttempts
+          : nextState === "awaiting-role-completion" && !result.clarificationExhausted
+            ? currentSession.clarificationAttempts + 1
+            : 0,
         activeLanguage,
         ...(beginsRoleAnalysis ? {
           reportPayload: null,
@@ -299,23 +313,24 @@ export default function RoleFitPage() {
       return;
     }
     if (!reportSession.pendingReportConfirmation || !hasRoleDraftContent(reportSession.activeRoleDraft)) {
-      const guidance = reportSession.pendingRoleField
-        ? missingDetailsAnswer({
-            missingField: reportSession.pendingRoleField,
-            language: reportSession.activeLanguage,
-            repeatedInput: true,
-          })
-        : hasRoleDraftContent(reportSession.activeRoleDraft)
-          ? missingDetailsAnswer({
-              missingField: "title",
-              missingFields: ["title", "responsibilities", "requirements"],
-              language: reportSession.activeLanguage,
-              repeatedInput: true,
-            })
-          : roleSubmissionSetupAnswer(reportSession.activeLanguage);
+      if (hasRoleDraftContent(reportSession.activeRoleDraft)) {
+        reportRequestInFlightRef.current = true;
+        setIsReportRequestInFlight(true);
+        try {
+          await submitLiveMessage("Generate report", reportSession, {
+            appendUserMessage: false,
+            revalidateRoleContext: true,
+          });
+        } finally {
+          reportRequestInFlightRef.current = false;
+          setIsReportRequestInFlight(false);
+        }
+        return;
+      }
+
       appendLiveMessage({
         role: "agent",
-        content: guidance,
+        content: roleSubmissionSetupAnswer(reportSession.activeLanguage),
       });
       syncLiveSession({ state: "awaiting-role-completion", pendingReportConfirmation: false });
       return;
