@@ -174,9 +174,52 @@ describe("Role Fit runtime conversation contract", () => {
       readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8"),
     ]);
 
-    assert.match(page, /roleCollectionActive: currentSession\.state === "awaiting-role-completion"/);
+    assert.match(page, /roleCollectionActive: Boolean\(currentSession\.activeRoleDraft\) && !currentSession\.reportPayload/);
     assert.match(route, /shouldValidateRoleCollectionMessage\(\{/);
     assert.match(route, /roleCollectionActive: parsedRequest\.data\.roleCollectionActive/);
+  });
+
+  it("preserves an active role workflow while a chat request is in flight", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+    const inFlightTransition = page.slice(
+      page.indexOf("const inFlightState"),
+      page.indexOf("try {", page.indexOf("const inFlightState")),
+    );
+
+    assert.match(inFlightTransition, /awaiting-role-completion/);
+    assert.match(inFlightTransition, /awaiting-report-confirmation/);
+    assert.match(inFlightTransition, /state: inFlightState/);
+    assert.doesNotMatch(inFlightTransition, /state: currentSession\.reportPayload \? "report-ready" : "general-qa"/);
+  });
+
+  it("routes an uncertain report action through canonical server revalidation", async () => {
+    const [page, route] = await Promise.all([
+      readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8"),
+      readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8"),
+    ]);
+    const requestReport = page.slice(page.indexOf("async function requestReport"), page.indexOf("setApiStatusMessage", page.indexOf("async function requestReport")));
+
+    assert.match(requestReport, /submitLiveMessage\("Generate report", reportSession/);
+    assert.match(requestReport, /appendUserMessage: false/);
+    assert.match(requestReport, /revalidateRoleContext: true/);
+    assert.doesNotMatch(requestReport, /missingFields: \["title", "responsibilities", "requirements"\]/);
+    assert.match(route, /revalidateRoleContext: z\.boolean\(\)\.optional\(\)\.default\(false\)/);
+    assert.match(route, /\|\| parsedRequest\.data\.revalidateRoleContext/);
+  });
+
+  it("keeps a side conversation attached to the same unresolved role", async () => {
+    const [page, route] = await Promise.all([
+      readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8"),
+      readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8"),
+    ]);
+    const preservedResponse = route.slice(route.indexOf("const preservedRoleValidation"));
+
+    assert.match(route, /isPotentialFieldClarification[\s\S]*isValidRoleClarificationAnswer/);
+    assert.match(preservedResponse, /roleDraft: roleContext\.roleDraft/);
+    assert.match(preservedResponse, /"awaiting-role-completion"/);
+    assert.match(preservedResponse, /"awaiting-report-confirmation"/);
+    assert.match(preservedResponse, /preserveClarificationAttempts: true/);
+    assert.match(page, /result\.preserveClarificationAttempts[\s\S]*currentSession\.clarificationAttempts/);
   });
 
   it("stores a first-message standalone title before collecting the remaining role details", async () => {
@@ -210,7 +253,7 @@ describe("Role Fit runtime conversation contract", () => {
     const route = await readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8");
     const rejectionBranch = route.slice(
       route.indexOf("if (roleContext && isTitleRejection)"),
-      route.indexOf("if (roleContext && pendingRoleField && isFieldClarification"),
+      route.indexOf("if (roleContext && pendingRoleField && isPotentialFieldClarification"),
     );
     const clarificationFlow = route.slice(
       route.indexOf("currentRoleDraft && pendingRoleField && isFieldClarification"),

@@ -91,9 +91,14 @@ describe("Role Fit conversation behavior", () => {
     assert.match(answer, /does not determine the fit result/);
   });
 
-  it("accepts short confirmations with normal punctuation", () => {
+  it("accepts representative natural confirmations with normal punctuation", () => {
     assert.equal(isReportConfirmationText("Yes!"), true);
     assert.equal(isReportConfirmationText("כן."), true);
+    assert.equal(isReportConfirmationText("כן תכיני לי דוח"), true);
+    assert.equal(isReportConfirmationText("מעולה, קדימה"), true);
+    assert.equal(isReportConfirmationText("yes please"), true);
+    assert.equal(isReportConfirmationText("sounds good, go ahead"), true);
+    assert.equal(isReportConfirmationText("yes please, generate the report"), true);
     assert.equal(isReportConfirmationText("Please generate the report again"), true);
     assert.equal(isReportConfirmationText("let's try again"), true);
     assert.equal(isReportConfirmationText("retry the report"), true);
@@ -103,6 +108,13 @@ describe("Role Fit conversation behavior", () => {
     assert.equal(isReportConfirmationText("אפשר לנסות שוב"), true);
     assert.equal(isReportConfirmationText("not yet"), false);
     assert.equal(isReportConfirmationText("continue exploring the portfolio"), false);
+  });
+
+  it("gives correction and negation precedence over an affirmative", () => {
+    assert.equal(isReportConfirmationText("כן, אבל הכותרת לא נכונה"), false);
+    assert.equal(isReportConfirmationText("yes, but change the title"), false);
+    assert.equal(isReportConfirmationText("לא עדיין"), false);
+    assert.equal(isReportConfirmationText("wait"), false);
   });
 
   it("requests explicit report confirmation after role completion", () => {

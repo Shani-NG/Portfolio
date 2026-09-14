@@ -53,6 +53,7 @@ const requestSchema = z
     language: z.enum(["he", "en", "mixed"]).default("en"),
     repeatedInput: z.boolean().optional().default(false),
     roleCollectionActive: z.boolean().optional().default(false),
+    revalidateRoleContext: z.boolean().optional().default(false),
     clarificationAttempts: z.number().int().nonnegative().max(10).optional().default(0),
     completedReportCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional().default(0),
     conversationContext: z.string().max(12_000).optional(),
@@ -131,7 +132,16 @@ export async function POST(request: Request) {
     roleCollectionActive: parsedRequest.data.roleCollectionActive,
   });
   const pendingRoleField = roleContext?.pendingField;
-  const isFieldClarification = Boolean(roleContext && shouldTreatAsRoleClarification(pendingRoleField, parsedRequest.data.message));
+  const isPotentialFieldClarification = Boolean(
+    roleContext
+    && !parsedRequest.data.revalidateRoleContext
+    && shouldTreatAsRoleClarification(pendingRoleField, parsedRequest.data.message),
+  );
+  const isFieldClarification = Boolean(
+    isPotentialFieldClarification
+    && pendingRoleField
+    && isValidRoleClarificationAnswer(pendingRoleField, parsedRequest.data.message),
+  );
   const isTitleRejection = Boolean(roleContext && isRoleTitleRejection(parsedRequest.data.message));
   const roleCorrection = roleContext && !pendingRoleField
     ? detectRoleCorrection(parsedRequest.data.message)
@@ -175,7 +185,7 @@ export async function POST(request: Request) {
     });
   }
 
-  if (roleContext && pendingRoleField && isFieldClarification && !isValidRoleClarificationAnswer(pendingRoleField, parsedRequest.data.message)) {
+  if (roleContext && pendingRoleField && isPotentialFieldClarification && !isFieldClarification) {
     if (pendingRoleField === "title" && referencesPreviouslyProvidedTitle(parsedRequest.data.message)) {
       return NextResponse.json({
         state: "awaiting-role-completion",
@@ -198,21 +208,6 @@ export async function POST(request: Request) {
       });
     }
 
-    const clarificationExhausted = parsedRequest.data.clarificationAttempts + 1 >= maxRoleClarificationAttempts;
-    return NextResponse.json({
-      state: "awaiting-role-completion",
-      answer: clarificationExhausted
-        ? clarificationLimitAnswer(parsedRequest.data.language)
-        : missingDetailsAnswer({
-            missingField: pendingRoleField,
-            language: parsedRequest.data.language,
-            repeatedInput: false,
-          }),
-      roleDraft: roleContext.roleDraft,
-      pendingField: clarificationExhausted ? null : pendingRoleField,
-      clarificationExhausted,
-      safeMessageKey: "role.invalid_clarification",
-    });
   }
 
   const currentRoleDraft = roleContext?.roleDraft;
@@ -264,7 +259,13 @@ export async function POST(request: Request) {
     });
   }
 
-  if (hasRoleInput || isFieldClarification || isRoleCorrection || (!parsedRequest.data.reportContext && hasReportIntent)) {
+  if (
+    hasRoleInput
+    || isFieldClarification
+    || isRoleCorrection
+    || parsedRequest.data.revalidateRoleContext
+    || (!parsedRequest.data.reportContext && hasReportIntent)
+  ) {
     const validation = validateStructuredRoleDraft({
       conversationId,
       traceId,
@@ -324,7 +325,8 @@ export async function POST(request: Request) {
       }),
     );
 
-    const clarificationExhausted = parsedRequest.data.clarificationAttempts + 1 >= maxRoleClarificationAttempts;
+    const clarificationExhausted = !parsedRequest.data.revalidateRoleContext
+      && parsedRequest.data.clarificationAttempts + 1 >= maxRoleClarificationAttempts;
 
     return NextResponse.json({
       state: "awaiting-role-completion",
@@ -340,6 +342,7 @@ export async function POST(request: Request) {
       roleDraft: validation.roleDraft,
       pendingField: clarificationExhausted ? null : missingField,
       clarificationExhausted,
+      preserveClarificationAttempts: parsedRequest.data.revalidateRoleContext,
       safeMessageKey: "role.missing_required_fields",
     });
   }
@@ -399,10 +402,30 @@ export async function POST(request: Request) {
     );
   }
 
+  const preservedRoleValidation = roleContext && !parsedRequest.data.reportContext
+    ? validateStructuredRoleDraft({
+        conversationId,
+        traceId,
+        roleDraft: roleContext.roleDraft,
+        detectedLanguage: parsedRequest.data.language,
+      })
+    : null;
+
   return NextResponse.json({
-    state: "general-qa",
+    state: preservedRoleValidation
+      ? preservedRoleValidation.parseStatus === "valid-complete"
+        ? "awaiting-report-confirmation"
+        : "awaiting-role-completion"
+      : "general-qa",
     provider: modelResult.provider,
     model: modelResult.model,
     answer: modelResult.answer,
+    ...(preservedRoleValidation ? {
+      roleDraft: preservedRoleValidation.roleDraft,
+      pendingField: preservedRoleValidation.parseStatus === "valid-complete"
+        ? null
+        : preservedRoleValidation.missingFields[0],
+      preserveClarificationAttempts: true,
+    } : {}),
   });
 }
