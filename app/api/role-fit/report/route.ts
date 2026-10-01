@@ -4,6 +4,7 @@ import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { createReportProviderFailureContract } from "@/lib/role-fit/model/failure-contract";
 import { generateReportWithRetry } from "@/lib/role-fit/model/report-retry";
+import { logReportLifecycle, type ReportLifecycleBoundary, type ReportLifecycleOutcome } from "@/lib/role-fit/runtime/report-lifecycle";
 import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getGoogleAiStudioReportModel, getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
   const startedAt = Date.now();
 
   if (!parsedRequest.success) {
+    logReportLifecycle({ boundary: "api-received", outcome: "blocked", reportId: "unknown", failureCategory: "invalid-request" });
     return NextResponse.json(
       {
         state: "validation-failed",
@@ -86,6 +88,10 @@ export async function POST(request: Request) {
   }
 
   const traceId = crypto.randomUUID();
+  const requestedReportId = parsedRequest.data.reportId;
+  const lifecycle = (boundary: ReportLifecycleBoundary, outcome: ReportLifecycleOutcome, extra: { attempt?: number; provider?: string; model?: string; failureCategory?: string; httpStatus?: number } = {}) =>
+    logReportLifecycle({ boundary, outcome, reportId: requestedReportId, traceId, ...extra });
+  lifecycle("api-received", "success");
   const conversationId = parsedRequest.data.conversationId ?? crypto.randomUUID();
   const sessionId = parsedRequest.data.sessionId;
   const roleDraftForAnalysis = {
@@ -95,6 +101,8 @@ export async function POST(request: Request) {
   const boundedRoleText = serializeRoleDraftForBoundary(roleDraftForAnalysis);
 
   if (boundedRoleText.length > policy.maxInputChars) {
+    lifecycle("before-provider", "blocked", { failureCategory: "role-input-too-long" });
+    lifecycle("response", "blocked", { httpStatus: 413 });
     after(() =>
       logRoleFitEvent({
         eventName: "role.validation_failed",
@@ -121,6 +129,8 @@ export async function POST(request: Request) {
 
   const persistedCount = await getCompletedReportCount(sessionId);
   if (!persistedCount.ok) {
+    lifecycle("before-provider", "failure", { failureCategory: "authoritative-count-unavailable" });
+    lifecycle("response", "failure", { httpStatus: 503 });
     after(() =>
       logRoleFitEvent({
         eventName: "report.failed",
@@ -145,6 +155,8 @@ export async function POST(request: Request) {
   const sessionCompletedReportCount = toSessionCompletedReportCount(completedReportCount);
 
   if (completedReportCount >= policy.maxReportsPerSession) {
+    lifecycle("before-provider", "blocked", { failureCategory: "report-limit-reached" });
+    lifecycle("response", "blocked", { httpStatus: 429 });
     const eligibility = evaluateReportEligibility({
       session: {
         status: "active",
@@ -176,6 +188,8 @@ export async function POST(request: Request) {
   }
 
   if (!parsedRequest.data.approved) {
+    lifecycle("before-provider", "blocked", { failureCategory: "approval-missing" });
+    lifecycle("response", "blocked", { httpStatus: 409 });
     const eligibility = evaluateReportEligibility({
       session: {
         status: "active",
@@ -211,6 +225,8 @@ export async function POST(request: Request) {
   });
 
   if (validation.parseStatus !== "valid-complete") {
+    lifecycle("before-provider", "blocked", { failureCategory: "role-validation-failed" });
+    lifecycle("response", "blocked", { httpStatus: 422 });
     after(() =>
       logRoleFitEvent({
         eventName: "role.validation_failed",
@@ -265,7 +281,15 @@ export async function POST(request: Request) {
 
   const roleItems = getRoleAnalysisItems(validation.roleDraft);
   const provider = getRoleFitModelProvider();
-  const approvedEvidence = await loadApprovedEvidence(boundedRoleText, roleItems);
+  lifecycle("before-provider", "started");
+  let approvedEvidence: Awaited<ReturnType<typeof loadApprovedEvidence>>;
+  try {
+    approvedEvidence = await loadApprovedEvidence(boundedRoleText, roleItems);
+  } catch {
+    lifecycle("before-provider", "failure", { failureCategory: "evidence-load-failed" });
+    lifecycle("response", "failure", { httpStatus: 503 });
+    return NextResponse.json({ state: "model-unavailable", safeMessage: "I couldn't prepare the report this time. Your role details are still here. Please try again later." }, { status: 503 });
+  }
   if (approvedEvidence.catalogAudit?.issues.length) {
     console.warn("[role-fit-report] evidence catalog exclusions", {
       traceId,
@@ -276,6 +300,7 @@ export async function POST(request: Request) {
       })),
     });
   }
+  lifecycle("before-provider", "success");
   const initialAnalysisInput = {
     roleText: boundedRoleText,
     language: parsedRequest.data.language,
@@ -285,8 +310,42 @@ export async function POST(request: Request) {
     runtimeState: JSON.stringify({ validation: validationForAnalysis, roleItems }),
     approvedEvidence: approvedEvidence.promptContext,
   };
-  const initialAnalysis = await generateReportWithRetry(() => provider.generateReport(initialAnalysisInput));
+  let initialAnalysis: Awaited<ReturnType<typeof generateReportWithRetry>>;
+  try {
+    initialAnalysis = await generateReportWithRetry(
+      () => provider.generateReport(initialAnalysisInput),
+      undefined,
+      (attempt, result) => {
+        if (!result) {
+          lifecycle("provider-attempt", "started", { attempt });
+          return;
+        }
+        lifecycle("provider-call", result.ok ? "success" : "failure", {
+          attempt,
+          provider: result.provider,
+          model: result.model,
+          ...(!result.ok ? { failureCategory: result.diagnostics?.failureCategory ?? result.error, httpStatus: result.providerStatus } : {}),
+        });
+      },
+    );
+  } catch {
+    lifecycle("provider-call", "failure", { failureCategory: "unhandled-provider-exception" });
+    lifecycle("response", "failure", { httpStatus: 503 });
+    return NextResponse.json({ state: "model-unavailable", safeMessage: "I couldn't generate the report this time. Your role details are still here. Please try again later." }, { status: 503 });
+  }
   let modelResult = initialAnalysis.result;
+  const providerFailureCategory = modelResult.ok ? undefined : modelResult.diagnostics?.failureCategory ?? modelResult.error;
+  const contentReturned = modelResult.ok || ["invalid_json", "schema_invalid", "invalid_role_index", "duplicate_role_index", "max_tokens"].includes(providerFailureCategory ?? "");
+  lifecycle("provider-content", contentReturned ? "success" : "failure", {
+    provider: modelResult.provider,
+    model: modelResult.model,
+    ...(!modelResult.ok ? { failureCategory: providerFailureCategory } : {}),
+  });
+  lifecycle("output-validation", modelResult.ok ? "success" : contentReturned ? "failure" : "blocked", {
+    provider: modelResult.provider,
+    model: modelResult.model,
+    ...(!modelResult.ok ? { failureCategory: providerFailureCategory } : {}),
+  });
   let providerElapsedMs = modelResult.ok ? modelResult.diagnostics.providerElapsedMs : 0;
   let schemaRepairUsed = modelResult.ok ? modelResult.diagnostics.schemaRepairUsed : false;
 
@@ -326,9 +385,11 @@ export async function POST(request: Request) {
       }),
     );
 
+    lifecycle("response", "failure", { httpStatus: failureContract.status });
     return NextResponse.json(failureContract.body, { status: failureContract.status });
   }
 
+  lifecycle("composition", "started");
   let composition = composeReportUIPayload({
     analysis: modelResult.analysis,
     roleDraft: validation.roleDraft,
@@ -361,6 +422,7 @@ export async function POST(request: Request) {
 
   if (!composition.ok && shouldUseModelRepair(composition.diagnostic)) {
     const firstDiagnostic = composition.diagnostic;
+    lifecycle("provider-attempt", "started", { attempt: initialAnalysis.attempts + 1 });
     const repairResult = await provider.generateReport({
       roleText: boundedRoleText,
       language: parsedRequest.data.language,
@@ -376,6 +438,23 @@ export async function POST(request: Request) {
       }),
       approvedEvidence: approvedEvidence.promptContext,
       diagnosticAttemptPhase: "composition-repair",
+    });
+    lifecycle("provider-call", repairResult.ok ? "success" : "failure", {
+      attempt: initialAnalysis.attempts + 1,
+      provider: repairResult.provider,
+      model: repairResult.model,
+      ...(!repairResult.ok ? { failureCategory: repairResult.diagnostics?.failureCategory ?? repairResult.error, httpStatus: repairResult.providerStatus } : {}),
+    });
+
+    lifecycle("provider-content", repairResult.ok ? "success" : "failure", {
+      provider: repairResult.provider,
+      model: repairResult.model,
+      ...(!repairResult.ok ? { failureCategory: repairResult.diagnostics?.failureCategory ?? repairResult.error } : {}),
+    });
+    lifecycle("output-validation", repairResult.ok ? "success" : "failure", {
+      provider: repairResult.provider,
+      model: repairResult.model,
+      ...(!repairResult.ok ? { failureCategory: repairResult.diagnostics?.failureCategory ?? repairResult.error } : {}),
     });
 
     if (repairResult.ok) {
@@ -403,6 +482,7 @@ export async function POST(request: Request) {
   }
 
   if (!composition.ok) {
+    lifecycle("composition", "failure", { failureCategory: composition.diagnostic });
     console.error("[role-fit-report] report composition failed", createCompositionFailureMetadata({
       traceId,
       provider: modelResult.provider,
@@ -430,6 +510,7 @@ export async function POST(request: Request) {
       }),
     );
 
+    lifecycle("response", "failure", { httpStatus: 503 });
     return NextResponse.json(
       {
         state: "model-unavailable",
@@ -445,6 +526,7 @@ export async function POST(request: Request) {
   }
 
   const report = composition.report;
+  lifecycle("composition", "success");
 
   const eligibility = evaluateReportEligibility({
     session: {
@@ -460,11 +542,11 @@ export async function POST(request: Request) {
   const reportId = report.reportId;
   const roleFamily = inferRoleFamily(canonicalRoleTitle);
 
-  console.info("[role-fit-report] report completed", {
+  console.info("[role-fit-report] report composition completed", {
     traceId,
     provider: modelResult.provider,
     model: modelResult.model,
-    status: "success",
+    status: "composition-success",
     providerAttempts: initialAnalysis.attempts,
     providerElapsedMs,
     totalReportRouteElapsedMs: Date.now() - startedAt,
@@ -473,6 +555,7 @@ export async function POST(request: Request) {
   });
 
   if (eligibility.state === "no-report") {
+    lifecycle("persistence", "blocked", { failureCategory: eligibility.reason });
     after(() => {
       const eventName = eligibility.reason === "insufficient-evidence"
         ? "report.insufficient_evidence"
@@ -494,6 +577,7 @@ export async function POST(request: Request) {
       });
     });
 
+    lifecycle("response", "success", { httpStatus: 200 });
     return NextResponse.json({
       state: "no-report",
       provider: modelResult.provider,
@@ -503,7 +587,11 @@ export async function POST(request: Request) {
     });
   }
 
+  lifecycle("persistence", "started");
   const persistence = await persistCompletedReport(report, { roleFamily, sessionId });
+  lifecycle("persistence", persistence.ok ? "success" : "degraded", {
+    ...(!persistence.ok ? { failureCategory: persistence.reason } : {}),
+  });
 
   if (!persistence.ok && persistence.reason === "limit-reached") {
     const limitEligibility = evaluateReportEligibility({
@@ -528,6 +616,7 @@ export async function POST(request: Request) {
         },
       }),
     );
+    lifecycle("response", "blocked", { httpStatus: 429 });
     return NextResponse.json(
       { state: "blocked", eligibility: limitEligibility, completedReportCount: persistence.completedReportCount ?? policy.maxReportsPerSession },
       { status: 429 },
@@ -557,6 +646,7 @@ export async function POST(request: Request) {
     });
   });
 
+  lifecycle("response", persistence.ok ? "success" : "degraded", { httpStatus: 200 });
   return NextResponse.json({
     state: "ready",
     provider: modelResult.provider,

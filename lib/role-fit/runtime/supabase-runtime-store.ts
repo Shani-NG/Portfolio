@@ -103,6 +103,7 @@ function safeMetadata(metadata: SafeMetadata | undefined) {
     "persistenceState", "persistenceReason", "providerStatus", "retryable", "retryAfterSeconds",
     "attemptPhase", "repairTriggerCategory", "providerElapsedMs", "failureCategory", "finishReason",
     "responseBodyPresent", "promptTokenCount", "outputTokenCount", "totalTokenCount",
+    "providerAttempts",
   ]);
   return Object.fromEntries(
     Object.entries(metadata)

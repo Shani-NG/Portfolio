@@ -85,6 +85,15 @@ function normalizeRepeatedInput(value: string) {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+function recordReportClientEvent(reportId: string, boundary: "client-response" | "display", outcome: "success" | "failure") {
+  void fetch("/api/role-fit/report/client-event", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reportId, boundary, outcome }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
 export default function RoleFitPage() {
   const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => restoreRoleFitLiveSession());
   const [roleInput, setRoleInput] = useState("");
@@ -98,6 +107,7 @@ export default function RoleFitPage() {
   const [errorContext, setErrorContext] = useState<ErrorContext>(null);
   const reportRequestInFlightRef = useRef(false);
   const reportAttemptRef = useRef<RoleFitReportAttemptState | null>(liveSession.reportAttemptState);
+  const displayEventPendingRef = useRef<string | null>(null);
   const chatPaneRef = useRef<HTMLDivElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
@@ -184,10 +194,15 @@ export default function RoleFitPage() {
     const currentSession = resolveCanonicalSession(sessionOverride ?? liveSession);
     const submittedText = (textOverride ?? roleInput).trim();
     if (!submittedText || isSending || isAgentUnavailable) return;
-    if (!currentSession.reportPayload && hasRoleDraftContent(currentSession.activeRoleDraft) && isReportConfirmationText(submittedText)) {
+    if (currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
       const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
       setRoleInput("");
       await requestReport(sessionAfterUser);
+      return;
+    }
+    if (!options?.revalidateRoleContext && !currentSession.pendingReportConfirmation && !currentSession.reportPayload
+      && hasRoleDraftContent(currentSession.activeRoleDraft) && isReportConfirmationText(submittedText)) {
+      await submitLiveMessage(submittedText, currentSession, { revalidateRoleContext: true });
       return;
     }
     const normalizedSubmittedText = normalizeRepeatedInput(submittedText);
@@ -377,6 +392,7 @@ export default function RoleFitPage() {
         state: "malformed-output",
         safeMessage: genericRecoverableErrorAnswer(reportSession.activeLanguage),
       }));
+      recordReportClientEvent(reportId, "client-response", result.state === "malformed-output" ? "failure" : "success");
 
       if (!response.ok || result.state !== "ready") {
         const isRetryableReportFailure = result.retryable === true;
@@ -424,6 +440,7 @@ export default function RoleFitPage() {
       }
 
       const report = parsedReport.data;
+      displayEventPendingRef.current = report.reportId;
       const persisted = result.persistence === "persisted";
       const lifecycleMessage = persisted
         ? reportSuccessMessage(reportSession.activeLanguage)
@@ -460,6 +477,7 @@ export default function RoleFitPage() {
       reportAttemptRef.current = null;
       setActivePane("report");
     } catch {
+      recordReportClientEvent(reportId, "client-response", "failure");
       const canOfferRetry = reportAttemptNumber === 1;
       const message = canOfferRetry
         ? reportRetryableFailureAnswer(reportSession.activeLanguage)
@@ -509,6 +527,14 @@ export default function RoleFitPage() {
   useEffect(() => {
     if (isNarrowLayout && hasLiveReport) setActivePane("report");
   }, [activeReport?.reportId, hasLiveReport, isNarrowLayout]);
+
+  useEffect(() => {
+    const reportId = displayEventPendingRef.current;
+    if (reportId && activeReport?.reportId === reportId && reportPaneRef.current) {
+      displayEventPendingRef.current = null;
+      recordReportClientEvent(reportId, "display", "success");
+    }
+  }, [activeReport?.reportId, activePane]);
 
   useEffect(() => {
     scrollChatToEnd();

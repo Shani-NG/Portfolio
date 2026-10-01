@@ -104,6 +104,17 @@ describe("initial report provider retry", () => {
     assert.equal(waits, 1);
   });
 
+  it("reports each provider attempt and its classified result in order", async () => {
+    let calls = 0;
+    const observed: string[] = [];
+    await generateReportWithRetry(
+      async () => ++calls === 1 ? unavailable : success,
+      async () => {},
+      (attempt, result) => observed.push(`${attempt}:${result ? result.ok ? "success" : "failure" : "started"}`),
+    );
+    assert.deepEqual(observed, ["1:started", "1:failure", "2:started", "2:success"]);
+  });
+
   it("returns a recoverable failure after two 503 responses", async () => {
     let providerCalls = 0;
     const outcome = await generateReportWithRetry(async () => { providerCalls++; return unavailable; }, async () => {});
@@ -137,5 +148,18 @@ describe("initial report provider retry", () => {
       assert.equal(calls, 2);
       assert.equal(outcome.result.ok, true);
     }
+  });
+
+  it("honors a short Retry-After and leaves longer rate limits for a later user retry", async () => {
+    const limited = { ...unavailable, error: "rate-limited" as const, providerStatus: 429 };
+    const waits: number[] = [];
+    const short = await generateReportWithRetry(async () => ({ ...limited, retryAfterSeconds: 2 }), async (delay) => { waits.push(delay); });
+    assert.equal(short.attempts, 2);
+    assert.deepEqual(waits, [2_000]);
+
+    let calls = 0;
+    const long = await generateReportWithRetry(async () => { calls++; return { ...limited, retryAfterSeconds: 34 }; }, async () => assert.fail("unexpected wait"));
+    assert.equal(long.attempts, 1);
+    assert.equal(calls, 1);
   });
 });
