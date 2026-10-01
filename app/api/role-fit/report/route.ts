@@ -3,7 +3,8 @@ import { z } from "zod";
 import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { createReportProviderFailureContract } from "@/lib/role-fit/model/failure-contract";
-import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
+import { logRoleFitBoundaryEvent, logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
+import type { RoleFitBoundaryEventName, RoleFitBoundarySnapshot } from "@/lib/role-fit/runtime/boundary-events";
 import { getGoogleAiStudioReportModel, getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
 import { getCompletedReportCount, persistCompletedReport } from "@/lib/role-fit/persistence/task-e";
@@ -38,6 +39,7 @@ const requestSchema = z
     conversationId: z.string().optional(),
     sessionId: z.string().trim().min(1).max(160),
     reportId: z.string().regex(/^R[A-Z0-9]{4}$/),
+    correlationId: z.uuid().optional(),
     language: z.enum(["he", "en", "mixed"]).default("en"),
   })
   .strict();
@@ -85,8 +87,22 @@ export async function POST(request: Request) {
   }
 
   const traceId = crypto.randomUUID();
+  const correlationId = parsedRequest.data.correlationId ?? traceId;
   const conversationId = parsedRequest.data.conversationId ?? crypto.randomUUID();
   const sessionId = parsedRequest.data.sessionId;
+  const recordBoundary = (
+    eventName: RoleFitBoundaryEventName,
+    snapshot: Partial<RoleFitBoundarySnapshot> = {},
+    providerPhase?: "initial" | "composition-repair",
+  ) => after(() => logRoleFitBoundaryEvent({
+    eventName,
+    source: "server",
+    sessionId,
+    correlationId,
+    traceId,
+    reportId: parsedRequest.data.reportId,
+    snapshot: { ...snapshot, ...(providerPhase ? { providerPhase } : {}) },
+  }));
   const roleDraftForAnalysis = {
     ...parsedRequest.data.roleDraft,
     company: undefined,
@@ -202,6 +218,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ state: "blocked", eligibility }, { status: 409 });
   }
 
+  recordBoundary("rolefit.report_api_validation_started", { roleDraftPresent: true, roleDraftValidationStatus: "not-checked" });
   const validation = validateStructuredRoleDraft({
     conversationId,
     traceId,
@@ -210,6 +227,10 @@ export async function POST(request: Request) {
   });
 
   if (validation.parseStatus !== "valid-complete") {
+    recordBoundary("rolefit.report_api_validation_completed", {
+      roleDraftPresent: true,
+      roleDraftValidationStatus: validation.parseStatus === "valid-incomplete" ? "incomplete" : "invalid",
+    });
     after(() =>
       logRoleFitEvent({
         eventName: "role.validation_failed",
@@ -236,6 +257,8 @@ export async function POST(request: Request) {
     );
   }
 
+  recordBoundary("rolefit.report_api_validation_completed", { roleDraftPresent: true, roleDraftValidationStatus: "valid-complete" });
+
   const validationForAnalysis = {
     ...validation,
     roleDraft: {
@@ -258,6 +281,9 @@ export async function POST(request: Request) {
       metadata: {
         completedReportCount,
         language: parsedRequest.data.language,
+        correlationId,
+        reportId: parsedRequest.data.reportId,
+        traceId,
       },
     }),
   );
@@ -275,6 +301,7 @@ export async function POST(request: Request) {
       })),
     });
   }
+  recordBoundary("rolefit.provider_call_started", { roleDraftValidationStatus: "valid-complete" }, "initial");
   let modelResult = await provider.generateReport({
     roleText: boundedRoleText,
     language: parsedRequest.data.language,
@@ -283,11 +310,15 @@ export async function POST(request: Request) {
     maxOutputTokens: reportAnalysisMaxOutputTokens,
     runtimeState: JSON.stringify({ validation: validationForAnalysis, roleItems }),
     approvedEvidence: approvedEvidence.promptContext,
+  }).catch((error: unknown) => {
+    recordBoundary("rolefit.provider_call_failed", { roleDraftValidationStatus: "valid-complete" }, "initial");
+    throw error;
   });
   let providerElapsedMs = modelResult.ok ? modelResult.diagnostics.providerElapsedMs : 0;
   let schemaRepairUsed = modelResult.ok ? modelResult.diagnostics.schemaRepairUsed : false;
 
   if (!modelResult.ok) {
+    recordBoundary("rolefit.provider_call_failed", { roleDraftValidationStatus: "valid-complete" }, "initial");
     const failedModelResult = modelResult;
     const failureContract = createReportProviderFailureContract(failedModelResult);
     console.error("[role-fit-report] model generation failed", {
@@ -331,6 +362,8 @@ export async function POST(request: Request) {
     return NextResponse.json(failureContract.body, { status: failureContract.status });
   }
 
+  recordBoundary("rolefit.provider_call_completed", { roleDraftValidationStatus: "valid-complete" }, "initial");
+
   let composition = composeReportUIPayload({
     analysis: modelResult.analysis,
     roleDraft: validation.roleDraft,
@@ -363,6 +396,7 @@ export async function POST(request: Request) {
 
   if (!composition.ok && shouldUseModelRepair(composition.diagnostic)) {
     const firstDiagnostic = composition.diagnostic;
+    recordBoundary("rolefit.provider_call_started", { roleDraftValidationStatus: "valid-complete" }, "composition-repair");
     const repairResult = await provider.generateReport({
       roleText: boundedRoleText,
       language: parsedRequest.data.language,
@@ -378,9 +412,13 @@ export async function POST(request: Request) {
       }),
       approvedEvidence: approvedEvidence.promptContext,
       diagnosticAttemptPhase: "composition-repair",
+    }).catch((error: unknown) => {
+      recordBoundary("rolefit.provider_call_failed", { roleDraftValidationStatus: "valid-complete" }, "composition-repair");
+      throw error;
     });
 
     if (repairResult.ok) {
+      recordBoundary("rolefit.provider_call_completed", { roleDraftValidationStatus: "valid-complete" }, "composition-repair");
       providerElapsedMs += repairResult.diagnostics.providerElapsedMs;
       schemaRepairUsed ||= repairResult.diagnostics.schemaRepairUsed;
       const constrainedRepairAnalysis = constrainRepairAnalysis({
@@ -399,6 +437,7 @@ export async function POST(request: Request) {
       });
       if (!composition.ok) repairOutcome = "repaired-output-still-invalid";
     } else {
+      recordBoundary("rolefit.provider_call_failed", { roleDraftValidationStatus: "valid-complete" }, "composition-repair");
       repairOutcome = "repair-call-failed";
       repairFailureCategory = repairResult.error;
     }
@@ -505,6 +544,8 @@ export async function POST(request: Request) {
   }
 
   const persistence = await persistCompletedReport(report, { roleFamily, sessionId });
+  if (persistence.ok) recordBoundary("rolefit.report_persisted", { roleDraftValidationStatus: "valid-complete" });
+  else recordBoundary("rolefit.report_persistence_failed", { roleDraftValidationStatus: "valid-complete", persistenceOutcome: persistence.reason });
 
   if (!persistence.ok && persistence.reason === "limit-reached") {
     const limitEligibility = evaluateReportEligibility({

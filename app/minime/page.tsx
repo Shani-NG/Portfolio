@@ -4,6 +4,7 @@ import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { RoleFitReportProgress } from "@/components/role-fit/role-fit-report-progress";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import { createRoleFitBoundaryCorrelationId, emitRoleFitClientBoundaryEvent } from "@/lib/role-fit/client/boundary-telemetry";
 import {
   genericRecoverableErrorAnswer,
   isHebrewLanguage,
@@ -20,6 +21,7 @@ import {
 import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/contracts";
 import { createReportId } from "@/lib/role-fit/identifiers";
 import type { RoleFitLiveSession, RoleFitLiveState, RoleFitReportAttemptState } from "@/lib/role-fit/client/session";
+import type { RoleFitBoundarySnapshot, RoleFitClientBoundaryEventName } from "@/lib/role-fit/runtime/boundary-events";
 import { hasRoleDraftContent } from "@/lib/role-fit/server/role-understanding";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import styles from "./page.module.css";
@@ -98,6 +100,8 @@ export default function RoleFitPage() {
   const [errorContext, setErrorContext] = useState<ErrorContext>(null);
   const reportRequestInFlightRef = useRef(false);
   const reportAttemptRef = useRef<RoleFitReportAttemptState | null>(liveSession.reportAttemptState);
+  const reportCorrelationRef = useRef<{ reportId: string; correlationId: string } | null>(null);
+  const displayedReportRef = useRef<string | null>(null);
   const chatPaneRef = useRef<HTMLDivElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
@@ -153,6 +157,8 @@ export default function RoleFitPage() {
     setIsReportRequestInFlight(false);
     reportRequestInFlightRef.current = false;
     reportAttemptRef.current = null;
+    reportCorrelationRef.current = null;
+    displayedReportRef.current = null;
     setActivePane("chat");
   }
 
@@ -176,19 +182,55 @@ export default function RoleFitPage() {
     });
   }
 
+  function recordBoundary(
+    eventName: RoleFitClientBoundaryEventName,
+    session: RoleFitLiveSession,
+    correlationId: string,
+    options: { reportId?: string; snapshot?: Partial<RoleFitBoundarySnapshot> } = {},
+  ) {
+    emitRoleFitClientBoundaryEvent({
+      eventName,
+      sessionId: session.sessionId,
+      correlationId,
+      ...(options.reportId ? { reportId: options.reportId } : {}),
+      snapshot: {
+        roleDraftPresent: hasRoleDraftContent(session.activeRoleDraft),
+        roleDraftValidationStatus: "not-checked",
+        pendingReportConfirmation: session.pendingReportConfirmation,
+        reportPayloadPresent: Boolean(session.reportPayload),
+        clientState: session.state,
+        ...options.snapshot,
+      },
+    });
+  }
+
   async function submitLiveMessage(
     textOverride?: string,
     sessionOverride?: RoleFitLiveSession,
-    options?: { appendUserMessage?: boolean; revalidateRoleContext?: boolean },
+    options?: { appendUserMessage?: boolean; revalidateRoleContext?: boolean; correlationId?: string },
   ) {
     const currentSession = resolveCanonicalSession(sessionOverride ?? liveSession);
     const submittedText = (textOverride ?? roleInput).trim();
     if (!submittedText || isSending || isAgentUnavailable) return;
+    const isUserConfirmation = options?.appendUserMessage !== false && isReportConfirmationText(submittedText);
+    const confirmationCorrelationId = isUserConfirmation ? createRoleFitBoundaryCorrelationId() : null;
+    if (confirmationCorrelationId) {
+      recordBoundary("rolefit.confirmation_yes_received", currentSession, confirmationCorrelationId);
+    }
     if (currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
       const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
       setRoleInput("");
-      await requestReport(sessionAfterUser);
+      const correlationId = confirmationCorrelationId ?? createRoleFitBoundaryCorrelationId();
+      recordBoundary("rolefit.confirmation_yes_routed_to_report", currentSession, correlationId, {
+        snapshot: { routingDecision: "request-report" },
+      });
+      await requestReport(sessionAfterUser, correlationId, "confirmation");
       return;
+    }
+    if (confirmationCorrelationId) {
+      recordBoundary("rolefit.confirmation_yes_fell_through_to_chat", currentSession, confirmationCorrelationId, {
+        snapshot: { routingDecision: "chat-fall-through" },
+      });
     }
     const normalizedSubmittedText = normalizeRepeatedInput(submittedText);
     const previousUserMessage = [...currentSession.messages].reverse().find((message) => message.role === "user")?.content ?? "";
@@ -230,6 +272,7 @@ export default function RoleFitPage() {
         body: JSON.stringify({
           conversationId: sessionAfterUser.conversationId,
           sessionId: sessionAfterUser.sessionId,
+          correlationId: confirmationCorrelationId ?? options?.correlationId,
           message: messageForAgent,
           language: activeLanguage,
           repeatedInput,
@@ -263,7 +306,7 @@ export default function RoleFitPage() {
         setApiStatusMessage("");
         setErrorContext(null);
       }
-      syncLiveSession({
+      const updatedSession = syncLiveSession({
         state: nextState,
         activeRoleDraft: returnedRoleDraft ?? currentSession.activeRoleDraft,
         pendingRoleField: result.pendingField !== undefined ? result.pendingField : currentSession.pendingRoleField,
@@ -284,12 +327,32 @@ export default function RoleFitPage() {
         } : {}),
       });
 
+      if (options?.revalidateRoleContext && options.correlationId) {
+        const validationStatus = result.validation?.parseStatus === "valid-complete"
+          ? "valid-complete"
+          : result.validation?.parseStatus === "valid-incomplete" ? "incomplete"
+            : result.validation ? "invalid" : "not-checked";
+        recordBoundary("rolefit.cta_revalidated_draft", updatedSession, options.correlationId, {
+          snapshot: {
+            roleDraftValidationStatus: validationStatus,
+            revalidationAttempted: true,
+            routingDecision: !response.ok ? "revalidation-error"
+              : validationStatus === "valid-complete" ? "revalidation-complete" : "revalidation-incomplete",
+          },
+        });
+      }
+
       if (!response.ok) {
         setApiStatusMessage(result.answer ?? "The Role Fit Agent is not available right now. Please try again later.");
         setErrorContext("conversation");
         setIsAgentUnavailable(false);
       }
     } catch {
+      if (options?.revalidateRoleContext && options.correlationId) {
+        recordBoundary("rolefit.cta_revalidated_draft", currentSession, options.correlationId, {
+          snapshot: { revalidationAttempted: true, routingDecision: "revalidation-error" },
+        });
+      }
       const message = "The Role Fit Agent is not available right now. Please try again later.";
       appendLiveMessage({ role: "agent", content: message });
       setApiStatusMessage(message);
@@ -304,8 +367,20 @@ export default function RoleFitPage() {
     }
   }
 
-  async function requestReport(sessionOverride?: RoleFitLiveSession) {
+  async function requestReport(
+    sessionOverride?: RoleFitLiveSession,
+    correlationId = createRoleFitBoundaryCorrelationId(),
+    source: "confirmation" | "cta" = "cta",
+  ) {
     const reportSession = resolveCanonicalSession(sessionOverride ?? liveSession);
+    const routingDecision = reportRequestInFlightRef.current ? "already-in-flight"
+      : isAgentUnavailable ? "agent-unavailable"
+        : reportSession.reportPayload ? "report-ready"
+          : !hasRoleDraftContent(reportSession.activeRoleDraft) ? "missing-draft"
+            : !reportSession.pendingReportConfirmation ? "revalidate-draft" : "request-report";
+    recordBoundary("rolefit.request_report_entered", reportSession, correlationId, {
+      snapshot: { routingDecision },
+    });
 
     if (reportRequestInFlightRef.current || isAgentUnavailable) return;
     if (reportSession.reportPayload) {
@@ -320,6 +395,7 @@ export default function RoleFitPage() {
           await submitLiveMessage("Generate report", reportSession, {
             appendUserMessage: false,
             revalidateRoleContext: true,
+            correlationId,
           });
         } finally {
           reportRequestInFlightRef.current = false;
@@ -328,6 +404,11 @@ export default function RoleFitPage() {
         return;
       }
 
+      if (source === "cta") {
+        recordBoundary("rolefit.cta_missing_active_draft", reportSession, correlationId, {
+          snapshot: { routingDecision: "missing-draft", revalidationAttempted: false },
+        });
+      }
       appendLiveMessage({
         role: "agent",
         content: roleSubmissionSetupAnswer(reportSession.activeLanguage),
@@ -345,14 +426,17 @@ export default function RoleFitPage() {
       ? currentAttemptState.attempts + 1
       : 1;
     reportAttemptRef.current = { reportId, attempts: reportAttemptNumber };
+    reportCorrelationRef.current = { reportId, correlationId };
     reportRequestInFlightRef.current = true;
     setIsReportRequestInFlight(true);
     setActivePane("report");
-    syncLiveSession({ state: "generating-report", pendingReportId: reportId, reportAttemptState: reportAttemptRef.current });
+    const generatingSession = syncLiveSession({ state: "generating-report", pendingReportId: reportId, reportAttemptState: reportAttemptRef.current });
+    recordBoundary("rolefit.generating_report_state_set", generatingSession, correlationId, { reportId });
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), reportRequestTimeoutMs);
 
     try {
+      recordBoundary("rolefit.report_post_started", generatingSession, correlationId, { reportId });
       const response = await fetch("/api/role-fit/report", {
         method: "POST",
         headers: {
@@ -365,6 +449,7 @@ export default function RoleFitPage() {
           conversationId: reportSession.conversationId,
           sessionId: reportSession.sessionId,
           reportId,
+          correlationId,
           language: "en",
         }),
         signal: controller.signal,
@@ -376,6 +461,10 @@ export default function RoleFitPage() {
       }));
 
       if (!response.ok || result.state !== "ready") {
+        recordBoundary("rolefit.report_post_failed", generatingSession, correlationId, {
+          reportId,
+          snapshot: { routingDecision: "report-api-error", httpStatus: response.status },
+        });
         const isRetryableReportFailure = result.retryable === true;
         const canOfferRetry = isRetryableReportFailure && reportAttemptNumber === 1;
         const message = isRetryableReportFailure
@@ -406,6 +495,10 @@ export default function RoleFitPage() {
 
       const parsedReport = reportUIPayloadSchema.safeParse(result.report ?? result.eligibility?.report);
       if (!parsedReport.success) {
+        recordBoundary("rolefit.report_post_failed", generatingSession, correlationId, {
+          reportId,
+          snapshot: { routingDecision: "report-payload-invalid", httpStatus: response.status },
+        });
         const message = genericRecoverableErrorAnswer(reportSession.activeLanguage);
         setApiStatusMessage(message);
         setErrorContext("report");
@@ -436,7 +529,7 @@ export default function RoleFitPage() {
       });
       if (!persisted) setApiStatusMessage(lifecycleMessage);
       appendLiveMessage({ role: "agent", content: lifecycleMessage });
-      syncLiveSession({
+      const readySession = syncLiveSession({
         state: "report-ready",
         reportPayload: report,
         reportProvider: result.provider,
@@ -454,9 +547,17 @@ export default function RoleFitPage() {
           ? [report.requirementMapping.defaultSelectedItemId]
           : report.requirementMapping.items[0]?.itemId ? [report.requirementMapping.items[0].itemId] : [],
       });
+      recordBoundary("rolefit.report_ready_state_set", readySession, correlationId, {
+        reportId,
+        snapshot: { roleDraftValidationStatus: "valid-complete" },
+      });
       reportAttemptRef.current = null;
       setActivePane("report");
     } catch {
+      recordBoundary("rolefit.report_post_failed", generatingSession, correlationId, {
+        reportId,
+        snapshot: { routingDecision: "report-request-exception" },
+      });
       const canOfferRetry = reportAttemptNumber === 1;
       const message = canOfferRetry
         ? reportRetryableFailureAnswer(reportSession.activeLanguage)
@@ -506,6 +607,28 @@ export default function RoleFitPage() {
   useEffect(() => {
     if (isNarrowLayout && hasLiveReport) setActivePane("report");
   }, [activeReport?.reportId, hasLiveReport, isNarrowLayout]);
+
+  useEffect(() => {
+    if (!activeReport || liveSession.state !== "report-ready" || (isNarrowLayout && activePane !== "report")) return;
+    const correlation = reportCorrelationRef.current;
+    if (!correlation || correlation.reportId !== activeReport.reportId || displayedReportRef.current === correlation.reportId) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (!reportPaneRef.current?.querySelector("#role-fit-live-report")) return;
+      displayedReportRef.current = correlation.reportId;
+      recordBoundary("rolefit.report_display_state_reached", liveSession, correlation.correlationId, {
+        reportId: correlation.reportId,
+        snapshot: { roleDraftValidationStatus: "valid-complete" },
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeReport?.reportId, activePane, isNarrowLayout, liveSession]);
+
+  function handleReportCtaClick() {
+    const session = restoreRoleFitLiveSession();
+    const correlationId = createRoleFitBoundaryCorrelationId();
+    recordBoundary("rolefit.cta_clicked", session, correlationId);
+    void requestReport(session, correlationId, "cta");
+  }
 
   useEffect(() => {
     scrollChatToEnd();
@@ -582,7 +705,7 @@ export default function RoleFitPage() {
         type="button"
         disabled={isReportRequestInFlight || isAgentUnavailable}
         title={reportActionLabel}
-        onClick={() => void requestReport()}
+        onClick={handleReportCtaClick}
       >
         Generate Report
       </button> : null}

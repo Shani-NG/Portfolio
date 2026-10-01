@@ -8,6 +8,7 @@ import {
   clarificationLimitAnswer,
   existingReportAnswer,
   genericRoleTitleAnswer,
+  isReportConfirmationText,
   hasSameRoleSourceFingerprint,
   looksLikeNewReportRequest,
   looksLikeReportMutationRequest,
@@ -21,7 +22,7 @@ import {
   roleSubmissionSetupAnswer,
   shouldPreBlockReportAttempt,
 } from "@/lib/role-fit/conversation/behavior";
-import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
+import { logRoleFitBoundaryEvent, logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import {
   applyRoleDraftCorrection,
@@ -30,6 +31,7 @@ import {
   createRoleDraftFromText,
   detectRoleCorrection,
   extractStandaloneRoleTitle,
+  hasRoleDraftContent,
   isNoRoleTitleAnswer,
   isRoleTitleRejection,
   isValidRoleClarificationAnswer,
@@ -49,6 +51,7 @@ const requestSchema = z
   .object({
     conversationId: z.string().min(1).max(160),
     sessionId: z.string().min(1).max(160).optional(),
+    correlationId: z.uuid().optional(),
     message: z.string().min(1).max(20_000),
     language: z.enum(["he", "en", "mixed"]).default("en"),
     repeatedInput: z.boolean().optional().default(false),
@@ -112,6 +115,22 @@ export async function POST(request: Request) {
 
   const traceId = crypto.randomUUID();
   const { conversationId, sessionId } = parsedRequest.data;
+
+  if (sessionId && parsedRequest.data.correlationId && !parsedRequest.data.revalidateRoleContext
+    && isReportConfirmationText(parsedRequest.data.message)) {
+    after(() => logRoleFitBoundaryEvent({
+      eventName: "rolefit.confirmation_yes_fell_through_to_chat",
+      source: "server",
+      sessionId,
+      correlationId: parsedRequest.data.correlationId!,
+      traceId,
+      snapshot: {
+        roleDraftPresent: hasRoleDraftContent(parsedRequest.data.roleContext?.roleDraft),
+        roleDraftValidationStatus: "not-checked",
+        routingDecision: "chat-fall-through",
+      },
+    }));
+  }
 
   if (parsedRequest.data.reportContext && looksLikeReportMutationRequest(parsedRequest.data.message)) {
     return NextResponse.json({
@@ -274,6 +293,16 @@ export async function POST(request: Request) {
     });
 
     if (validation.parseStatus === "valid-complete") {
+      if (sessionId && parsedRequest.data.correlationId && parsedRequest.data.revalidateRoleContext) {
+        after(() => logRoleFitBoundaryEvent({
+          eventName: "rolefit.cta_revalidated_draft",
+          source: "server",
+          sessionId,
+          correlationId: parsedRequest.data.correlationId!,
+          traceId,
+          snapshot: { roleDraftPresent: hasRoleDraftContent(validation.roleDraft), roleDraftValidationStatus: "valid-complete", revalidationAttempted: true, routingDecision: "revalidation-complete" },
+        }));
+      }
       const title = validation.roleDraft.title?.originalValue ?? "";
       const companyName = validation.roleDraft.company?.originalValue;
       after(() =>
@@ -309,6 +338,16 @@ export async function POST(request: Request) {
     }
 
     const missingField = validation.missingFields[0];
+    if (sessionId && parsedRequest.data.correlationId && parsedRequest.data.revalidateRoleContext) {
+      after(() => logRoleFitBoundaryEvent({
+        eventName: "rolefit.cta_revalidated_draft",
+        source: "server",
+        sessionId,
+        correlationId: parsedRequest.data.correlationId!,
+        traceId,
+        snapshot: { roleDraftPresent: hasRoleDraftContent(validation.roleDraft), roleDraftValidationStatus: validation.parseStatus === "valid-incomplete" ? "incomplete" : "invalid", revalidationAttempted: true, routingDecision: "revalidation-incomplete" },
+      }));
+    }
     after(() =>
       logRoleFitEvent({
         eventName: "role.clarification_requested",

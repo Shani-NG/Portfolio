@@ -1,4 +1,7 @@
+import type { RoleFitBoundaryEventName, RoleFitBoundarySnapshot } from "./boundary-events.ts";
+
 export type RuntimeEventName =
+  | "session.activity"
   | "intent.detected"
   | "role.classified"
   | "role.validation_failed"
@@ -103,6 +106,9 @@ function safeMetadata(metadata: SafeMetadata | undefined) {
     "persistenceState", "persistenceReason", "providerStatus", "retryable", "retryAfterSeconds",
     "attemptPhase", "repairTriggerCategory", "providerElapsedMs", "failureCategory", "finishReason",
     "responseBodyPresent", "promptTokenCount", "outputTokenCount", "totalTokenCount",
+    "boundaryEvent", "source", "correlationId", "traceId", "reportId", "clientTimestamp",
+    "roleDraftPresent", "roleDraftValidationStatus", "pendingReportConfirmation", "reportPayloadPresent",
+    "clientState", "revalidationAttempted", "routingDecision", "providerPhase", "httpStatus", "persistenceOutcome",
   ]);
   return Object.fromEntries(
     Object.entries(metadata)
@@ -222,6 +228,35 @@ export async function logRoleFitEvent(event: RoleFitRuntimeEvent) {
     return { ok: false as const, reason: "invalid-response" as const };
   }
   return { ok: true as const };
+}
+
+export function logRoleFitBoundaryEvent(input: {
+  eventName: RoleFitBoundaryEventName;
+  source: "client" | "server";
+  sessionId: string;
+  correlationId: string;
+  traceId?: string;
+  reportId?: string;
+  clientTimestamp?: string;
+  snapshot?: Partial<RoleFitBoundarySnapshot>;
+}) {
+  // A report may not exist yet, so its ID belongs in safe details rather than
+  // runtime_logs.report_id, which has a foreign key to persisted reports.
+  return logRoleFitEvent({
+    eventName: "session.activity",
+    sessionId: input.sessionId,
+    mode: "fit-analysis",
+    outcome: "success",
+    metadata: {
+      boundaryEvent: input.eventName,
+      source: input.source,
+      correlationId: input.correlationId,
+      ...(input.traceId ? { traceId: input.traceId } : {}),
+      ...(input.reportId ? { reportId: input.reportId } : {}),
+      ...(input.clientTimestamp ? { clientTimestamp: input.clientTimestamp } : {}),
+      ...input.snapshot,
+    },
+  });
 }
 
 export async function persistContactLeadToSupabase(input: ContactLeadPersistenceInput) {

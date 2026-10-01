@@ -15,7 +15,7 @@ describe("Role Fit runtime conversation contract", () => {
   it("generates a report from chat only after an explicit confirmation", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
     const confirmationGuard = page.indexOf("currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)");
-    const guardedRequest = page.indexOf("await requestReport(sessionAfterUser);", confirmationGuard);
+    const guardedRequest = page.indexOf('await requestReport(sessionAfterUser, correlationId, "confirmation");', confirmationGuard);
     const guardExit = page.indexOf("return;", guardedRequest);
 
     assert.ok(confirmationGuard >= 0);
@@ -28,7 +28,7 @@ describe("Role Fit runtime conversation contract", () => {
     const behavior = await readFile(join(process.cwd(), "lib", "role-fit", "conversation", "behavior.ts"), "utf8");
 
     assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)/);
-    assert.match(page, /await requestReport\(sessionAfterUser\)/);
+    assert.match(page, /await requestReport\(sessionAfterUser, correlationId, "confirmation"\)/);
     assert.match(behavior, /generate\(\?:\\s\+\(\?:the\|this\)\)\?\\s\+report/);
     assert.match(behavior, /try\\s\+again/);
     assert.match(page, /reportAttemptRef/);
@@ -107,7 +107,7 @@ describe("Role Fit runtime conversation contract", () => {
   it("allows one direct report retry and disables an immediate third attempt", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
 
-    assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)[\s\S]*await requestReport\(sessionAfterUser\)/);
+    assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)[\s\S]*await requestReport\(sessionAfterUser, correlationId, "confirmation"\)/);
     assert.match(page, /reportAttemptNumber === 1/);
     assert.match(page, /pendingReportConfirmation: canOfferRetry/);
     assert.match(page, /reportAttemptState: null/);

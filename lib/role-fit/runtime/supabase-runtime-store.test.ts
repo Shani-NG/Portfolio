@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
 
-import { logRoleFitEvent, persistContactLeadToSupabase } from "./supabase-runtime-store.ts";
+import { logRoleFitBoundaryEvent, logRoleFitEvent, persistContactLeadToSupabase } from "./supabase-runtime-store.ts";
 
 const previousUrl = process.env.SUPABASE_URL;
 const previousKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -164,5 +164,45 @@ describe("RoleFit Supabase runtime persistence", () => {
     assert.equal(requests[0]?.body.p_session_id, "session_abc");
     assert.equal(requests[0]?.body.p_report_id, "R9K2Q");
     assert.equal(diagnostics.at(-1)?.correlationId, "trace_abc");
+  });
+
+  test("stores pre-persistence boundary IDs only in safe details", async () => {
+    captureDiagnostics();
+    const requests = configureFetch(true);
+
+    const result = await logRoleFitBoundaryEvent({
+      eventName: "rolefit.report_post_started",
+      source: "client",
+      sessionId: "session_12345678",
+      correlationId: "b8d9d39f-aea2-4c8f-b95a-2b4cf9c6c2e2",
+      reportId: "R9K2Q",
+      clientTimestamp: "2026-09-30T12:00:00.000Z",
+      snapshot: {
+        roleDraftPresent: true,
+        roleDraftValidationStatus: "not-checked",
+        pendingReportConfirmation: true,
+        reportPayloadPresent: false,
+        clientState: "generating-report",
+        routingDecision: "request-report",
+      },
+    });
+
+    assert.deepEqual(result, { ok: true });
+    assert.equal(requests[0]?.body.p_event_name, "session.activity");
+    assert.equal(requests[0]?.body.p_report_id, "");
+    assert.deepEqual(requests[0]?.body.p_details, {
+      boundaryEvent: "rolefit.report_post_started",
+      source: "client",
+      correlationId: "b8d9d39f-aea2-4c8f-b95a-2b4cf9c6c2e2",
+      reportId: "R9K2Q",
+      clientTimestamp: "2026-09-30T12:00:00.000Z",
+      roleDraftPresent: true,
+      roleDraftValidationStatus: "not-checked",
+      pendingReportConfirmation: true,
+      reportPayloadPresent: false,
+      clientState: "generating-report",
+      routingDecision: "request-report",
+    });
+    assert.doesNotMatch(JSON.stringify(requests[0]?.body), /roleText|jobDescription|chatText|providerPayload|secret/i);
   });
 });
