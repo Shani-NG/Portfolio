@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
+import { guardUnstartedReportClaim } from "@/lib/role-fit/conversation/report-state-claims";
 import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import {
@@ -419,7 +420,9 @@ export async function POST(request: Request) {
       : "general-qa",
     provider: modelResult.provider,
     model: modelResult.model,
-    answer: modelResult.answer,
+    answer: parsedRequest.data.reportContext
+      ? modelResult.answer
+      : guardUnstartedReportClaim(modelResult.answer, parsedRequest.data.language, Boolean(roleContext)),
     ...(preservedRoleValidation ? {
       roleDraft: preservedRoleValidation.roleDraft,
       pendingField: preservedRoleValidation.parseStatus === "valid-complete"

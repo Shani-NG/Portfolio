@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { RoleValidationResult } from "../contracts/index.ts";
+import { guardUnstartedReportClaim } from "./report-state-claims.ts";
+
+describe("normal chat report state guard", () => {
+  it("replaces false English and Hebrew operational claims when no report route ran", () => {
+    assert.match(guardUnstartedReportClaim("I am generating the report now.", "en", true), /once the role details are confirmed/);
+    assert.match(guardUnstartedReportClaim("The report is ready.", "en", false), /send the job description/);
+    assert.match(guardUnstartedReportClaim("אני מייצרת את הדוח עכשיו.", "he", true), /אחרי אישור פרטי המשרה/);
+    assert.match(guardUnstartedReportClaim("הדוח מוכן.", "he", false), /לשלוח את תיאור המשרה/);
+  });
+
+  it("preserves normal portfolio conversation and future capability statements", () => {
+    const answer = "I can generate a report after you confirm the role details.";
+    assert.equal(guardUnstartedReportClaim(answer, "en", true), answer);
+    const hebrew = "אפשר לבחון את הניסיון של שני מול דרישות המשרה.";
+    assert.equal(guardUnstartedReportClaim(hebrew, "he", true), hebrew);
+  });
+});
 
 import {
   createRoleSourceFingerprint,

@@ -202,7 +202,10 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(requestReport, /submitLiveMessage\("Generate report", reportSession/);
     assert.match(requestReport, /appendUserMessage: false/);
     assert.match(requestReport, /revalidateRoleContext: true/);
+    assert.match(requestReport, /if \(revalidatedSession\?\.pendingReportConfirmation\) await requestReport\(revalidatedSession\)/);
     assert.doesNotMatch(requestReport, /missingFields: \["title", "responsibilities", "requirements"\]/);
+    assert.match(page, /!options\?\.revalidateRoleContext && !currentSession\.pendingReportConfirmation && !currentSession\.reportPayload[\s\S]*hasRoleDraftContent\(currentSession\.activeRoleDraft\) && isReportConfirmationText\(submittedText\)[\s\S]*revalidateRoleContext: true/);
+    assert.match(page, /return response\.ok \? updatedSession : undefined/);
     assert.match(route, /revalidateRoleContext: z\.boolean\(\)\.optional\(\)\.default\(false\)/);
     assert.match(route, /\|\| parsedRequest\.data\.revalidateRoleContext/);
   });
