@@ -14,7 +14,7 @@ describe("Role Fit runtime conversation contract", () => {
 
   it("generates a report from chat only after an explicit confirmation", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
-    const confirmationGuard = page.indexOf("currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)");
+    const confirmationGuard = page.indexOf("!currentSession.reportPayload && hasRoleDraftContent(currentSession.activeRoleDraft) && isReportConfirmationText(submittedText)");
     const guardedRequest = page.indexOf("await requestReport(sessionAfterUser);", confirmationGuard);
     const guardExit = page.indexOf("return;", guardedRequest);
 
@@ -27,7 +27,7 @@ describe("Role Fit runtime conversation contract", () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
     const behavior = await readFile(join(process.cwd(), "lib", "role-fit", "conversation", "behavior.ts"), "utf8");
 
-    assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)/);
+    assert.match(page, /hasRoleDraftContent\(currentSession\.activeRoleDraft\) && isReportConfirmationText\(submittedText\)/);
     assert.match(page, /await requestReport\(sessionAfterUser\)/);
     assert.match(behavior, /generate\(\?:\\s\+\(\?:the\|this\)\)\?\\s\+report/);
     assert.match(behavior, /try\\s\+again/);
@@ -107,7 +107,7 @@ describe("Role Fit runtime conversation contract", () => {
   it("allows one direct report retry and disables an immediate third attempt", async () => {
     const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
 
-    assert.match(page, /currentSession\.pendingReportConfirmation && isReportConfirmationText\(submittedText\)[\s\S]*await requestReport\(sessionAfterUser\)/);
+    assert.match(page, /hasRoleDraftContent\(currentSession\.activeRoleDraft\) && isReportConfirmationText\(submittedText\)[\s\S]*await requestReport\(sessionAfterUser\)/);
     assert.match(page, /reportAttemptNumber === 1/);
     assert.match(page, /pendingReportConfirmation: canOfferRetry/);
     assert.match(page, /reportAttemptState: null/);
@@ -202,7 +202,10 @@ describe("Role Fit runtime conversation contract", () => {
     assert.match(requestReport, /submitLiveMessage\("Generate report", reportSession/);
     assert.match(requestReport, /appendUserMessage: false/);
     assert.match(requestReport, /revalidateRoleContext: true/);
+    assert.match(requestReport, /if \(revalidatedSession\?\.pendingReportConfirmation\) await requestReport\(revalidatedSession\)/);
     assert.doesNotMatch(requestReport, /missingFields: \["title", "responsibilities", "requirements"\]/);
+    assert.match(page, /!currentSession\.reportPayload && hasRoleDraftContent\(currentSession\.activeRoleDraft\) && isReportConfirmationText\(submittedText\)/);
+    assert.match(page, /return response\.ok \? updatedSession : undefined/);
     assert.match(route, /revalidateRoleContext: z\.boolean\(\)\.optional\(\)\.default\(false\)/);
     assert.match(route, /\|\| parsedRequest\.data\.revalidateRoleContext/);
   });

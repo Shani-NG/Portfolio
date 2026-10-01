@@ -3,6 +3,7 @@ import { z } from "zod";
 import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import { createReportProviderFailureContract } from "@/lib/role-fit/model/failure-contract";
+import { generateReportWithRetry } from "@/lib/role-fit/model/report-retry";
 import { logRoleFitEvent } from "@/lib/role-fit/runtime/supabase-runtime-store";
 import { getGoogleAiStudioReportModel, getRoleFitPolicy } from "@/lib/role-fit/runtime/policy";
 import { loadApprovedEvidence } from "@/lib/role-fit/knowledge/load-approved-evidence";
@@ -275,15 +276,17 @@ export async function POST(request: Request) {
       })),
     });
   }
-  let modelResult = await provider.generateReport({
+  const initialAnalysisInput = {
     roleText: boundedRoleText,
     language: parsedRequest.data.language,
-    task: "analysis",
+    task: "analysis" as const,
     modelOverride: getGoogleAiStudioReportModel(),
     maxOutputTokens: reportAnalysisMaxOutputTokens,
     runtimeState: JSON.stringify({ validation: validationForAnalysis, roleItems }),
     approvedEvidence: approvedEvidence.promptContext,
-  });
+  };
+  const initialAnalysis = await generateReportWithRetry(() => provider.generateReport(initialAnalysisInput));
+  let modelResult = initialAnalysis.result;
   let providerElapsedMs = modelResult.ok ? modelResult.diagnostics.providerElapsedMs : 0;
   let schemaRepairUsed = modelResult.ok ? modelResult.diagnostics.schemaRepairUsed : false;
 
@@ -297,15 +300,9 @@ export async function POST(request: Request) {
       error: failedModelResult.error,
       providerStatus: failedModelResult.providerStatus,
       retryable: failedModelResult.retryable ?? false,
+      providerAttempts: initialAnalysis.attempts,
       retryAfterSeconds: failedModelResult.retryAfterSeconds,
       ...safeProviderDiagnostics(failedModelResult),
-      ...(failedModelResult.error === "provider-error"
-        && failedModelResult.providerStatus !== undefined
-        && failedModelResult.diagnostics?.responseBodyPresent
-        && failedModelResult.detail
-          ? { providerErrorDetail: failedModelResult.detail }
-          : {}),
-      ...(failedModelResult.error === "invalid-output" ? { diagnostic: failedModelResult.detail } : {}),
     });
     after(() =>
       logRoleFitEvent({
@@ -322,6 +319,7 @@ export async function POST(request: Request) {
           safeMessageKey: failedModelResult.safeMessageKey,
           providerStatus: failedModelResult.providerStatus,
           retryable: failedModelResult.retryable ?? false,
+          providerAttempts: initialAnalysis.attempts,
           retryAfterSeconds: failedModelResult.retryAfterSeconds,
           ...safeProviderDiagnostics(failedModelResult),
         },
@@ -467,6 +465,7 @@ export async function POST(request: Request) {
     provider: modelResult.provider,
     model: modelResult.model,
     status: "success",
+    providerAttempts: initialAnalysis.attempts,
     providerElapsedMs,
     totalReportRouteElapsedMs: Date.now() - startedAt,
     schemaRepairUsed,
@@ -549,6 +548,7 @@ export async function POST(request: Request) {
       metadata: {
         provider: modelResult.provider,
         model: modelResult.model,
+        providerAttempts: initialAnalysis.attempts,
         fitMode: report.overallFitVisual.mode,
         evidenceConfidence: report.evidenceConfidence.level,
         persistenceState,

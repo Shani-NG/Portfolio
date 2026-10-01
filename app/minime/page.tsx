@@ -184,7 +184,7 @@ export default function RoleFitPage() {
     const currentSession = resolveCanonicalSession(sessionOverride ?? liveSession);
     const submittedText = (textOverride ?? roleInput).trim();
     if (!submittedText || isSending || isAgentUnavailable) return;
-    if (currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
+    if (!currentSession.reportPayload && hasRoleDraftContent(currentSession.activeRoleDraft) && isReportConfirmationText(submittedText)) {
       const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
       setRoleInput("");
       await requestReport(sessionAfterUser);
@@ -263,7 +263,7 @@ export default function RoleFitPage() {
         setApiStatusMessage("");
         setErrorContext(null);
       }
-      syncLiveSession({
+      const updatedSession = syncLiveSession({
         state: nextState,
         activeRoleDraft: returnedRoleDraft ?? currentSession.activeRoleDraft,
         pendingRoleField: result.pendingField !== undefined ? result.pendingField : currentSession.pendingRoleField,
@@ -289,6 +289,7 @@ export default function RoleFitPage() {
         setErrorContext("conversation");
         setIsAgentUnavailable(false);
       }
+      return response.ok ? updatedSession : undefined;
     } catch {
       const message = "The Role Fit Agent is not available right now. Please try again later.";
       appendLiveMessage({ role: "agent", content: message });
@@ -316,8 +317,9 @@ export default function RoleFitPage() {
       if (hasRoleDraftContent(reportSession.activeRoleDraft)) {
         reportRequestInFlightRef.current = true;
         setIsReportRequestInFlight(true);
+        let revalidatedSession: RoleFitLiveSession | undefined;
         try {
-          await submitLiveMessage("Generate report", reportSession, {
+          revalidatedSession = await submitLiveMessage("Generate report", reportSession, {
             appendUserMessage: false,
             revalidateRoleContext: true,
           });
@@ -325,6 +327,7 @@ export default function RoleFitPage() {
           reportRequestInFlightRef.current = false;
           setIsReportRequestInFlight(false);
         }
+        if (revalidatedSession?.pendingReportConfirmation) await requestReport(revalidatedSession);
         return;
       }
 
