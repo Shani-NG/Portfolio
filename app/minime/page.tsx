@@ -624,10 +624,10 @@ export default function RoleFitPage() {
   }, [activeReport?.reportId, activePane, isNarrowLayout, liveSession]);
 
   function handleReportCtaClick() {
-    const session = restoreRoleFitLiveSession();
+    const session = resolveCanonicalSession(liveSession);
     const correlationId = createRoleFitBoundaryCorrelationId();
     recordBoundary("rolefit.cta_clicked", session, correlationId);
-    void requestReport(session, correlationId, "cta");
+    void requestReport(undefined, correlationId, "cta");
   }
 
   useEffect(() => {
