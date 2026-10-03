@@ -9,6 +9,9 @@ describe("normal chat report state guard", () => {
     assert.match(guardUnstartedReportClaim("The report is ready.", "en", false), /send the job description/);
     assert.match(guardUnstartedReportClaim("אני מייצרת את הדוח עכשיו.", "he", true), /אחרי אישור פרטי המשרה/);
     assert.match(guardUnstartedReportClaim("הדוח מוכן.", "he", false), /לשלוח את תיאור המשרה/);
+    assert.match(guardUnstartedReportClaim("Generating the role-fit report for the Senior Product Designer position at Gong.", "en", false), /send the job description/);
+    assert.match(guardUnstartedReportClaim("Opening your fit review now.", "en", true), /once the role details are confirmed/);
+    assert.match(guardUnstartedReportClaim("Would you like me to generate the role-fit report?", "en", false), /send the job description/);
   });
 
   it("preserves normal portfolio conversation and future capability statements", () => {

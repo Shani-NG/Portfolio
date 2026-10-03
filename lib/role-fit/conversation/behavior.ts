@@ -157,6 +157,12 @@ export function roleSubmissionSetupAnswer(language: "he" | "en" | "mixed") {
     : "You can upload a file or paste the job description here.\n\nTo assess the fit, please make sure it includes:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\n\nThe company name is helpful if included, but it is not required.\nIf an essential detail is missing, I’ll ask only for that.";
 }
 
+export function roleRecoveryUnavailableAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "השיחה נשמרה, אבל אין בה כרגע טיוטת משרה מאומתת או תיאור משרה שאפשר לשחזר בבטחה. אם כבר שלחת משרה, אפשר לשלוח שוב רק את תיאור התפקיד והדרישות; אציג מה הבנתי לאישור לפני יצירת דוח."
+    : "I still have the conversation, but no validated role draft or job description I can safely recover. If you already sent a role, resend just its responsibilities and requirements; I will show what I understood for confirmation before generating a report.";
+}
+
 function normalizeRoleFingerprintValue(value: string) {
   return value.normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim().toLowerCase();
 }

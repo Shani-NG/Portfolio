@@ -38,6 +38,7 @@ import {
   mergeRoleDraftClarification,
   mergeStructuredRoleDraft,
   referencesPreviouslyProvidedTitle,
+  roleIntakeChatState,
   serializeRoleDraftForBoundary,
   shouldValidateRoleCollectionMessage,
   shouldTreatAsRoleClarification,
@@ -274,7 +275,7 @@ export async function POST(request: Request) {
       detectedLanguage: parsedRequest.data.language,
     });
 
-    if (validation.parseStatus === "valid-complete") {
+    if (roleIntakeChatState(validation) === "awaiting-report-confirmation") {
       const title = validation.roleDraft.title?.originalValue ?? "";
       const companyName = validation.roleDraft.company?.originalValue;
       after(() =>

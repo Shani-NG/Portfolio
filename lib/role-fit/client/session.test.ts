@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, test } from "node:test";
 
 import type { ReportUIPayload, RoleValidationResult } from "../contracts/index.ts";
+import { createRoleDraftFromText } from "../server/role-understanding.ts";
 import { resetRoleFitAnalysis, restoreRoleFitLiveSession, serializeRoleFitSession, sessionLifetimeMs, updateRoleFitLiveSession } from "./session.ts";
 
 class MemoryStorage {
@@ -140,6 +141,31 @@ describe("Role Fit report session persistence", () => {
     assert.equal(restored.pendingRoleField, "responsibilities");
     assert.equal(restored.messages.at(-1)?.content, "Continue this conversation");
     assert.deepEqual(restored.expandedEvidenceItemIds, ["requirement_navigation"]);
+  });
+
+  test("restores a confirmed role draft and its pending approval across a reload", () => {
+    const confirmedDraft = createRoleDraftFromText([
+      "Senior Service Designer",
+      "You'll Own",
+      "Lead discovery across complex customer journeys.",
+      "Design prototypes with product and engineering teams.",
+      "How You'll Succeed Here",
+      "Strong experience in service design and research.",
+      "Portfolio showing clear design outcomes.",
+    ].join("\n"));
+    const saved = updateRoleFitLiveSession({
+      state: "awaiting-report-confirmation",
+      activeRoleDraft: confirmedDraft,
+      pendingReportConfirmation: true,
+    });
+    saved.expiresAt = 0;
+
+    const restored = restoreRoleFitLiveSession();
+
+    assert.equal(restored.state, "awaiting-report-confirmation");
+    assert.deepEqual(restored.activeRoleDraft, confirmedDraft);
+    assert.equal(restored.pendingReportConfirmation, true);
+    assert.equal(restored.reportPayload, null);
   });
 
   test("normalizes abandoned generating state without resetting retry attempts", () => {

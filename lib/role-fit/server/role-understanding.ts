@@ -962,6 +962,12 @@ export function validateStructuredRoleDraft(input: {
   return createRoleValidationResult(input);
 }
 
+export function roleIntakeChatState(validation: RoleValidationResult): "awaiting-report-confirmation" | "awaiting-role-completion" {
+  return validation.parseStatus === "valid-complete" && validation.missingFields.length === 0
+    ? "awaiting-report-confirmation"
+    : "awaiting-role-completion";
+}
+
 export function looksLikeReportIntent(message: string) {
   return /\b(report|fit|match|role fit|analy[sz]e|analysis)\b/i.test(message) || /דוח|דו"ח|דו״ח|התאמה|מתאימ|נתח|משרה|תפקיד/.test(message);
 }

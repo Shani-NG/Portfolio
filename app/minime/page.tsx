@@ -4,6 +4,7 @@ import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { RoleFitReportProgress } from "@/components/role-fit/role-fit-report-progress";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import { decideReportRequest, requestReportForConfirmedReply } from "@/lib/role-fit/client/report-transition";
 import {
   genericRecoverableErrorAnswer,
   isHebrewLanguage,
@@ -13,6 +14,7 @@ import {
   reportReadyAnswer,
   reportRetryExhaustedAnswer,
   reportRetryableFailureAnswer,
+  roleRecoveryUnavailableAnswer,
   resolveConversationLanguage,
   roleFileErrorAnswer,
   roleSubmissionSetupAnswer,
@@ -197,7 +199,7 @@ export default function RoleFitPage() {
     if (currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
       const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
       setRoleInput("");
-      await requestReport(sessionAfterUser);
+      await requestReportForConfirmedReply(sessionAfterUser, submittedText, requestReport);
       return;
     }
     if (!options?.revalidateRoleContext && !currentSession.pendingReportConfirmation && !currentSession.reportPayload
@@ -324,33 +326,38 @@ export default function RoleFitPage() {
     const reportSession = resolveCanonicalSession(sessionOverride ?? liveSession);
 
     if (reportRequestInFlightRef.current || isAgentUnavailable) return;
-    if (reportSession.reportPayload) {
+    const decision = decideReportRequest(reportSession);
+    if (decision.kind === "show-existing") {
       syncLiveSession({ state: "report-ready" });
+      setActivePane("report");
       return;
     }
-    if (!reportSession.pendingReportConfirmation || !hasRoleDraftContent(reportSession.activeRoleDraft)) {
-      if (hasRoleDraftContent(reportSession.activeRoleDraft)) {
-        reportRequestInFlightRef.current = true;
-        setIsReportRequestInFlight(true);
-        let revalidatedSession: RoleFitLiveSession | undefined;
-        try {
-          revalidatedSession = await submitLiveMessage("Generate report", reportSession, {
-            appendUserMessage: false,
-            revalidateRoleContext: true,
-          });
-        } finally {
-          reportRequestInFlightRef.current = false;
-          setIsReportRequestInFlight(false);
-        }
-        if (revalidatedSession?.pendingReportConfirmation) await requestReport(revalidatedSession);
-        return;
-      }
-
+    if (decision.kind === "recover-role") {
+      await submitLiveMessage(decision.roleText, reportSession, { appendUserMessage: false });
+      return;
+    }
+    if (decision.kind === "request-role") {
       appendLiveMessage({
         role: "agent",
-        content: roleSubmissionSetupAnswer(reportSession.activeLanguage),
+        content: reportSession.messages.some((message) => message.role === "user")
+          ? roleRecoveryUnavailableAnswer(reportSession.activeLanguage)
+          : roleSubmissionSetupAnswer(reportSession.activeLanguage),
       });
       syncLiveSession({ state: "awaiting-role-completion", pendingReportConfirmation: false });
+      return;
+    }
+    if (decision.kind === "revalidate-role") {
+      reportRequestInFlightRef.current = true;
+      setIsReportRequestInFlight(true);
+      try {
+        await submitLiveMessage("Generate report", reportSession, {
+          appendUserMessage: false,
+          revalidateRoleContext: true,
+        });
+      } finally {
+        reportRequestInFlightRef.current = false;
+        setIsReportRequestInFlight(false);
+      }
       return;
     }
 
