@@ -4,7 +4,7 @@ import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { RoleFitReportProgress } from "@/components/role-fit/role-fit-report-progress";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
-import { decideReportRequest, requestReportForConfirmedReply } from "@/lib/role-fit/client/report-transition";
+import { decideReportRequest, recoveredRoleMessage, requestReportForConfirmedReply } from "@/lib/role-fit/client/report-transition";
 import {
   genericRecoverableErrorAnswer,
   isHebrewLanguage,
@@ -217,7 +217,8 @@ export default function RoleFitPage() {
         (normalizedSubmittedText.length > 80 && normalizedPreviousInput.includes(normalizedSubmittedText))
       ),
     );
-    const messageForAgent = submittedText;
+    const recoveredRoleText = recoveredRoleMessage(currentSession, submittedText);
+    const messageForAgent = recoveredRoleText ?? submittedText;
     const activeLanguage = resolveConversationLanguage(submittedText, currentSession.activeLanguage);
 
     const sessionAfterUser = options?.appendUserMessage === false
@@ -251,7 +252,7 @@ export default function RoleFitPage() {
           language: activeLanguage,
           repeatedInput,
           roleCollectionActive: Boolean(currentSession.activeRoleDraft) && !currentSession.reportPayload,
-          revalidateRoleContext: options?.revalidateRoleContext ?? false,
+          revalidateRoleContext: options?.revalidateRoleContext || Boolean(recoveredRoleText),
           clarificationAttempts: currentSession.clarificationAttempts,
           completedReportCount: currentSession.completedReportCount,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)).slice(-12000),
@@ -333,7 +334,7 @@ export default function RoleFitPage() {
       return;
     }
     if (decision.kind === "recover-role") {
-      await submitLiveMessage(decision.roleText, reportSession, { appendUserMessage: false });
+      await submitLiveMessage(decision.roleText, reportSession, { appendUserMessage: false, revalidateRoleContext: true });
       return;
     }
     if (decision.kind === "request-role") {

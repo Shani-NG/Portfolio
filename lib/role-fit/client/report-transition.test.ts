@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createRoleDraftFromText } from "../server/role-understanding.ts";
-import { decideReportRequest, latestRecoverableRoleInput, requestReportForConfirmedReply } from "./report-transition.ts";
+import { createRoleDraftFromText, looksLikeRoleInput } from "../server/role-understanding.ts";
+import { decideReportRequest, latestRecoverableRoleInput, recoveredRoleMessage, requestReportForConfirmedReply } from "./report-transition.ts";
 import type { RoleFitLiveSession } from "./session.ts";
 
 const completeRoleText = [
@@ -52,6 +52,32 @@ describe("Role Fit conversation-to-report transition", () => {
     assert.equal(latestRecoverableRoleInput(messages), completeRoleText);
     assert.deepEqual(decideReportRequest(session({ messages })), { kind: "recover-role", roleText: completeRoleText });
     assert.deepEqual(decideReportRequest(session({ messages: messages.slice(1) })), { kind: "request-role" });
+  });
+
+  it("revalidates the previous user JD when an uncaptured title or YES follows model chat", () => {
+    const messages: RoleFitLiveSession["messages"] = [
+      { id: "1", role: "user", content: completeRoleText },
+      { id: "2", role: "agent", content: "The report is ready to generate." },
+    ];
+    const lostDraft = session({ messages });
+    assert.equal(recoveredRoleMessage(lostDraft, "SENIOR SERVICE DESIGNER"), `${completeRoleText}\n\nTitle: SENIOR SERVICE DESIGNER`);
+    assert.equal(recoveredRoleMessage(lostDraft, "YES"), completeRoleText);
+    assert.equal(recoveredRoleMessage(lostDraft, "Tell me about Shani's portfolio"), null);
+    assert.equal(recoveredRoleMessage(session({ messages: messages.slice(1) }), "YES"), null);
+    assert.equal(recoveredRoleMessage(session({ messages, activeRoleDraft: createRoleDraftFromText(completeRoleText) }), "YES"), null);
+  });
+
+  it("can recover an extractable JD that the initial intake gate missed", () => {
+    const missedRole = [
+      "This opening covers complex customer workflows across several product teams and requires design leadership throughout discovery and delivery.",
+      "Lead product discovery with customers and stakeholders across enterprise workflows.",
+      "Design prototypes with product and engineering teams to test user needs.",
+      "Strong experience with UX research and service design in B2B software.",
+      "Portfolio showing recent work with clear product outcomes.",
+    ].join("\n");
+    assert.equal(looksLikeRoleInput(missedRole), false);
+    assert.equal(latestRecoverableRoleInput([{ id: "1", role: "user", content: missedRole }]), missedRole);
+    assert.equal(recoveredRoleMessage(session({ messages: [{ id: "1", role: "user", content: missedRole }] }), "YES"), missedRole);
   });
 
   it("never starts generation from a JD paste, an incomplete draft, or missing confirmation", () => {

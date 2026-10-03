@@ -541,12 +541,25 @@ function extractLeadingSourceTitle(roleText: string) {
   return "";
 }
 
+function extractTrailingSourceTitle(roleText: string) {
+  const lastLine = normalizeRoleText(roleText).split(/\r?\n/).map((line) => line.trim()).filter(Boolean).at(-1) ?? "";
+  if (!lastLine || stripListMarker(lastLine).isListItem) return "";
+  const title = stripMarkdownPresentation(lastLine);
+  const titleCasing = title.split(/\s+/).every((word) =>
+    /^(?:of|and|for|the|in|at|to|&|\/)$/i.test(word) || /^[\p{Lu}][\p{L}\p{N}&/().+-]*$/u.test(word),
+  );
+  return isPlausibleSourceTitle(title) && titleCasing && !classifyRoleItem(title) ? title : "";
+}
+
 function inferTitle(roleText: string): { value: string; confidence: "high" | "medium" | "low"; confirmed: boolean } {
   const labeledTitle = extractSection(roleText, ["title", "role", "תפקיד", "שם המשרה"]);
   if (labeledTitle && isPlausibleRoleTitle(labeledTitle)) return { value: labeledTitle, confidence: "high", confirmed: true };
 
   const leadingSourceTitle = extractLeadingSourceTitle(roleText);
   if (leadingSourceTitle) return { value: leadingSourceTitle, confidence: "medium", confirmed: true };
+
+  const trailingSourceTitle = extractTrailingSourceTitle(roleText);
+  if (trailingSourceTitle) return { value: trailingSourceTitle, confidence: "medium", confirmed: true };
 
   for (const line of normalizeRoleText(roleText).split(/\r?\n/).slice(0, 40)) {
     const hiringTitle = extractTitleFromHiringSentence(line);

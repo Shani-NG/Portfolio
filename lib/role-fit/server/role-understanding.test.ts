@@ -32,6 +32,30 @@ describe("Role Fit pasted job understanding", () => {
     );
   });
 
+  it("finds a source title at the end of a Markdown JD without losing its earlier role details", () => {
+    const roleText = [
+      "## About the job",
+      "At Gong, we’re seeking a highly motivated, Senior Product Designer to design product experiences.",
+      "**You'll Own**",
+      "- Drive the user experience and design for a key product area.",
+      "- Lead end-to-end design processes with product and engineering teams.",
+      "**How You’ll Succeed Here**",
+      "- 8+ years of experience designing flows and UI for web products.",
+      "- Portfolio showcasing recent relevant work.",
+      "**What makes the department unique?**",
+      "Our design team owns complex customer problems.",
+      "SENIOR PRODUCT DESIGNER",
+    ].join("\n\n");
+    const result = validateRoleText({ conversationId: "tail_title", traceId: "tail_title", roleText, detectedLanguage: "en" });
+
+    assert.equal(looksLikeRoleInput(roleText), true);
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.equal(roleIntakeChatState(result), "awaiting-report-confirmation");
+    assert.equal(result.roleDraft.title?.originalValue, "SENIOR PRODUCT DESIGNER");
+    assert.ok(result.roleDraft.responsibilities.some((item) => item.originalValue.startsWith("Drive the user experience")));
+    assert.ok(result.roleDraft.requirements.some((item) => item.originalValue.startsWith("8+ years")));
+  });
+
   it("accepts natural role headings while keeping an incomplete JD on the existing clarification path", () => {
     const complete = [
       "Service Design Lead",

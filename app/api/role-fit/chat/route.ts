@@ -213,7 +213,7 @@ export async function POST(request: Request) {
   }
 
   const currentRoleDraft = roleContext?.roleDraft;
-  const incomingRoleDraft = hasRoleInput && !isFieldClarification
+  const incomingRoleDraft = (hasRoleInput || parsedRequest.data.revalidateRoleContext) && !isFieldClarification
     ? createRoleDraftFromText(parsedRequest.data.message)
     : createEmptyRoleDraft();
   if (
