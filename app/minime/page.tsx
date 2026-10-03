@@ -98,6 +98,7 @@ function recordReportClientEvent(reportId: string, boundary: "client-response" |
 
 export default function RoleFitPage() {
   const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => restoreRoleFitLiveSession());
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [roleInput, setRoleInput] = useState("");
   const [apiStatusMessage, setApiStatusMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -114,16 +115,18 @@ export default function RoleFitPage() {
   const chatHistoryRef = useRef<HTMLDivElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
   const roleFileInputRef = useRef<HTMLInputElement>(null);
-  const activeReport = liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined;
+  const activeReport = hasHydrated
+    ? liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined
+    : undefined;
   const hasLiveReport = Boolean(activeReport);
-  const liveSplitCanvas = liveSession.state === "generating-report"
+  const liveSplitCanvas = hasHydrated && (liveSession.state === "generating-report"
     || liveSession.state === "report-ready"
-    || (liveSession.state === "recoverable-error" && (Boolean(activeReport) || errorContext === "report" || errorContext === "validation"));
+    || (liveSession.state === "recoverable-error" && (Boolean(activeReport) || errorContext === "report" || errorContext === "validation")));
   const splitCanvas = liveSplitCanvas;
-  const hasConversation = liveSession.messages.length > 0 || liveSession.state !== "initial";
+  const hasConversation = hasHydrated && (liveSession.messages.length > 0 || liveSession.state !== "initial");
   const reportActionLabel = hasLiveReport
     ? "Show report"
-    : liveSession.pendingReportConfirmation
+    : hasHydrated && liveSession.pendingReportConfirmation
       ? "Generate confirmed report"
       : "Generate report";
   const errorHeading = isHebrewLanguage(liveSession.activeLanguage)
@@ -514,6 +517,7 @@ export default function RoleFitPage() {
   useEffect(() => {
     const restoredSession = restoreRoleFitLiveSession();
     setLiveSession(restoredSession);
+    setHasHydrated(true);
     if (restoredSession.reportPayload) setActivePane("report");
 
     const pendingInput = consumePendingHomeRoleFitInput();
