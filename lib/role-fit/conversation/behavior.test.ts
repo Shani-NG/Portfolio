@@ -111,6 +111,10 @@ describe("Role Fit conversation behavior", () => {
   it("accepts representative natural confirmations with normal punctuation", () => {
     assert.equal(isReportConfirmationText("Yes!"), true);
     assert.equal(isReportConfirmationText("כן."), true);
+    assert.equal(isReportConfirmationText("בטח"), true);
+    assert.equal(isReportConfirmationText("ודאי, קדימה"), true);
+    assert.equal(isReportConfirmationText("בוודאי"), true);
+    assert.equal(isReportConfirmationText("ברור"), true);
     assert.equal(isReportConfirmationText("כן תכיני לי דוח"), true);
     assert.equal(isReportConfirmationText("מעולה, קדימה"), true);
     assert.equal(isReportConfirmationText("yes please"), true);

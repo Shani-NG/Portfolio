@@ -47,7 +47,7 @@ export function isReportConfirmationText(value: string) {
   if (explicitReportAction.test(normalized)) return true;
   if (/^(?:תנסי שוב|נסה שוב|ניסיון נוסף|אפשר לנסות שוב)$/.test(normalized)) return true;
   const englishAffirmative = /^(?:yes|yep|sure|ok|okay|great|nice|sounds good|looks right)(?:\s*,?\s*(?:please(?:\s*,?\s*(?:go ahead|continue|proceed|generate(?:\s+(?:the|this))?\s+report|create(?:\s+(?:the|this))?\s+report))?|go ahead|continue|proceed|generate(?:\s+(?:the|this))?\s+report|create(?:\s+(?:the|this))?\s+report))?$/i;
-  const hebrewAffirmative = /^(?:יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך|נשמע\s+נכון)(?:\s*,?\s*(?:קדימה|בואי\s+נמשיך|אפשר\s+להמשיך|תמשיכי|תכיני(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)|תייצרי(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)))?$/;
+  const hebrewAffirmative = /^(?:יופי|כן|בטח|ודאי|בוודאי|ברור|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך|נשמע\s+נכון)(?:\s*,?\s*(?:קדימה|בואי\s+נמשיך|אפשר\s+להמשיך|תמשיכי|תכיני(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)|תייצרי(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)))?$/;
   return englishAffirmative.test(normalized) || hebrewAffirmative.test(normalized)
     || /^(?:go ahead|generate|continue|confirm)$/.test(normalized);
 }
