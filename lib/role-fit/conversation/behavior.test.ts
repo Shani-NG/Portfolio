@@ -1,8 +1,29 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { RoleValidationResult } from "../contracts/index.ts";
+import { guardUnstartedReportClaim } from "./report-state-claims.ts";
+
+describe("normal chat report state guard", () => {
+  it("replaces false English and Hebrew operational claims when no report route ran", () => {
+    assert.match(guardUnstartedReportClaim("I am generating the report now.", "en", true), /once the role details are confirmed/);
+    assert.match(guardUnstartedReportClaim("The report is ready.", "en", false), /send the job description/);
+    assert.match(guardUnstartedReportClaim("אני מייצרת את הדוח עכשיו.", "he", true), /אחרי אישור פרטי המשרה/);
+    assert.match(guardUnstartedReportClaim("הדוח מוכן.", "he", false), /לשלוח את תיאור המשרה/);
+    assert.match(guardUnstartedReportClaim("Generating the role-fit report for the Senior Product Designer position at Gong.", "en", false), /send the job description/);
+    assert.match(guardUnstartedReportClaim("Opening your fit review now.", "en", true), /once the role details are confirmed/);
+    assert.match(guardUnstartedReportClaim("Would you like me to generate the role-fit report?", "en", false), /send the job description/);
+  });
+
+  it("preserves normal portfolio conversation and future capability statements", () => {
+    const answer = "I can generate a report after you confirm the role details.";
+    assert.equal(guardUnstartedReportClaim(answer, "en", true), answer);
+    const hebrew = "אפשר לבחון את הניסיון של שני מול דרישות המשרה.";
+    assert.equal(guardUnstartedReportClaim(hebrew, "he", true), hebrew);
+  });
+});
 
 import {
+  cleanHebrewOpeningCopy,
   createRoleSourceFingerprint,
   existingReportAnswer,
   genericRecoverableErrorAnswer,
@@ -18,6 +39,7 @@ import {
   reportMutationBlockedAnswer,
   reportReadyAnswer,
   reportRetryExhaustedAnswer,
+  reportProviderUnavailableAnswer,
   reportRetryableFailureAnswer,
   resolveConversationLanguage,
   roleFileErrorAnswer,
@@ -94,6 +116,10 @@ describe("Role Fit conversation behavior", () => {
   it("accepts representative natural confirmations with normal punctuation", () => {
     assert.equal(isReportConfirmationText("Yes!"), true);
     assert.equal(isReportConfirmationText("כן."), true);
+    assert.equal(isReportConfirmationText("בטח"), true);
+    assert.equal(isReportConfirmationText("ודאי, קדימה"), true);
+    assert.equal(isReportConfirmationText("בוודאי"), true);
+    assert.equal(isReportConfirmationText("ברור"), true);
     assert.equal(isReportConfirmationText("כן תכיני לי דוח"), true);
     assert.equal(isReportConfirmationText("מעולה, קדימה"), true);
     assert.equal(isReportConfirmationText("yes please"), true);
@@ -249,6 +275,9 @@ describe("Role Fit conversation behavior", () => {
     assert.match(reportRetryExhaustedAnswer("en"), /additional attempt either/);
     assert.doesNotMatch(reportRetryExhaustedAnswer("he"), /לנסות שוב\?/);
     assert.doesNotMatch(reportRetryExhaustedAnswer("en"), /Would you like me to try again/i);
+    assert.match(reportProviderUnavailableAnswer("he", true), /לא נוצר דוח.*זמנית.*לנסות שוב.*שני/);
+    assert.match(reportProviderUnavailableAnswer("en", false), /No report was created.*temporarily unavailable.*contact Shani/);
+    assert.equal(cleanHebrewOpeningCopy("רוצה לבдиקת התאמה?"), "רוצה לבדיקת התאמה?");
   });
 
   it("acknowledges an uncaptured previous title without implying the role draft was lost", () => {

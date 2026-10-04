@@ -129,6 +129,8 @@ describe("Role Fit report lifecycle boundary", () => {
 
     assert.ok(providerFailure >= 0);
     assert.ok(persistence > providerFailure);
+    assert.ok(route.indexOf("generateReportWithRetry(") < providerFailure);
+    assert.equal(route.match(/persistCompletedReport\(report,/g)?.length, 1);
     assert.match(route, /return NextResponse\.json\(failureContract\.body, \{ status: failureContract\.status \}\)/);
     assert.match(failedRequestBranch, /state: isNoReport \? "general-qa" : "recoverable-error"/);
     assert.match(failedRequestBranch, /pendingReportId: isRetryableReportFailure \? reportId : null/);

@@ -47,7 +47,7 @@ export function isReportConfirmationText(value: string) {
   if (explicitReportAction.test(normalized)) return true;
   if (/^(?:תנסי שוב|נסה שוב|ניסיון נוסף|אפשר לנסות שוב)$/.test(normalized)) return true;
   const englishAffirmative = /^(?:yes|yep|sure|ok|okay|great|nice|sounds good|looks right)(?:\s*,?\s*(?:please(?:\s*,?\s*(?:go ahead|continue|proceed|generate(?:\s+(?:the|this))?\s+report|create(?:\s+(?:the|this))?\s+report))?|go ahead|continue|proceed|generate(?:\s+(?:the|this))?\s+report|create(?:\s+(?:the|this))?\s+report))?$/i;
-  const hebrewAffirmative = /^(?:יופי|כן|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך|נשמע\s+נכון)(?:\s*,?\s*(?:קדימה|בואי\s+נמשיך|אפשר\s+להמשיך|תמשיכי|תכיני(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)|תייצרי(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)))?$/;
+  const hebrewAffirmative = /^(?:יופי|כן|בטח|ודאי|בוודאי|ברור|יאללה|אפשר|קדימה|מעולה|בסדר|מאשרת|תמשיכי|נמשיך|נשמע\s+נכון)(?:\s*,?\s*(?:קדימה|בואי\s+נמשיך|אפשר\s+להמשיך|תמשיכי|תכיני(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)|תייצרי(?:\s+לי)?\s+(?:את\s+)?(?:הדוח|דוח)))?$/;
   return englishAffirmative.test(normalized) || hebrewAffirmative.test(normalized)
     || /^(?:go ahead|generate|continue|confirm)$/.test(normalized);
 }
@@ -157,6 +157,12 @@ export function roleSubmissionSetupAnswer(language: "he" | "en" | "mixed") {
     : "You can upload a file or paste the job description here.\n\nTo assess the fit, please make sure it includes:\n- Role title\n- Main responsibilities\n- Main requirements or qualifications\n\nThe company name is helpful if included, but it is not required.\nIf an essential detail is missing, I’ll ask only for that.";
 }
 
+export function roleRecoveryUnavailableAnswer(language: "he" | "en" | "mixed") {
+  return isHebrewLanguage(language)
+    ? "השיחה נשמרה, אבל אין בה כרגע טיוטת משרה מאומתת או תיאור משרה שאפשר לשחזר בבטחה. אם כבר שלחת משרה, אפשר לשלוח שוב רק את תיאור התפקיד והדרישות; אציג מה הבנתי לאישור לפני יצירת דוח."
+    : "I still have the conversation, but no validated role draft or job description I can safely recover. If you already sent a role, resend just its responsibilities and requirements; I will show what I understood for confirmation before generating a report.";
+}
+
 function normalizeRoleFingerprintValue(value: string) {
   return value.normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim().toLowerCase();
 }
@@ -223,6 +229,21 @@ export function reportRetryExhaustedAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
     ? "לא הצלחתי להשלים את הדוח גם בניסיון הנוסף. פרטי המשרה עדיין כאן, ואפשר להמשיך לשאול אותי על ההתאמה או לנסות שוב מאוחר יותר."
     : "I couldn’t complete the report on the additional attempt either. The role details are still here, so you can continue asking about the fit or try again later.";
+}
+
+export function reportProviderUnavailableAnswer(language: "he" | "en" | "mixed", canRetry: boolean) {
+  if (isHebrewLanguage(language)) {
+    return canRetry
+      ? "לא נוצר דוח. ספק הדוח אינו זמין זמנית. אפשר לנסות שוב פעם אחת, או ליצור קשר עם שני."
+      : "לא נוצר דוח. ספק הדוח אינו זמין זמנית גם לאחר ניסיון נוסף. אפשר לנסות מאוחר יותר או ליצור קשר עם שני.";
+  }
+  return canRetry
+    ? "No report was created. The report provider is temporarily unavailable. You can try once more or contact Shani."
+    : "No report was created. The report provider is temporarily unavailable after another attempt. You can try later or contact Shani.";
+}
+
+export function cleanHebrewOpeningCopy(answer: string) {
+  return answer.replaceAll("לבдиקת", "לבדיקת");
 }
 
 export function reportReadyAnswer(language: "he" | "en" | "mixed") {

@@ -2,10 +2,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
+import { guardUnstartedReportClaim } from "@/lib/role-fit/conversation/report-state-claims";
 import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import {
   clarificationLimitAnswer,
+  cleanHebrewOpeningCopy,
   existingReportAnswer,
   genericRoleTitleAnswer,
   hasSameRoleSourceFingerprint,
@@ -37,6 +39,7 @@ import {
   mergeRoleDraftClarification,
   mergeStructuredRoleDraft,
   referencesPreviouslyProvidedTitle,
+  roleIntakeChatState,
   serializeRoleDraftForBoundary,
   shouldValidateRoleCollectionMessage,
   shouldTreatAsRoleClarification,
@@ -211,7 +214,7 @@ export async function POST(request: Request) {
   }
 
   const currentRoleDraft = roleContext?.roleDraft;
-  const incomingRoleDraft = hasRoleInput && !isFieldClarification
+  const incomingRoleDraft = (hasRoleInput || parsedRequest.data.revalidateRoleContext) && !isFieldClarification
     ? createRoleDraftFromText(parsedRequest.data.message)
     : createEmptyRoleDraft();
   if (
@@ -273,7 +276,7 @@ export async function POST(request: Request) {
       detectedLanguage: parsedRequest.data.language,
     });
 
-    if (validation.parseStatus === "valid-complete") {
+    if (roleIntakeChatState(validation) === "awaiting-report-confirmation") {
       const title = validation.roleDraft.title?.originalValue ?? "";
       const companyName = validation.roleDraft.company?.originalValue;
       after(() =>
@@ -419,7 +422,9 @@ export async function POST(request: Request) {
       : "general-qa",
     provider: modelResult.provider,
     model: modelResult.model,
-    answer: modelResult.answer,
+    answer: parsedRequest.data.reportContext
+      ? modelResult.answer
+      : cleanHebrewOpeningCopy(guardUnstartedReportClaim(modelResult.answer, parsedRequest.data.language, Boolean(roleContext))),
     ...(preservedRoleValidation ? {
       roleDraft: preservedRoleValidation.roleDraft,
       pendingField: preservedRoleValidation.parseStatus === "valid-complete"

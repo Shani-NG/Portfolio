@@ -3,9 +3,140 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { goldenCorpusFixtures } from "./golden-corpus/fixtures.ts";
 import { getRoleAnalysisItems } from "../report/compose-report.ts";
-import { applyRoleDraftCorrection, clearRoleDraftField, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, isPlausibleRoleTitle, isRoleTitleRejection, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeCompanyName, normalizeRoleTitleClarification, referencesPreviouslyProvidedTitle, resolveEnglishReportTitle, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
+import { applyRoleDraftCorrection, clearRoleDraftField, createRoleDraftFromText, detectRoleCorrection, extractRoleContent, extractStandaloneRoleTitle, isNoRoleTitleAnswer, isPlausibleRoleTitle, isRoleTitleRejection, looksLikeRoleInput, mergeRoleDraftClarification, mergeStructuredRoleDraft, normalizeCompanyName, normalizeRoleTitleClarification, referencesPreviouslyProvidedTitle, resolveEnglishReportTitle, roleIntakeChatState, serializeRoleDraftForBoundary, shouldTreatAsRoleClarification, shouldValidateRoleCollectionMessage, validateRoleText, validateStructuredRoleDraft } from "./role-understanding.ts";
 
 describe("Role Fit pasted job understanding", () => {
+  it("admits the exact Gong replay JD and keeps its canonical role fields clean", () => {
+    // PR13 completed this exact replay; keep its intake behavior while retaining PR19 validation and confirmation gates.
+    const roleText = "Senior Product Designer\nAbout the job\nGong harnesses the power of AI to transform how revenue teams win. The Gong Revenue AI Operating System unifies data, insights, and workflows into a single, trusted system that observes, guides, and acts alongside the world’s most successful revenue teams. Powered by the Gong Revenue Graph, AI-powered intelligence, specialized agents, and trusted applications, Gong helps more than 5,000 companies around the world deeply understand their teams and customers, automate critical sales workflows, and close more deals with less effort. For more information, visit [www.gong.io](http://www.gong.io).\nAt Gong, you will join a company built on innovative products, ambitious goals, and passionate people. We are shaping the future of revenue intelligence and we want people who are excited to build what comes next. You will work with a team that dreams big, moves fast, and cares deeply about the craft and about each other. Here, transparency and trust are core to how we operate, and every person has the opportunity to make a visible impact. If you want to grow, stretch, and do work that truly matters, Gong is the place to do the best work of your career.\nWe’re seeking a highly motivated, Senior Product Designer to play a key role in designing, exploring, and continually delivering innovative solutions and experiences. If you have a passion for creating innovative products and thrive on identifying and solving user needs, we want you!\nYou'll Own\nDrive the user experience and design for one of Gong’s key product areas.\nLead end-to-end design processes- from ideation and wireframes to polished, high-fidelity designs.\nChampion user-centered design principles and act as the voice of the user across the product lifecycle.\nHelp shape and refine Gong’s UI pattern libraries and design guidelines.\nTake ownership of creating intuitive, scalable, and impactful product experiences.\nYou'll Solve\nResearch and deeply understand complex user problems in B2B SaaS environments.\nTransform complicated workflows into elegant, simple, and easy-to-use solutions.\nBalance strategic thinking with attention to detail while designing flows and interfaces.\nCollaborate closely with Product Managers and Engineers to bring ideas to life.\nUse prototyping, user research, and testing methodologies to validate and improve solutions.\nYou'll Impact\nCreate exceptional UX experiences that turn users into loyal advocates and “raving fans.”\nInfluence how revenue teams worldwide work more productively and make smarter decisions.\nContribute to products used by more than 4,500 companies globally.\nHelp build innovative AI-powered experiences that drive measurable business outcomes.\nBe part of Gong’s “Own. Solve. Impact.” culture by delivering meaningful product and customer impact.\nHow You’ll Succeed Here\n8+ years of experience designing flows, experiences, and UI for web and mobile products, preferably in B2B SaaS.\nStrong skills in both rapid and high-fidelity prototyping.\nExperience creating clear, intuitive, and user-friendly designs.\nA highly creative and self-driven mindset with strong problem-solving abilities.\nAbility to simplify complex challenges into elegant solutions.\nPassion for crafting exceptional user experiences.\nExperience with user research methodologies and usability testing.\nProficiency with Figma and other design tools.\nStrong collaboration and interpersonal skills.\nExcellent communication, presentation, and organizational abilities.\nHigh level of written and verbal English.\nPortfolio showcasing recent relevant work.\nDegree in a related field (Design, Human Factors Engineering, Cognitive / Applied Psychology)- an advantage.\nWhat makes the Product Design department at Gong unique?\nHere at Gong, we trust and empower our employees with ownership to solve complex problems, make the right decisions, and build the best products that create radical impact. We call this “Own. Solve. Impact.”\nBeing a Product Designer at Gong is all about engaging with customers, understanding their needs, and building great products to address those needs. We have empowered teams. Each product designer works closely with a product manager and an engineering team to drive forward an agenda or domain. The pod is responsible for working with customers, iterating towards a great solution, and driving it towards success. There are many amazingly talented PDs to work with, collaborate, learn from, and contribute from your own knowledge.\nWe encourage our employees to express their personality and identity (whether gender, ethnic, religious, or sexual), and we ensure fairness and equal opportunities. We follow a hybrid working model that combines working from home, on the go, or at the office. This allows us: flexibility, autonomy, positive work relationships, and effective work habits.\nIf these considerations are important to you when choosing a work place, we'd love to see you with us.";
+    const result = validateRoleText({ conversationId: "gong_replay", traceId: "gong_replay", roleText, detectedLanguage: "en" });
+    const draft = result.roleDraft;
+
+    assert.equal(looksLikeRoleInput(roleText), true);
+    assert.equal(shouldValidateRoleCollectionMessage({ message: roleText, roleCollectionActive: false }), true);
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.equal(roleIntakeChatState(result), "awaiting-report-confirmation");
+    assert.equal(draft.title?.originalValue, "Senior Product Designer");
+    assert.equal(draft.company?.originalValue, "Gong");
+    assert.ok(draft.responsibilities.some((item) => item.originalValue.startsWith("Drive the user experience")));
+    assert.ok(draft.responsibilities.some((item) => item.originalValue.startsWith("Research and deeply understand")));
+    assert.ok(draft.requirements.some((item) => item.originalValue.startsWith("8+ years of experience")));
+    assert.ok(draft.preferredQualifications.some((item) => item.originalValue.startsWith("Degree in a related field")));
+    assert.equal(draft.requirements.some((item) => item.originalValue.includes("What makes the Product Design department")), false);
+    assert.equal(draft.requirements.some((item) => item.originalValue.includes("We encourage our employees")), false);
+    assert.equal(draft.responsibilities.some((item) => item.originalValue.includes("Be part of Gong's")), false);
+    assert.deepEqual(createRoleDraftFromText(`Uploaded file: gong.txt\n\n${roleText}`), draft);
+    assert.equal(
+      serializeRoleDraftForBoundary(mergeStructuredRoleDraft(draft, createRoleDraftFromText(roleText))),
+      serializeRoleDraftForBoundary(draft),
+    );
+  });
+
+  it("finds a source title at the end of a Markdown JD without losing its earlier role details", () => {
+    const roleText = [
+      "## About the job",
+      "At Gong, we’re seeking a highly motivated, Senior Product Designer to design product experiences.",
+      "**You'll Own**",
+      "- Drive the user experience and design for a key product area.",
+      "- Lead end-to-end design processes with product and engineering teams.",
+      "**How You’ll Succeed Here**",
+      "- 8+ years of experience designing flows and UI for web products.",
+      "- Portfolio showcasing recent relevant work.",
+      "**What makes the department unique?**",
+      "Our design team owns complex customer problems.",
+      "SENIOR PRODUCT DESIGNER",
+    ].join("\n\n");
+    const result = validateRoleText({ conversationId: "tail_title", traceId: "tail_title", roleText, detectedLanguage: "en" });
+
+    assert.equal(looksLikeRoleInput(roleText), true);
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.equal(roleIntakeChatState(result), "awaiting-report-confirmation");
+    assert.equal(result.roleDraft.title?.originalValue, "SENIOR PRODUCT DESIGNER");
+    assert.ok(result.roleDraft.responsibilities.some((item) => item.originalValue.startsWith("Drive the user experience")));
+    assert.ok(result.roleDraft.requirements.some((item) => item.originalValue.startsWith("8+ years")));
+  });
+
+  it("accepts natural role headings while keeping an incomplete JD on the existing clarification path", () => {
+    const complete = [
+      "Service Design Lead",
+      "What You'll Shape",
+      "Lead service discovery across complex customer journeys.",
+      "Design prototypes with product and engineering partners.",
+      "To Succeed In This Role",
+      "Strong experience in service design and research.",
+      "Portfolio showing end-to-end design work.",
+    ].join("\n");
+    const incomplete = [
+      "Service Design Lead",
+      "You'll Own",
+      "Lead service discovery across complex customer journeys.",
+      "Design prototypes with product and engineering partners.",
+      "About Us",
+      "Our company has years of experience delivering digital services.",
+    ].join("\n");
+
+    assert.equal(looksLikeRoleInput(complete), true);
+    assert.equal(validateRoleText({ conversationId: "natural", traceId: "natural", roleText: complete, detectedLanguage: "en" }).parseStatus, "valid-complete");
+    assert.equal(looksLikeRoleInput(incomplete), true);
+    const incompleteResult = validateRoleText({ conversationId: "incomplete", traceId: "incomplete", roleText: incomplete, detectedLanguage: "en" });
+    assert.equal(incompleteResult.parseStatus, "valid-incomplete");
+    assert.equal(roleIntakeChatState(incompleteResult), "awaiting-role-completion");
+    assert.deepEqual(incompleteResult.missingFields, ["requirements"]);
+  });
+
+  it("infers unfamiliar standalone section boundaries from the source lines that follow", () => {
+    const roleText = [
+      "Product Research Lead",
+      "The Work Ahead",
+      "Lead interviews to uncover product needs.",
+      "Design studies with product and engineering teams.",
+      "Candidate Profile",
+      "Strong experience conducting mixed-method research.",
+      "Portfolio showing clear research outcomes.",
+      "Our Team Culture",
+      "We are a collaborative and supportive group.",
+    ].join("\n");
+    const result = validateRoleText({ conversationId: "unknown", traceId: "unknown", roleText, detectedLanguage: "en" });
+
+    assert.equal(looksLikeRoleInput(roleText), true);
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.deepEqual(result.roleDraft.responsibilities.map((item) => item.originalValue), [
+      "Lead interviews to uncover product needs.",
+      "Design studies with product and engineering teams.",
+    ]);
+    assert.deepEqual(result.roleDraft.requirements.map((item) => item.originalValue), [
+      "Strong experience conducting mixed-method research.",
+      "Portfolio showing clear research outcomes.",
+    ]);
+  });
+
+  it("keeps source duties, candidate criteria, and company context in separate fields", () => {
+    const roleText = [
+      "Senior Service Designer",
+      "You'll Own",
+      "Lead discovery with customers and stakeholders.",
+      "Strong experience running service design research.",
+      "Our team values thoughtful collaboration.",
+      "How You'll Succeed Here",
+      "Design prototypes with engineers and product managers.",
+      "Portfolio showing clear service design outcomes.",
+    ].join("\n");
+    const draft = createRoleDraftFromText(roleText);
+    const responsibilities = draft.responsibilities.map((item) => item.originalValue);
+    const requirements = draft.requirements.map((item) => item.originalValue);
+
+    assert.equal(looksLikeRoleInput(roleText), true);
+    assert.deepEqual(responsibilities, [
+      "Lead discovery with customers and stakeholders.",
+      "Design prototypes with engineers and product managers.",
+    ]);
+    assert.deepEqual(requirements, [
+      "Strong experience running service design research.",
+      "Portfolio showing clear service design outcomes.",
+    ]);
+    assert.equal(draft.description?.originalValue.includes("Our team values thoughtful collaboration."), true);
+  });
+
   it("recognizes LinkedIn sections with curly apostrophes", () => {
     const roleText = [
       "Senior UX Strategist",
@@ -142,6 +273,7 @@ describe("Role Fit pasted job understanding", () => {
       "Job Description",
       "Qualifications",
       "Can you explain product strategy requirements?",
+      "Can you tell me about the Senior Product Designer case study in your portfolio?",
       "I am a product designer and want advice about responsibilities, qualifications, stakeholder alignment, research, and design systems for my next career move.",
       "Job Description\nThis paragraph describes a collaborative workplace but supplies no source-backed title, responsibilities, or requirements.",
     ];

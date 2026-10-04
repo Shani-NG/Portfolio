@@ -4,6 +4,7 @@ import { Chip } from "@/components/ui/chip";
 import { RoleFitLiveReport } from "@/components/role-fit/role-fit-live-report";
 import { RoleFitReportProgress } from "@/components/role-fit/role-fit-report-progress";
 import { appendRoleFitMessage, consumePendingHomeRoleFitInput, restoreRoleFitLiveSession, updateRoleFitLiveSession } from "@/lib/role-fit/client/session";
+import { decideReportRequest, isNewRoleAfterFailedReport, recoveredRoleMessage, requestReportForConfirmedReply } from "@/lib/role-fit/client/report-transition";
 import {
   genericRecoverableErrorAnswer,
   isHebrewLanguage,
@@ -12,7 +13,9 @@ import {
   reportLimitAnswer,
   reportReadyAnswer,
   reportRetryExhaustedAnswer,
+  reportProviderUnavailableAnswer,
   reportRetryableFailureAnswer,
+  roleRecoveryUnavailableAnswer,
   resolveConversationLanguage,
   roleFileErrorAnswer,
   roleSubmissionSetupAnswer,
@@ -21,6 +24,7 @@ import { reportUIPayloadSchema, type ReportUIPayload } from "@/lib/role-fit/cont
 import { createReportId } from "@/lib/role-fit/identifiers";
 import type { RoleFitLiveSession, RoleFitLiveState, RoleFitReportAttemptState } from "@/lib/role-fit/client/session";
 import { hasRoleDraftContent } from "@/lib/role-fit/server/role-understanding";
+import Link from "next/link";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import styles from "./page.module.css";
 
@@ -40,6 +44,7 @@ type ReportFailureResult = {
   state?: string;
   safeMessage?: string;
   retryable?: boolean;
+  providerStatus?: number;
   eligibility?: { reason?: string };
   validation?: { missingFields?: string[] };
 };
@@ -85,8 +90,18 @@ function normalizeRepeatedInput(value: string) {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+function recordReportClientEvent(reportId: string, boundary: "client-response" | "display", outcome: "success" | "failure") {
+  void fetch("/api/role-fit/report/client-event", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reportId, boundary, outcome }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
 export default function RoleFitPage() {
   const [liveSession, setLiveSession] = useState<RoleFitLiveSession>(() => restoreRoleFitLiveSession());
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [roleInput, setRoleInput] = useState("");
   const [apiStatusMessage, setApiStatusMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -98,22 +113,28 @@ export default function RoleFitPage() {
   const [errorContext, setErrorContext] = useState<ErrorContext>(null);
   const reportRequestInFlightRef = useRef(false);
   const reportAttemptRef = useRef<RoleFitReportAttemptState | null>(liveSession.reportAttemptState);
+  const displayEventPendingRef = useRef<string | null>(null);
   const chatPaneRef = useRef<HTMLDivElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
   const reportPaneRef = useRef<HTMLElement>(null);
   const roleFileInputRef = useRef<HTMLInputElement>(null);
-  const activeReport = liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined;
+  const activeReport = hasHydrated
+    ? liveReportState?.report ?? (liveSession.reportPayload as ReportUIPayload | null) ?? undefined
+    : undefined;
   const hasLiveReport = Boolean(activeReport);
-  const liveSplitCanvas = liveSession.state === "generating-report"
+  const liveSplitCanvas = hasHydrated && (liveSession.state === "generating-report"
     || liveSession.state === "report-ready"
-    || (liveSession.state === "recoverable-error" && (Boolean(activeReport) || errorContext === "report" || errorContext === "validation"));
+    || (liveSession.state === "recoverable-error" && (Boolean(activeReport) || errorContext === "report" || errorContext === "validation")));
   const splitCanvas = liveSplitCanvas;
-  const hasConversation = liveSession.messages.length > 0 || liveSession.state !== "initial";
+  const hasConversation = hasHydrated && (liveSession.messages.length > 0 || liveSession.state !== "initial");
+  const retryExhausted = (liveSession.reportAttemptState?.attempts ?? 0) >= 2;
   const reportActionLabel = hasLiveReport
     ? "Show report"
-    : liveSession.pendingReportConfirmation
-      ? "Generate confirmed report"
-      : "Generate report";
+    : hasHydrated && liveSession.state === "recoverable-error" && liveSession.pendingReportConfirmation
+      ? "Retry report"
+      : hasHydrated && liveSession.pendingReportConfirmation
+        ? "Generate confirmed report"
+        : "Generate report";
   const errorHeading = isHebrewLanguage(liveSession.activeLanguage)
     ? errorContext === "conversation"
       ? "סוכנת RoleFit אינה זמינה כרגע"
@@ -187,7 +208,20 @@ export default function RoleFitPage() {
     if (currentSession.pendingReportConfirmation && isReportConfirmationText(submittedText)) {
       const sessionAfterUser = appendLiveMessage({ role: "user", content: submittedText });
       setRoleInput("");
-      await requestReport(sessionAfterUser);
+      await requestReportForConfirmedReply(sessionAfterUser, submittedText, requestReport);
+      return;
+    }
+    if ((currentSession.reportAttemptState?.attempts ?? 0) >= 2
+      && isReportConfirmationText(submittedText)) {
+      appendLiveMessage({ role: "user", content: submittedText });
+      appendLiveMessage({ role: "agent", content: reportRetryExhaustedAnswer(currentSession.activeLanguage) });
+      setRoleInput("");
+      return;
+    }
+    if (!options?.revalidateRoleContext && !currentSession.pendingReportConfirmation && !currentSession.reportPayload
+      && (currentSession.reportAttemptState?.attempts ?? 0) < 2
+      && hasRoleDraftContent(currentSession.activeRoleDraft) && isReportConfirmationText(submittedText)) {
+      await submitLiveMessage(submittedText, currentSession, { revalidateRoleContext: true });
       return;
     }
     const normalizedSubmittedText = normalizeRepeatedInput(submittedText);
@@ -200,7 +234,9 @@ export default function RoleFitPage() {
         (normalizedSubmittedText.length > 80 && normalizedPreviousInput.includes(normalizedSubmittedText))
       ),
     );
-    const messageForAgent = submittedText;
+    const recoveredRoleText = recoveredRoleMessage(currentSession, submittedText);
+    const messageForAgent = recoveredRoleText ?? submittedText;
+    const startsNewRole = isNewRoleAfterFailedReport(currentSession, submittedText);
     const activeLanguage = resolveConversationLanguage(submittedText, currentSession.activeLanguage);
 
     const sessionAfterUser = options?.appendUserMessage === false
@@ -234,12 +270,12 @@ export default function RoleFitPage() {
           language: activeLanguage,
           repeatedInput,
           roleCollectionActive: Boolean(currentSession.activeRoleDraft) && !currentSession.reportPayload,
-          revalidateRoleContext: options?.revalidateRoleContext ?? false,
+          revalidateRoleContext: options?.revalidateRoleContext || Boolean(recoveredRoleText),
           clarificationAttempts: currentSession.clarificationAttempts,
           completedReportCount: currentSession.completedReportCount,
           conversationContext: JSON.stringify(sessionAfterUser.messages.slice(-8)).slice(-12000),
           reportContext: currentSession.reportPayload ? JSON.stringify(currentSession.reportPayload).slice(0, 18000) : undefined,
-          roleContext: currentSession.activeRoleDraft
+          roleContext: currentSession.activeRoleDraft && !startsNewRole
             ? {
                 roleDraft: currentSession.activeRoleDraft,
                 ...(currentSession.pendingRoleField ? { pendingField: currentSession.pendingRoleField } : {}),
@@ -263,7 +299,7 @@ export default function RoleFitPage() {
         setApiStatusMessage("");
         setErrorContext(null);
       }
-      syncLiveSession({
+      const updatedSession = syncLiveSession({
         state: nextState,
         activeRoleDraft: returnedRoleDraft ?? currentSession.activeRoleDraft,
         pendingRoleField: result.pendingField !== undefined ? result.pendingField : currentSession.pendingRoleField,
@@ -289,6 +325,7 @@ export default function RoleFitPage() {
         setErrorContext("conversation");
         setIsAgentUnavailable(false);
       }
+      return response.ok ? updatedSession : undefined;
     } catch {
       const message = "The Role Fit Agent is not available right now. Please try again later.";
       appendLiveMessage({ role: "agent", content: message });
@@ -308,31 +345,41 @@ export default function RoleFitPage() {
     const reportSession = resolveCanonicalSession(sessionOverride ?? liveSession);
 
     if (reportRequestInFlightRef.current || isAgentUnavailable) return;
-    if (reportSession.reportPayload) {
+    const decision = decideReportRequest(reportSession);
+    if (decision.kind === "show-existing") {
       syncLiveSession({ state: "report-ready" });
+      setActivePane("report");
       return;
     }
-    if (!reportSession.pendingReportConfirmation || !hasRoleDraftContent(reportSession.activeRoleDraft)) {
-      if (hasRoleDraftContent(reportSession.activeRoleDraft)) {
-        reportRequestInFlightRef.current = true;
-        setIsReportRequestInFlight(true);
-        try {
-          await submitLiveMessage("Generate report", reportSession, {
-            appendUserMessage: false,
-            revalidateRoleContext: true,
-          });
-        } finally {
-          reportRequestInFlightRef.current = false;
-          setIsReportRequestInFlight(false);
-        }
-        return;
-      }
-
+    if (decision.kind === "retry-exhausted") {
+      return;
+    }
+    if (decision.kind === "recover-role") {
+      await submitLiveMessage(decision.roleText, reportSession, { appendUserMessage: false, revalidateRoleContext: true });
+      return;
+    }
+    if (decision.kind === "request-role") {
       appendLiveMessage({
         role: "agent",
-        content: roleSubmissionSetupAnswer(reportSession.activeLanguage),
+        content: reportSession.messages.some((message) => message.role === "user")
+          ? roleRecoveryUnavailableAnswer(reportSession.activeLanguage)
+          : roleSubmissionSetupAnswer(reportSession.activeLanguage),
       });
       syncLiveSession({ state: "awaiting-role-completion", pendingReportConfirmation: false });
+      return;
+    }
+    if (decision.kind === "revalidate-role") {
+      reportRequestInFlightRef.current = true;
+      setIsReportRequestInFlight(true);
+      try {
+        await submitLiveMessage("Generate report", reportSession, {
+          appendUserMessage: false,
+          revalidateRoleContext: true,
+        });
+      } finally {
+        reportRequestInFlightRef.current = false;
+        setIsReportRequestInFlight(false);
+      }
       return;
     }
 
@@ -374,15 +421,18 @@ export default function RoleFitPage() {
         state: "malformed-output",
         safeMessage: genericRecoverableErrorAnswer(reportSession.activeLanguage),
       }));
+      recordReportClientEvent(reportId, "client-response", result.state === "malformed-output" ? "failure" : "success");
 
       if (!response.ok || result.state !== "ready") {
         const isRetryableReportFailure = result.retryable === true;
         const canOfferRetry = isRetryableReportFailure && reportAttemptNumber === 1;
-        const message = isRetryableReportFailure
-          ? canOfferRetry
-            ? reportRetryableFailureAnswer(reportSession.activeLanguage)
-            : reportRetryExhaustedAnswer(reportSession.activeLanguage)
-          : reportFailureMessage(result, reportSession.activeLanguage);
+        const message = result.providerStatus === 503 && result.state === "provider-retryable"
+          ? reportProviderUnavailableAnswer(reportSession.activeLanguage, canOfferRetry)
+          : isRetryableReportFailure
+            ? canOfferRetry
+              ? reportRetryableFailureAnswer(reportSession.activeLanguage)
+              : reportRetryExhaustedAnswer(reportSession.activeLanguage)
+            : reportFailureMessage(result, reportSession.activeLanguage);
         const missingField = result.validation?.missingFields?.[0] ?? null;
         const isNoReport = result.state === "no-report";
         if (!isRetryableReportFailure) reportAttemptRef.current = null;
@@ -421,6 +471,7 @@ export default function RoleFitPage() {
       }
 
       const report = parsedReport.data;
+      displayEventPendingRef.current = report.reportId;
       const persisted = result.persistence === "persisted";
       const lifecycleMessage = persisted
         ? reportSuccessMessage(reportSession.activeLanguage)
@@ -457,6 +508,7 @@ export default function RoleFitPage() {
       reportAttemptRef.current = null;
       setActivePane("report");
     } catch {
+      recordReportClientEvent(reportId, "client-response", "failure");
       const canOfferRetry = reportAttemptNumber === 1;
       const message = canOfferRetry
         ? reportRetryableFailureAnswer(reportSession.activeLanguage)
@@ -485,6 +537,7 @@ export default function RoleFitPage() {
   useEffect(() => {
     const restoredSession = restoreRoleFitLiveSession();
     setLiveSession(restoredSession);
+    setHasHydrated(true);
     if (restoredSession.reportPayload) setActivePane("report");
 
     const pendingInput = consumePendingHomeRoleFitInput();
@@ -506,6 +559,14 @@ export default function RoleFitPage() {
   useEffect(() => {
     if (isNarrowLayout && hasLiveReport) setActivePane("report");
   }, [activeReport?.reportId, hasLiveReport, isNarrowLayout]);
+
+  useEffect(() => {
+    const reportId = displayEventPendingRef.current;
+    if (reportId && activeReport?.reportId === reportId && reportPaneRef.current) {
+      displayEventPendingRef.current = null;
+      recordReportClientEvent(reportId, "display", "success");
+    }
+  }, [activeReport?.reportId, activePane]);
 
   useEffect(() => {
     scrollChatToEnd();
@@ -580,11 +641,11 @@ export default function RoleFitPage() {
         className={[styles.stickyReportChip, splitCanvas && styles.canvasActiveAction, styles.liveReportAction].filter(Boolean).join(" ")}
         aria-label={reportActionLabel}
         type="button"
-        disabled={isReportRequestInFlight || isAgentUnavailable}
+        disabled={isReportRequestInFlight || isAgentUnavailable || retryExhausted}
         title={reportActionLabel}
         onClick={() => void requestReport()}
       >
-        Generate Report
+        {reportActionLabel === "Retry report" ? reportActionLabel : "Generate Report"}
       </button> : null}
       {isNarrowLayout && splitCanvas ? (
         <button
@@ -694,6 +755,7 @@ export default function RoleFitPage() {
                   <span className={styles.msi} aria-hidden="true">error</span>
                   <h2>{errorHeading}</h2>
                   <p>{apiStatusMessage || genericRecoverableErrorAnswer(liveSession.activeLanguage)}</p>
+                  {errorContext === "report" ? <Link href="/contact?source=role-fit-report-error">{isHebrewLanguage(liveSession.activeLanguage) ? "יצירת קשר עם שני" : "Contact Shani"}</Link> : null}
                 </div>
               ) : (
                 activeReport ? (
