@@ -130,6 +130,18 @@ describe("Role Fit runtime conversation contract", () => {
     assert.doesNotMatch(page, /\/api\/role-fit\/chat[\s\S]{0,500}retry the report/);
   });
 
+  it("keeps a provider 503 in the failed report state with recovery actions", async () => {
+    const page = await readFile(join(process.cwd(), "app", "minime", "page.tsx"), "utf8");
+    const failureStart = page.indexOf('if (!response.ok || result.state !== "ready")');
+    const failureBranch = page.slice(failureStart, page.indexOf('const parsedReport =', failureStart));
+    assert.match(failureBranch, /result\.providerStatus === 503 && result\.state === "provider-retryable"/);
+    assert.match(failureBranch, /reportProviderUnavailableAnswer\(reportSession\.activeLanguage, canOfferRetry\)/);
+    assert.match(failureBranch, /state: isNoReport \? "general-qa" : "recoverable-error"/);
+    assert.doesNotMatch(failureBranch, /reportPayload: report|state: "report-ready"/);
+    assert.match(page, /href="\/contact\?source=role-fit-report-error"/);
+    assert.match(page, /roleContext: currentSession\.activeRoleDraft && !startsNewRole/);
+  });
+
   it("blocks explicit report mutation before role correction or model follow-up", async () => {
     const [route, behavior] = await Promise.all([
       readFile(join(process.cwd(), "app", "api", "role-fit", "chat", "route.ts"), "utf8"),

@@ -231,6 +231,21 @@ export function reportRetryExhaustedAnswer(language: "he" | "en" | "mixed") {
     : "I couldn’t complete the report on the additional attempt either. The role details are still here, so you can continue asking about the fit or try again later.";
 }
 
+export function reportProviderUnavailableAnswer(language: "he" | "en" | "mixed", canRetry: boolean) {
+  if (isHebrewLanguage(language)) {
+    return canRetry
+      ? "לא נוצר דוח. ספק הדוח אינו זמין זמנית. אפשר לנסות שוב פעם אחת, או ליצור קשר עם שני."
+      : "לא נוצר דוח. ספק הדוח אינו זמין זמנית גם לאחר ניסיון נוסף. אפשר לנסות מאוחר יותר או ליצור קשר עם שני.";
+  }
+  return canRetry
+    ? "No report was created. The report provider is temporarily unavailable. You can try once more or contact Shani."
+    : "No report was created. The report provider is temporarily unavailable after another attempt. You can try later or contact Shani.";
+}
+
+export function cleanHebrewOpeningCopy(answer: string) {
+  return answer.replaceAll("לבдиקת", "לבדיקת");
+}
+
 export function reportReadyAnswer(language: "he" | "en" | "mixed") {
   return isHebrewLanguage(language)
     ? "בדיקת ההתאמה מוכנה באנגלית. אפשר להתחיל מהתמונה הכללית, או לשאול אותי על דרישה, נקודת חוזק או פער מסוים."

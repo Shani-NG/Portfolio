@@ -23,6 +23,7 @@ describe("normal chat report state guard", () => {
 });
 
 import {
+  cleanHebrewOpeningCopy,
   createRoleSourceFingerprint,
   existingReportAnswer,
   genericRecoverableErrorAnswer,
@@ -38,6 +39,7 @@ import {
   reportMutationBlockedAnswer,
   reportReadyAnswer,
   reportRetryExhaustedAnswer,
+  reportProviderUnavailableAnswer,
   reportRetryableFailureAnswer,
   resolveConversationLanguage,
   roleFileErrorAnswer,
@@ -273,6 +275,9 @@ describe("Role Fit conversation behavior", () => {
     assert.match(reportRetryExhaustedAnswer("en"), /additional attempt either/);
     assert.doesNotMatch(reportRetryExhaustedAnswer("he"), /לנסות שוב\?/);
     assert.doesNotMatch(reportRetryExhaustedAnswer("en"), /Would you like me to try again/i);
+    assert.match(reportProviderUnavailableAnswer("he", true), /לא נוצר דוח.*זמנית.*לנסות שוב.*שני/);
+    assert.match(reportProviderUnavailableAnswer("en", false), /No report was created.*temporarily unavailable.*contact Shani/);
+    assert.equal(cleanHebrewOpeningCopy("רוצה לבдиקת התאמה?"), "רוצה לבדיקת התאמה?");
   });
 
   it("acknowledges an uncaptured previous title without implying the role draft was lost", () => {

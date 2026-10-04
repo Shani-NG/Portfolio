@@ -7,6 +7,7 @@ import { roleDraftSchema } from "@/lib/role-fit/contracts";
 import { getRoleFitModelProvider } from "@/lib/role-fit/model";
 import {
   clarificationLimitAnswer,
+  cleanHebrewOpeningCopy,
   existingReportAnswer,
   genericRoleTitleAnswer,
   hasSameRoleSourceFingerprint,
@@ -423,7 +424,7 @@ export async function POST(request: Request) {
     model: modelResult.model,
     answer: parsedRequest.data.reportContext
       ? modelResult.answer
-      : guardUnstartedReportClaim(modelResult.answer, parsedRequest.data.language, Boolean(roleContext)),
+      : cleanHebrewOpeningCopy(guardUnstartedReportClaim(modelResult.answer, parsedRequest.data.language, Boolean(roleContext))),
     ...(preservedRoleValidation ? {
       roleDraft: preservedRoleValidation.roleDraft,
       pendingField: preservedRoleValidation.parseStatus === "valid-complete"

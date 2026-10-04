@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createRoleDraftFromText, looksLikeRoleInput } from "../server/role-understanding.ts";
-import { decideReportRequest, latestRecoverableRoleInput, recoveredRoleMessage, requestReportForConfirmedReply } from "./report-transition.ts";
+import { createRoleDraftFromText, looksLikeRoleInput, validateStructuredRoleDraft } from "../server/role-understanding.ts";
+import { decideReportRequest, isNewRoleAfterFailedReport, latestRecoverableRoleInput, recoveredRoleMessage, requestReportForConfirmedReply } from "./report-transition.ts";
 import type { RoleFitLiveSession } from "./session.ts";
 
 const completeRoleText = [
@@ -87,6 +87,27 @@ describe("Role Fit conversation-to-report transition", () => {
     assert.deepEqual(decideReportRequest(session({ activeRoleDraft: draft })), { kind: "revalidate-role" });
     assert.deepEqual(decideReportRequest(session({ activeRoleDraft: incomplete, pendingReportConfirmation: true })), { kind: "revalidate-role" });
     assert.deepEqual(decideReportRequest(session({ activeRoleDraft: draft, pendingReportConfirmation: true })), { kind: "start-report" });
+  });
+
+  it("routes a new JD after report failure back to intake, including an עכשיו prefix", () => {
+    const oldDraft = createRoleDraftFromText(completeRoleText);
+    const nextRole = `עכשיו אני רוצה לבדוק משרה אחרת:\n${completeRoleText.replace("Senior Service Designer", "Senior Product Designer")}`;
+    const failed = session({ state: "recoverable-error", activeRoleDraft: oldDraft, reportAttemptState: { reportId: "report_1", attempts: 1 }, pendingReportConfirmation: true });
+    assert.equal(isNewRoleAfterFailedReport(failed, nextRole), true);
+    assert.equal(isNewRoleAfterFailedReport(failed, "עכשיו אפשר לנסות שוב?"), false);
+    assert.equal(isNewRoleAfterFailedReport(session({ ...failed, state: "general-qa" }), nextRole), true);
+    assert.equal(isNewRoleAfterFailedReport(session({ activeRoleDraft: oldDraft }), nextRole), false);
+    const validation = validateStructuredRoleDraft({ conversationId: failed.conversationId, traceId: "new_role", roleDraft: createRoleDraftFromText(nextRole), detectedLanguage: "he" });
+    assert.equal(validation.parseStatus, "valid-complete");
+    assert.equal(validation.roleDraft.title?.originalValue, "Senior Product Designer");
+    assert.deepEqual(decideReportRequest(failed), { kind: "start-report" });
+    assert.deepEqual(decideReportRequest(session({ ...failed, pendingReportConfirmation: false })), { kind: "revalidate-role" });
+  });
+
+  it("does not allow a third request for the same failed report", () => {
+    const failed = session({ state: "recoverable-error", activeRoleDraft: createRoleDraftFromText(completeRoleText), reportAttemptState: { reportId: "report_1", attempts: 2 } });
+    assert.deepEqual(decideReportRequest(failed), { kind: "retry-exhausted" });
+    assert.deepEqual(decideReportRequest(session({ ...failed, state: "general-qa" })), { kind: "retry-exhausted" });
   });
 
   it("dispatches one mocked report request for YES only after confirmation", async () => {

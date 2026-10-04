@@ -7,7 +7,13 @@ export type ReportRequestDecision =
   | { kind: "recover-role"; roleText: string }
   | { kind: "request-role" }
   | { kind: "revalidate-role" }
+  | { kind: "retry-exhausted" }
   | { kind: "start-report" };
+
+export function isNewRoleAfterFailedReport(session: RoleFitLiveSession, message: string) {
+  return (session.state === "recoverable-error" || Boolean(session.reportAttemptState)) && !session.reportPayload
+    && Boolean(session.activeRoleDraft) && looksLikeRoleInput(message);
+}
 
 export function latestRecoverableRoleInput(messages: RoleFitLiveSession["messages"]): string | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -32,6 +38,9 @@ export function recoveredRoleMessage(session: RoleFitLiveSession, submittedText:
 
 export function decideReportRequest(session: RoleFitLiveSession): ReportRequestDecision {
   if (session.reportPayload) return { kind: "show-existing" };
+  if ((session.reportAttemptState?.attempts ?? 0) >= 2) {
+    return { kind: "retry-exhausted" };
+  }
   if (!session.activeRoleDraft) {
     const roleText = latestRecoverableRoleInput(session.messages);
     return roleText ? { kind: "recover-role", roleText } : { kind: "request-role" };
