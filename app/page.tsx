@@ -32,28 +32,32 @@ export default function HomePage() {
           </section>
         </HomeCoverPanel>
 
-        <section className={`${styles.section} ${styles.valuesSection}`} aria-labelledby="values-title">
-          <div className={styles.sectionIntro}>
-            <h2 id="values-title">Core Values</h2>
-            <p className={styles.valuesSubtitle}>
-              <span>The working principles behind the way</span>
-              <span>I lead strategy, innovation and AI adoption.</span>
-            </p>
-          </div>
-          <div className={styles.cardGrid}>
-            {homeValues.map((value) => (
-              <SystemCard className={styles.valueCard} interaction="lift" key={value.title}>
-                <SystemCard.Header className={styles.valueCardHeader}>
-                  <SystemCard.Icon className={styles.valueCardIcon}>
-                    <MaterialIcon name={value.icon} />
-                  </SystemCard.Icon>
-                  <SystemCard.Title className={styles.valueCardTitle}>{value.title}</SystemCard.Title>
-                </SystemCard.Header>
-                <SystemCard.Body>{value.body}</SystemCard.Body>
-              </SystemCard>
-            ))}
-          </div>
-        </section>
+        <HomeCoverPanel>
+          <section className={`${styles.section} ${styles.valuesSection}`} aria-labelledby="values-title">
+            <div className={styles.sectionIntro}>
+              <h2 id="values-title">Core Values</h2>
+              <p className={styles.valuesSubtitle}>
+                <span>The working principles behind the way</span>
+                <span>I lead strategy, innovation and AI adoption.</span>
+              </p>
+            </div>
+            <div className={styles.cardGrid}>
+              {homeValues.map((value) => (
+                <ScrollReveal className={styles.valueReveal} key={value.title}>
+                  <SystemCard className={styles.valueCard} interaction="lift">
+                    <SystemCard.Header className={styles.valueCardHeader}>
+                      <SystemCard.Icon className={styles.valueCardIcon}>
+                        <MaterialIcon name={value.icon} />
+                      </SystemCard.Icon>
+                      <SystemCard.Title className={styles.valueCardTitle}>{value.title}</SystemCard.Title>
+                    </SystemCard.Header>
+                    <SystemCard.Body>{value.body}</SystemCard.Body>
+                  </SystemCard>
+                </ScrollReveal>
+              ))}
+            </div>
+          </section>
+        </HomeCoverPanel>
 
         <HomeCoverPanel>
           <section className={`${styles.section} ${styles.expertiseSection}`} aria-labelledby="expertise-title">

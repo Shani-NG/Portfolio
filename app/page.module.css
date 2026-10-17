@@ -603,7 +603,7 @@
   overflow-x: clip;
 }
 
-/* Values keep normal document scrolling while covering the preceding gallery. */
-.coverContent > .valuesSection {
-  z-index: 1;
+.valueReveal {
+  display: grid;
+  height: 100%;
 }
