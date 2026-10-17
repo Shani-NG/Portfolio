@@ -589,3 +589,21 @@
     transform: none;
   }
 }
+
+/* Opaque page layer covers the sticky hero; site navigation stays above it. */
+.coverContent {
+  position: relative;
+  z-index: 1;
+  display: flow-root;
+  background: var(--ds-color-canvas);
+}
+
+/* Keep the document as the sticky scroll container on the home route only. */
+:global(body):has(.page) {
+  overflow-x: clip;
+}
+
+.valueReveal {
+  display: grid;
+  height: 100%;
+}
