@@ -7,7 +7,6 @@ import { setPendingHomeRoleFitInput } from "@/lib/role-fit/client/session";
 import styles from "./role-fit-conversation-entry.module.css";
 
 const rotatingTerms = ["Product Strategy", "Vision & Innovation", "AI Workflows"];
-const heroCompleteEvent = "portfolio-hero-animation-complete";
 
 const quickActions = [
   { label: "Upload a job description", icon: "upload_file", action: "upload" as const },
@@ -22,31 +21,11 @@ export function RoleFitConversationEntry() {
   const [termIndex, setTermIndex] = useState(0);
   const [visibleLength, setVisibleLength] = useState(rotatingTerms[0].length);
   const [phase, setPhase] = useState<"typing" | "pause" | "deleting" | "nextPause">("pause");
-  const [typingEnabled, setTypingEnabled] = useState(false);
 
   const activeTerm = rotatingTerms[termIndex];
   const visibleTerm = useMemo(() => activeTerm.slice(0, visibleLength), [activeTerm, visibleLength]);
 
   useEffect(() => {
-    if (isRoleFitPage) {
-      setTypingEnabled(true);
-      return;
-    }
-
-    const storedAt = Number(sessionStorage.getItem(heroCompleteEvent));
-    if (storedAt > 0) {
-      setTypingEnabled(true);
-      return;
-    }
-
-    const enableTyping = () => setTypingEnabled(true);
-    window.addEventListener(heroCompleteEvent, enableTyping);
-
-    return () => window.removeEventListener(heroCompleteEvent, enableTyping);
-  }, [isRoleFitPage]);
-
-  useEffect(() => {
-    if (!typingEnabled) return;
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -88,7 +67,7 @@ export function RoleFitConversationEntry() {
     }, delay);
 
     return () => window.clearTimeout(timeout);
-  }, [activeTerm.length, phase, typingEnabled, visibleLength]);
+  }, [activeTerm.length, phase, visibleLength]);
 
   useEffect(() => {
     if (phase === "typing" && visibleLength === 0) {
