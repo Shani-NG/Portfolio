@@ -1,0 +1,20 @@
+.panel {
+  position: sticky;
+  top: var(--home-cover-top, var(--site-header-height));
+  z-index: 1;
+  display: flow-root;
+  background: var(--ds-color-canvas);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    position: relative;
+    top: auto;
+  }
+}
+
+/* Keyboard/input focus must never remain behind a later cover layer. */
+.panel:has(:focus-visible) {
+  position: relative;
+  top: auto;
+}
