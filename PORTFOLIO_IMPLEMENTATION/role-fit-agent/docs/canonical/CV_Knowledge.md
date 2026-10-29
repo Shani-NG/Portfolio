@@ -1,14 +1,14 @@
-Senior UX Strategist & Innovation Lead; 12 yrs UX; AI solutions/automation/product; AI adoption; AI agents/agentic workflows; RAG/LLM; prompt engineering; Product/Project Mgmt/PM; product strategy; complex problem-solving; UX/UI; user research; Figma; design systems built/managed; mobile; MVP prioritization; data-driven; dashboards/data viz; information fusion; mission-critical systems; defense/C4I/command & control; medical; SaaS; knowledge management; innovation; cross-functional/stakeholder mgmt; Design Thinking/hackathons; Vibe Coding; Claude Code; Codex; MCP/API integrations; Make; Supabase; DB/persistence/logging; Git/GitHub; Vercel; ML data annotation; not SWE/backend/ML/DevOps owner
+Senior UX & Product Design Team Lead; 15 yrs total; AI solutions/automation/product; AI adoption; AI agents/agentic workflows; RAG/LLM; prompt engineering; Product/Project Mgmt/PM; product strategy; complex problem-solving; UX/UI; user research; Figma; design systems built/managed; mobile; MVP prioritization; data-driven; dashboards/data viz; information fusion; mission-critical systems; defense/C4I/command & control; medical; SaaS; knowledge management; innovation; cross-functional/stakeholder mgmt; Design Thinking/hackathons; Vibe Coding; Claude Code; Codex; MCP/API integrations; Make; Supabase; DB/persistence/logging; Git/GitHub; Vercel; ML data annotation; not SWE/backend/ML/DevOps owner
 
 **DOCUMENT CONTROL**
 
-Source file: CV\_Shani\_NG\_2026.docx
+Source file: Latest user-approved English CV (2026); factual alignment approved 28 October 2026
 
-Knowledge file version: 1.0
+Knowledge file version: 1.1
 
 Source status: User-confirmed closed CV
 
-Knowledge status: Draft for review
+Knowledge status: Approved factual corrections applied; broader content audit pending
 
 Language: English
 
@@ -18,11 +18,11 @@ Scope: Career facts, cross-role capabilities, education, tools, and CV-level evi
 
 Approved headline
 
-Senior UX Strategist & Innovation Lead
+Senior UX & Product Design Team Lead
 
 Professional summary
 
-Strategic UX leader with 12 years of experience architecting complex, mission-critical systems across military, medical, and enterprise SaaS environments. Experienced in transforming complex requirements into clear, high-impact solutions, bridging R\&D, engineering, and management teams, integrating AI-driven methodologies, and surfacing risks early.
+Strategic UX leader with 15 years of professional experience, specializing in complex, mission-critical systems across military, medical, and enterprise SaaS environments. Experienced in transforming complex requirements into clear, high-impact solutions, bridging R\&D, engineering, and management teams, integrating AI-driven methodologies, and surfacing risks early.
 
 **CORE PROFESSIONAL THEMES**
 
@@ -44,7 +44,7 @@ Strategic UX leader with 12 years of experience architecting complex, mission-cr
 
 **Energy Team**
 
-Senior UX Strategist | 2021–Present
+Senior UX Strategist & Product Design Team Lead | 2021–2026
 
 Primary scope
 
@@ -88,7 +88,7 @@ UX education; mentoring; methodology; portfolio guidance; usability.
 
 **Ginger-Gene**
 
-Lead UX/UI & Product Manager | 2015–2020
+Lead UX/UI & Project Manager | 2015–2020
 
 Primary scope
 
@@ -138,7 +138,7 @@ Defense; GUI design; enterprise design collaboration.
 
 **EDUCATION & CERTIFICATIONS**
 
-• AI Implementation & Integration — Vibe Engineering & Coding | In progress
+• AI Implementation & Integration — Vibe Engineering & Coding | Hackeru College, August 2026
 
 • Power Scale Up — Managerial Program for Women in High-Tech | Technion & Israel Innovation Authority, 2024
 
@@ -184,7 +184,7 @@ English — Strong written and spoken proficiency
 
 Israel Air Force — Completed full service.
 
-Security clearance — Active Level 3 Security Clearance, as stated in the source CV.
+Security clearance — Level 3, as stated in the approved CV. Current validity is not verified. Internal only.
 
 **CV-LEVEL EVIDENCE CARDS**
 
@@ -258,7 +258,7 @@ Shani has hands-on AI product implementation experience using AI-assisted develo
 
 Evidence basis
 
-Energy Team responsibilities, strategic skills, current AI Implementation & Integration studies, and documented hands-on Role Fit Agent implementation practice.
+Energy Team responsibilities, strategic skills, completed AI Implementation & Integration training, and documented hands-on Role Fit Agent implementation practice.
 
 Reliability
 
@@ -336,9 +336,9 @@ Do not claim
 
 **REVIEW FLAGS**
 
-• “2021–Present” is preserved exactly as stated in the source CV and should be reviewed when the CV is updated.
+• Energy Team title and 2021–2026 dates are aligned with the latest approved English CV.
 
-• “12 years of experience” is preserved from the professional summary.
+• “15 years of professional experience” refers to overall professional experience, not 15 years exclusively in UX, AI, product management, or systems analysis.
 
 • Security-clearance information is sensitive. Keep it internal unless Shani explicitly approves public use.
 
@@ -348,7 +348,7 @@ Do not claim
 
 Primary source
 
-CV\_Shani\_NG\_2026.docx
+Latest user-approved English CV (2026), with the factual corrections explicitly approved on 28 October 2026.
 
 Source role
 

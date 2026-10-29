@@ -14,7 +14,8 @@ describe("Role Fit report lifecycle boundary", () => {
     assert.match(report, /label="FIT"[\s\S]{0,120}value=\{fitValue\}/);
     assert.match(report, /label="Requirements Assessed"[\s\S]{0,140}value=\{String\(report\.requirementMapping\.items\.length\)\}/);
     assert.match(report, /label="Location & Work Model"/);
-    assert.match(report, /label="Relevant Experience"/);
+    assert.match(report, /label="Overall Experience"/);
+    assert.match(report, /const experience = "15 years"/);
     assert.doesNotMatch(report, /Verified Requirements|Core Skills Coverage|coveragePercent|coverageCounts|matchedCount/);
     assert.doesNotMatch(report, /className=\{styles\.fitValue\}|styles\.fitValue/);
     assert.doesNotMatch(report, /fitVisualValue\}\s*%|FIT percentage|Fit percentage/i);
