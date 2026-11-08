@@ -856,3 +856,100 @@ describe("Role Fit pasted job understanding", () => {
     assert.equal(merged.responsibilities.some((item) => /discovery research/i.test(item.originalValue)), false);
   });
 });
+
+describe("contextual title recovery regression", () => {
+  const body = [
+    "## About the job",
+    "Responsibilities:",
+    "- Design useful product experiences across teams",
+    "Requirements:",
+    "- Experience in user research and product design",
+  ].join("\n");
+  const validate = (roleText: string) => validateRoleText({ conversationId: "title_regression", traceId: "offline", roleText, detectedLanguage: "mixed" });
+
+  it("keeps the supplied role missing only its title across paste formats", async () => {
+    // Visible-text transcription; LinkedIn safety targets are not the original browser request payload.
+    const source = await readFile(new URL("./golden-corpus/source/render-title-regression.txt", import.meta.url), "utf8");
+    const variants = [source, source.replace(/^- /gm, ""), source.replace(/^- /gm, "").replace(/\*\*/g, ""), source.replace(/^- /gm, "").replace("High-level English", "HIGH-LEVEL ENGLISH")];
+    for (const [index, text] of variants.entries()) {
+      const result = validate(text);
+      assert.equal(shouldValidateRoleCollectionMessage({ message: text, roleCollectionActive: false }), true);
+      assert.equal(result.roleDraft.title?.confirmed, false);
+      assert.deepEqual(result.missingFields, ["title"]);
+      assert.equal(roleIntakeChatState(result), "awaiting-role-completion");
+      // Production already drops short unbulleted items as subheadings (9/11 -> 7/8).
+      // Do not silently expand this title-only correction into body parsing or claim that existing defect is fixed.
+      assert.ok(result.roleDraft.responsibilities.length >= (index === 0 ? 9 : 7));
+      assert.ok(result.roleDraft.requirements.length >= (index === 0 ? 11 : 8));
+      if (index === 0) assert.ok(result.roleDraft.requirements.some(item => /high-level english/i.test(item.originalValue)));
+    }
+  });
+
+  for (const phrase of ["High-level English", "High AI fluency", "High proficiency in Figma and prototyping", "Builder mentality, comfort with ambiguity", "Exceptional visual and interaction design", "Excellent Product Design Skills", "Product design experience", "Lead and mentor the design team", "Lead product design initiatives", "Work closely with senior product designers", "Lead teams with a senior product designer", "Deep product design expertise", "Product strategy and roadmap ownership", "AI-native product instincts", "Hands-on product design", "Product and design", "Experienced Product Designer", "Passionate Product Designer"]) {
+    it(`does not promote requirement or action prose: ${phrase}`, () => {
+      for (const line of [phrase, `- ${phrase}`, `**${phrase}**`]) {
+        const result = validate(`${body}\n${line}`);
+        assert.notEqual(result.roleDraft.title?.confirmed, true);
+        assert.deepEqual(result.missingFields, ["title"]);
+      }
+    });
+  }
+
+  for (const title of ["Senior Product Designer", "senior product designer", "Lead Product Designer", "Product Strategy Lead", "Director of User Experience", "Payroll Accountant", "Research Scientist", "Design Systems Architect", "Design Operations Manager", "Research and Design Manager", "Product Owner", "UX Writer", "Scrum Master", "VP, Product Design", "Marketing Executive", "מנהל מוצר בכיר"]) {
+    it(`preserves a professional late title across presentation variants: ${title}`, () => {
+      for (const line of [title, `**${title}**`]) {
+        const result = validate(`${body}\n${line}`);
+        assert.equal(result.roleDraft.title?.originalValue, title);
+        assert.equal(result.parseStatus, "valid-complete");
+      }
+      const leading = validate(`${title}\n${body}`);
+      assert.equal(leading.roleDraft.title?.originalValue, title);
+      assert.equal(leading.parseStatus, "valid-complete");
+    });
+  }
+
+  it("does not reinterpret the final requirement bullet as an independent title", () => {
+    for (const phrase of ["Experienced Product Designer", "Product Owner", "Senior Product Designer"]) {
+      const result = validate(`${body}\n- ${phrase}`);
+      assert.equal(result.roleDraft.title?.confirmed, false);
+      assert.deepEqual(result.missingFields, ["title"]);
+    }
+  });
+
+  it("preserves source-heading vocabulary and genuine title scope qualifiers", () => {
+    for (const title of ["Head of Developer Experience", "Go-to-Market Strategy Lead"]) {
+      for (const text of [`${title}\n${body}`, `${body}\n${title}`]) assert.equal(validate(text).roleDraft.title?.originalValue, title);
+    }
+    // These heading forms were accepted by the existing source-heading path. Do not retune that path.
+    for (const title of ["AI Researcher with Product Focus", "Design Thinking Facilitator", "Research Program Owner", "Design Program Executive", "Product owner", "Knowledge Management Lead", "Director of Customer Experience"]) {
+      assert.equal(validate(`${title}\n${body}`).roleDraft.title?.originalValue, title);
+    }
+  });
+
+  it("prefers an explicit recruiting title to a weaker trailing candidate anywhere in the bounded input", () => {
+    for (const filler of ["", Array(45).fill("Our company values thoughtful collaboration.").join("\n")]) {
+      const result = validate(`${body}\n${filler}\nWe're looking for a Senior Product Designer to join our team.\nProduct Strategy Lead`);
+      assert.equal(result.roleDraft.title?.originalValue, "Senior Product Designer");
+      assert.equal(result.roleDraft.title?.confidence, "high");
+    }
+  });
+
+  it("keeps the canonical source title ahead of a more specific title in the description", () => {
+    const result = validate(`Product Manager\n${body}\nWe're looking for a Technical Product Manager to join our team.\nProduct Strategy Lead`);
+    assert.equal(result.roleDraft.title?.originalValue, "Product Manager");
+  });
+
+  it("completes a missing title without changing collected source facts or weakening sufficiency", () => {
+    const original = validate(`${body}\nHigh-level English`).roleDraft;
+    const completed = mergeRoleDraftClarification(original, "title", "Design Lead");
+    const result = validateStructuredRoleDraft({ conversationId: "title_regression", traceId: "completion", roleDraft: completed, detectedLanguage: "en" });
+    assert.equal(result.parseStatus, "valid-complete");
+    assert.equal(completed.title?.sourceRef.kind, "clarification");
+    assert.deepEqual(completed.responsibilities, original.responsibilities);
+    assert.deepEqual(completed.requirements, original.requirements);
+    assert.deepEqual(completed.preferredQualifications, original.preferredQualifications);
+    const titleOnly = validate("Senior Product Designer");
+    assert.equal(titleOnly.parseStatus, "valid-incomplete");
+    assert.deepEqual(titleOnly.missingFields, ["responsibilities", "requirements"]);
+  });
+});

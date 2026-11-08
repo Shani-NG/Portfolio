@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createRoleDraftFromText, looksLikeRoleInput, validateStructuredRoleDraft } from "../server/role-understanding.ts";
+import { createRoleDraftFromText, looksLikeRoleInput, mergeRoleDraftClarification, validateStructuredRoleDraft } from "../server/role-understanding.ts";
 import { decideReportRequest, isNewRoleAfterFailedReport, latestRecoverableRoleInput, recoveredRoleMessage, requestReportForConfirmedReply } from "./report-transition.ts";
 import type { RoleFitLiveSession } from "./session.ts";
 
@@ -123,5 +123,28 @@ describe("Role Fit conversation-to-report transition", () => {
     assert.equal(await requestReportForConfirmedReply(session({ activeRoleDraft: draft }), "YES", requestReport), false);
     assert.equal(await requestReportForConfirmedReply(confirmed, "Not yet", requestReport), false);
     assert.deepEqual(requests, ["start-report"]);
+  });
+});
+
+describe("missing-title report boundary", () => {
+  it("requires title completion and fresh report consent while preserving the accumulated draft", async () => {
+    const text = "## About the job\nResponsibilities:\n- Design product workflows with users and engineering\nRequirements:\n- Experience in product design and user research\nHigh-level English";
+    const draft = createRoleDraftFromText(text);
+    const collecting = session({ state: "awaiting-role-completion", activeRoleDraft: draft, pendingRoleField: "title" });
+    assert.deepEqual(decideReportRequest(collecting), { kind: "revalidate-role" });
+    // Even a stale consent flag cannot make the incomplete role eligible.
+    assert.deepEqual(decideReportRequest({ ...collecting, pendingReportConfirmation: true }), { kind: "revalidate-role" });
+    let requests = 0;
+    assert.equal(await requestReportForConfirmedReply(collecting, "כן", async () => { requests += 1; }), false);
+    const completed = mergeRoleDraftClarification(draft, "title", "Design Lead");
+    assert.deepEqual(completed.responsibilities, draft.responsibilities);
+    assert.deepEqual(completed.requirements, draft.requirements);
+    const ready = session({ state: "awaiting-report-confirmation", activeRoleDraft: completed });
+    assert.deepEqual(decideReportRequest(ready), { kind: "revalidate-role" });
+    const confirmed = { ...ready, pendingReportConfirmation: true };
+    assert.deepEqual(decideReportRequest(confirmed), { kind: "start-report" });
+    assert.equal(await requestReportForConfirmedReply(confirmed, "לא, שם המשרה לא נכון", async () => { requests += 1; }), false);
+    assert.equal(await requestReportForConfirmedReply(confirmed, "כן תכיני לי דוח", async () => { requests += 1; }), true);
+    assert.equal(requests, 1);
   });
 });

@@ -531,6 +531,33 @@ function inferSemanticTitle(roleText: string): string {
   return best.entry.preferred_label;
 }
 
+function isRecoveredRoleTitle(value: string): boolean {
+  const title = stripMarkdownPresentation(stripListMarker(value).text);
+  if (!isPlausibleSourceTitle(title)) return false;
+  if (/^(?:strong|excellent|exceptional|high[- ](?:level|proficiency|fluency)|experience|experienced|proven|passionate|talented|deep|hands[- ]on|proficiency|ability|knowledge|track record)\b/i.test(title)
+    || /\b(?:skills|fluency|proficiency|expertise|ownership|instincts|mindset|acumen)\s*$/i.test(title)
+    || (/\bexperience\s*$/i.test(title) && !/^(?:head|director|vp|vice president|chief)\b/i.test(title))) return false;
+  const kind = classifyRoleItem(title);
+  if (kind && (kind !== "responsibilities" || !/^(?:lead|design|research)\b/i.test(title))) return false;
+  // A noun phrase disambiguates action-like Lead/Design/Research titles. Other source titles
+  // keep the existing open vocabulary; do not turn this into a mandatory occupation whitelist.
+  const rolePhrase = title.split(/\s[-–—]\s|,\s/)[0]!.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const roleNoun = /\b(?:designer|engineer|manager|researcher|architect|analyst|strategist|consultant|specialist|developer|lead|director|head|officer|coordinator|accountant|auditor|recruiter|lawyer|attorney|nurse|physician|scientist|technician)\s*$/i;
+  if (kind === "responsibilities") return roleNoun.test(rolePhrase)
+    && !/(?:^|\s)(?:a|an|with|across|through|to|our|your)(?=\s|$)/i.test(title)
+    && !/^lead\s+(?:and|or)\b/i.test(title);
+  if (/^(?:product|design|ux|ui|ai)(?:\s+(?:and\s+|&\s+)?(?:product|design|ux|ui|ai))+$/i.test(rolePhrase)) return false;
+  const sourceTitleCasing = title.split(/\s+/).every((word) =>
+    /^(?:of|and|for|the|in|at|to|&|\/)$/i.test(word) || /^[\p{Lu}][\p{L}\p{N}&/().+,-]*$/u.test(word),
+  );
+  return roleNoun.test(rolePhrase)
+    || /^(?:head|director|vp|vice president|chief)(?:\s|$)/i.test(rolePhrase)
+    || hebrewRoleTitleSignal.test(rolePhrase)
+    || /^(?:מאפיין|מאפיינת)(?:[/.־-]ת)?(?:\s|$)/.test(rolePhrase)
+    || genericRoleTitles.has(rolePhrase.toLowerCase())
+    || sourceTitleCasing;
+}
+
 function extractLeadingSourceTitle(roleText: string) {
   for (const rawLine of normalizeRoleText(roleText).split(/\r?\n/).slice(0, 12)) {
     const line = rawLine.trim();
@@ -543,12 +570,10 @@ function extractLeadingSourceTitle(roleText: string) {
 
 function extractTrailingSourceTitle(roleText: string) {
   const lastLine = normalizeRoleText(roleText).split(/\r?\n/).map((line) => line.trim()).filter(Boolean).at(-1) ?? "";
-  if (!lastLine || stripListMarker(lastLine).isListItem) return "";
-  const title = stripMarkdownPresentation(lastLine);
-  const titleCasing = title.split(/\s+/).every((word) =>
-    /^(?:of|and|for|the|in|at|to|&|\/)$/i.test(word) || /^[\p{Lu}][\p{L}\p{N}&/().+-]*$/u.test(word),
-  );
-  return isPlausibleSourceTitle(title) && titleCasing && !classifyRoleItem(title) ? title : "";
+  // A final list item belongs to the surrounding role content; it is not independent title evidence.
+  if (stripListMarker(lastLine).isListItem) return "";
+  const title = stripMarkdownPresentation(stripListMarker(lastLine).text);
+  return isRecoveredRoleTitle(title) ? title : "";
 }
 
 function inferTitle(roleText: string): { value: string; confidence: "high" | "medium" | "low"; confirmed: boolean } {
@@ -558,13 +583,13 @@ function inferTitle(roleText: string): { value: string; confidence: "high" | "me
   const leadingSourceTitle = extractLeadingSourceTitle(roleText);
   if (leadingSourceTitle) return { value: leadingSourceTitle, confidence: "medium", confirmed: true };
 
-  const trailingSourceTitle = extractTrailingSourceTitle(roleText);
-  if (trailingSourceTitle) return { value: trailingSourceTitle, confidence: "medium", confirmed: true };
-
-  for (const line of normalizeRoleText(roleText).split(/\r?\n/).slice(0, 40)) {
+  for (const line of normalizeRoleText(roleText).split(/\r?\n/)) {
     const hiringTitle = extractTitleFromHiringSentence(line);
     if (hiringTitle) return { value: hiringTitle, confidence: "high", confirmed: true };
   }
+
+  const trailingSourceTitle = extractTrailingSourceTitle(roleText);
+  if (trailingSourceTitle) return { value: trailingSourceTitle, confidence: "medium", confirmed: true };
 
   const inferredTitle = parseRoleStructure(roleText).titleCandidate;
 

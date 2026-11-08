@@ -1,0 +1,31 @@
+## About the job
+
+Meet render.ai, monday.com's new AI venture. At render.ai, we're redefining how humans use AI for work. render.ai enables anyone to bring ideas to life in minutes, using their words. We're a small, autonomous team - closer in spirit to an early-stage startup than to an established company. There's no fixed playbook: we're still figuring out what the product looks like, and every engineer helps shape that, not just build it.
+
+About the role: Define and drive the design vision for a product built from the ground up. You’ll own the design end-to-end, from discovery and strategy to polished, shipped experiences, working closely with engineering and leadership, and using AI tools and rapid prototyping to move fast.
+
+**What you’ll do:**
+
+- Lead and mentor the design team
+- Set the design vision and principles
+- Drive ambiguous problems from exploration through launch
+- Design AI-native workflows that make creating visual content effortless
+- Raise the bar on visual and interaction craft
+- Influence product strategy and roadmap
+- Build design systems, components, and templates that scale
+- Use AI tools and coding agents to prototype and accelerate execution
+- Validate ideas through research and customer feedback
+
+**Requirements:**
+
+- 8+ years of product design experience shipping high-quality products
+- Track record of driving design direction, ideally on 0-to-1 products
+- Exceptional visual and interaction design, with a strong portfolio
+- Strong product sense and strategic thinking
+- High AI fluency
+- Experience building and scaling design systems
+- Systems thinking and the ability to influence through collaboration with engineering
+- Builder mentality, comfort with ambiguity, balance of speed and quality
+- Excellent communication, low ego, team-first
+- High proficiency in Figma and prototyping
+- High-level English
